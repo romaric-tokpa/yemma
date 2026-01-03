@@ -1,0 +1,426 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # INFRASTRUCTURE - Bases de données
+  # ============================================
+  
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-auth
+    environment:
+      POSTGRES_USER: ${DB_AUTH_USER:-auth_user}
+      POSTGRES_PASSWORD: ${DB_AUTH_PASSWORD:-auth_password}
+      POSTGRES_DB: ${DB_AUTH_NAME:-auth_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    networks:
+      - auth-network
+    ports:
+      - "${DB_AUTH_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_AUTH_USER:-auth_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-candidate:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-candidate
+    environment:
+      POSTGRES_USER: ${DB_CANDIDATE_USER:-candidate_user}
+      POSTGRES_PASSWORD: ${DB_CANDIDATE_PASSWORD:-candidate_password}
+      POSTGRES_DB: ${DB_CANDIDATE_NAME:-candidate_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_candidate_data:/var/lib/postgresql/data
+    networks:
+      - candidate-network
+    ports:
+      - "${DB_CANDIDATE_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_CANDIDATE_USER:-candidate_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-admin:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-admin
+    environment:
+      POSTGRES_USER: ${DB_ADMIN_USER:-admin_user}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-admin_password}
+      POSTGRES_DB: ${DB_ADMIN_NAME:-admin_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_admin_data:/var/lib/postgresql/data
+    networks:
+      - admin-network
+    ports:
+      - "${DB_ADMIN_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_ADMIN_USER:-admin_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # INFRASTRUCTURE - Message Broker
+  # ============================================
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: yemma-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbitmq_password}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-yemma}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - messaging-network
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"      # AMQP port
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"  # Management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # INFRASTRUCTURE - Object Storage
+  # ============================================
+
+  minio:
+    image: minio/minio:latest
+    container_name: yemma-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    networks:
+      - storage-network
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"      # API port
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"  # Console UI
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  # ============================================
+  # MICROSERVICES - Auth Service
+  # ============================================
+
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    container_name: yemma-auth-service
+    environment:
+      # Application
+      APP_NAME: auth-service
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      
+      # Database
+      DB_HOST: postgres-auth
+      DB_PORT: 5432
+      DB_USER: ${DB_AUTH_USER:-auth_user}
+      DB_PASSWORD: ${DB_AUTH_PASSWORD:-auth_password}
+      DB_NAME: ${DB_AUTH_NAME:-auth_db}
+      DATABASE_URL: postgresql://${DB_AUTH_USER:-auth_user}:${DB_AUTH_PASSWORD:-auth_password}@postgres-auth:5432/${DB_AUTH_NAME:-auth_db}
+      
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      
+      # OAuth2
+      OAUTH2_SECRET_KEY: ${OAUTH2_SECRET_KEY:-your-oauth2-secret-key}
+      
+      # Password Hashing
+      PASSWORD_HASH_ALGORITHM: ${PASSWORD_HASH_ALGORITHM:-bcrypt}
+      
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbitmq_password}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-yemma}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq_password}@rabbitmq:5672/${RABBITMQ_VHOST:-yemma}
+    volumes:
+      - ../services/auth-service:/app
+      - /app/__pycache__
+    networks:
+      - auth-network
+      - messaging-network
+    ports:
+      - "${AUTH_SERVICE_PORT:-8001}:8000"
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ============================================
+  # MICROSERVICES - Candidate Service
+  # ============================================
+
+  candidate-service:
+    build:
+      context: ../services/candidate-service
+      dockerfile: Dockerfile
+    container_name: yemma-candidate-service
+    environment:
+      # Application
+      APP_NAME: candidate-service
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      
+      # Database
+      DB_HOST: postgres-candidate
+      DB_PORT: 5432
+      DB_USER: ${DB_CANDIDATE_USER:-candidate_user}
+      DB_PASSWORD: ${DB_CANDIDATE_PASSWORD:-candidate_password}
+      DB_NAME: ${DB_CANDIDATE_NAME:-candidate_db}
+      DATABASE_URL: postgresql://${DB_CANDIDATE_USER:-candidate_user}:${DB_CANDIDATE_PASSWORD:-candidate_password}@postgres-candidate:5432/${DB_CANDIDATE_NAME:-candidate_db}
+      
+      # JWT Validation
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      AUTH_SERVICE_URL: http://auth-service:8000
+      
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbitmq_password}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-yemma}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq_password}@rabbitmq:5672/${RABBITMQ_VHOST:-yemma}
+    volumes:
+      - ../services/candidate-service:/app
+      - /app/__pycache__
+    networks:
+      - candidate-network
+      - messaging-network
+    ports:
+      - "${CANDIDATE_SERVICE_PORT:-8002}:8000"
+    depends_on:
+      postgres-candidate:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ============================================
+  # MICROSERVICES - Admin Service
+  # ============================================
+
+  admin-service:
+    build:
+      context: ../services/admin-service
+      dockerfile: Dockerfile
+    container_name: yemma-admin-service
+    environment:
+      # Application
+      APP_NAME: admin-service
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      
+      # Database
+      DB_HOST: postgres-admin
+      DB_PORT: 5432
+      DB_USER: ${DB_ADMIN_USER:-admin_user}
+      DB_PASSWORD: ${DB_ADMIN_PASSWORD:-admin_password}
+      DB_NAME: ${DB_ADMIN_NAME:-admin_db}
+      DATABASE_URL: postgresql://${DB_ADMIN_USER:-admin_user}:${DB_ADMIN_PASSWORD:-admin_password}@postgres-admin:5432/${DB_ADMIN_NAME:-admin_db}
+      
+      # JWT Validation
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      AUTH_SERVICE_URL: http://auth-service:8000
+      
+      # Service URLs
+      CANDIDATE_SERVICE_URL: http://candidate-service:8000
+      DOCUMENT_SERVICE_URL: http://document-service:8000
+      
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbitmq_password}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-yemma}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq_password}@rabbitmq:5672/${RABBITMQ_VHOST:-yemma}
+    volumes:
+      - ../services/admin-service:/app
+      - /app/__pycache__
+    networks:
+      - admin-network
+      - messaging-network
+      - candidate-network
+      - storage-network
+    ports:
+      - "${ADMIN_SERVICE_PORT:-8003}:8000"
+    depends_on:
+      postgres-admin:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      candidate-service:
+        condition: service_healthy
+      document-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ============================================
+  # MICROSERVICES - Document Service
+  # ============================================
+
+  document-service:
+    build:
+      context: ../services/document-service
+      dockerfile: Dockerfile
+    container_name: yemma-document-service
+    environment:
+      # Application
+      APP_NAME: document-service
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      
+      # MinIO / S3
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-documents}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_USE_SSL: ${S3_USE_SSL:-false}
+      
+      # File Upload
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}  # 10MB in bytes
+      ALLOWED_EXTENSIONS: ${ALLOWED_EXTENSIONS:-pdf,jpg,jpeg,png,doc,docx}
+      
+      # Encryption
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-chars-long}
+      
+      # Antivirus (optional - ClamAV)
+      ENABLE_ANTIVIRUS: ${ENABLE_ANTIVIRUS:-false}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      
+      # JWT Validation
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      AUTH_SERVICE_URL: http://auth-service:8000
+      
+      # Temporary Links
+      TEMP_LINK_EXPIRE_HOURS: ${TEMP_LINK_EXPIRE_HOURS:-24}
+      
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbitmq_password}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-yemma}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbitmq}:${RABBITMQ_PASSWORD:-rabbitmq_password}@rabbitmq:5672/${RABBITMQ_VHOST:-yemma}
+    volumes:
+      - ../services/document-service:/app
+      - /app/__pycache__
+      - document_temp:/tmp/uploads
+    networks:
+      - storage-network
+      - messaging-network
+    ports:
+      - "${DOCUMENT_SERVICE_PORT:-8004}:8000"
+    depends_on:
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+# ============================================
+# NETWORKS - Isolation des services
+# ============================================
+
+networks:
+  auth-network:
+    name: yemma-auth-network
+    driver: bridge
+  candidate-network:
+    name: yemma-candidate-network
+    driver: bridge
+  admin-network:
+    name: yemma-admin-network
+    driver: bridge
+  storage-network:
+    name: yemma-storage-network
+    driver: bridge
+  messaging-network:
+    name: yemma-messaging-network
+    driver: bridge
+
+# ============================================
+# VOLUMES - Persistance des données
+# ============================================
+
+volumes:
+  postgres_auth_data:
+    name: yemma-postgres-auth-data
+  postgres_candidate_data:
+    name: yemma-postgres-candidate-data
+  postgres_admin_data:
+    name: yemma-postgres-admin-data
+  rabbitmq_data:
+    name: yemma-rabbitmq-data
+  minio_data:
+    name: yemma-minio-data
+  document_temp:
+    name: yemma-document-temp
+

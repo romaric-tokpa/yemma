@@ -1,0 +1,275 @@
+"""
+Endpoints d'authentification
+"""
+from datetime import datetime, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain.schemas import (
+    LoginRequest,
+    RegisterRequest,
+    Token,
+    RefreshTokenRequest,
+    PasswordResetRequest,
+    PasswordResetConfirm,
+    PasswordChange,
+)
+from app.domain.models import User, UserRoleLink, RefreshToken
+from app.domain.exceptions import InvalidCredentialsError, UserNotFoundError
+from app.infrastructure.database import get_session
+from app.infrastructure.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    get_token_data,
+    get_current_user,
+)
+from app.infrastructure.repositories import (
+    UserRepository,
+    RoleRepository,
+    RefreshTokenRepository,
+)
+from app.core.config import settings
+
+router = APIRouter()
+
+
+@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+async def register(
+    request: RegisterRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """Inscription d'un nouvel utilisateur"""
+    user_repo = UserRepository(session)
+    role_repo = RoleRepository(session)
+    
+    # Vérifier si l'utilisateur existe déjà
+    existing_user = await user_repo.get_by_email(request.email)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with this email already exists"
+        )
+    
+    # Créer l'utilisateur
+    hashed_password = hash_password(request.password)
+    user = User(
+        email=request.email,
+        hashed_password=hashed_password,
+        first_name=request.first_name,
+        last_name=request.last_name,
+    )
+    user = await user_repo.create(user)
+    
+    # Assigner le rôle
+    role = await role_repo.get_or_create(request.role)
+    user_role = UserRoleLink(user_id=user.id, role_id=role.id)
+    session.add(user_role)
+    await session.commit()
+    
+    # Créer les tokens
+    token_data = {
+        "sub": user.id,
+        "email": user.email,
+        "roles": [role.name],
+    }
+    access_token = create_access_token(token_data)
+    refresh_token_str = create_refresh_token(token_data)
+    
+    # Sauvegarder le refresh token
+    refresh_token_repo = RefreshTokenRepository(session)
+    refresh_token = RefreshToken(
+        user_id=user.id,
+        token=refresh_token_str,
+        expires_at=datetime.utcnow() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+    await refresh_token_repo.create(refresh_token)
+    
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token_str,
+        expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+@router.post("/login", response_model=Token)
+async def login(
+    request: LoginRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """Connexion d'un utilisateur"""
+    user_repo = UserRepository(session)
+    role_repo = RoleRepository(session)
+    refresh_token_repo = RefreshTokenRepository(session)
+    
+    # Récupérer l'utilisateur
+    user = await user_repo.get_by_email(request.email)
+    if not user:
+        raise InvalidCredentialsError()
+    
+    # Vérifier le mot de passe
+    if not verify_password(request.password, user.hashed_password):
+        raise InvalidCredentialsError()
+    
+    # Vérifier le statut
+    if user.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is not active"
+        )
+    
+    # Récupérer les rôles
+    roles = await user_repo.get_user_roles(user.id)
+    role_names = [role.name for role in roles]
+    
+    # Mettre à jour la dernière connexion
+    user.last_login = datetime.utcnow()
+    await user_repo.update(user)
+    
+    # Créer les tokens
+    token_data = {
+        "sub": user.id,
+        "email": user.email,
+        "roles": role_names,
+    }
+    access_token = create_access_token(token_data)
+    refresh_token_str = create_refresh_token(token_data)
+    
+    # Sauvegarder le refresh token
+    refresh_token = RefreshToken(
+        user_id=user.id,
+        token=refresh_token_str,
+        expires_at=datetime.utcnow() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+    await refresh_token_repo.create(refresh_token)
+    
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token_str,
+        expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    request: RefreshTokenRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """Rafraîchit un access token"""
+    refresh_token_repo = RefreshTokenRepository(session)
+    user_repo = UserRepository(session)
+    
+    # Vérifier le refresh token
+    stored_token = await refresh_token_repo.get_by_token(request.refresh_token)
+    if not stored_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+    
+    # Vérifier l'expiration
+    if stored_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired"
+        )
+    
+    # Décoder le token
+    try:
+        token_data = get_token_data(request.refresh_token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+    
+    # Récupérer l'utilisateur et ses rôles
+    user = await user_repo.get_by_id(token_data.user_id)
+    if not user:
+        raise UserNotFoundError(str(token_data.user_id))
+    
+    roles = await user_repo.get_user_roles(user.id)
+    role_names = [role.name for role in roles]
+    
+    # Créer un nouveau access token
+    new_token_data = {
+        "sub": user.id,
+        "email": user.email,
+        "roles": role_names,
+    }
+    access_token = create_access_token(new_token_data)
+    
+    return Token(
+        access_token=access_token,
+        refresh_token=request.refresh_token,  # Le refresh token reste le même
+        expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+@router.post("/logout")
+async def logout(
+    current_user = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Déconnexion (révoque le refresh token)"""
+    refresh_token_repo = RefreshTokenRepository(session)
+    # Note: Dans une implémentation complète, on devrait révoquer le token spécifique
+    # Pour l'instant, on retourne juste un succès
+    return {"message": "Logged out successfully"}
+
+
+@router.post("/password-reset")
+async def password_reset(
+    request: PasswordResetRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """Demande de réinitialisation de mot de passe"""
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_email(request.email)
+    
+    if user:
+        # Générer un token de réinitialisation
+        # TODO: Implémenter l'envoi d'email avec le token
+        pass
+    
+    # Toujours retourner succès pour ne pas révéler si l'email existe
+    return {"message": "If the email exists, a password reset link has been sent"}
+
+
+@router.post("/password-reset/confirm")
+async def password_reset_confirm(
+    request: PasswordResetConfirm,
+    session: AsyncSession = Depends(get_session)
+):
+    """Confirme la réinitialisation de mot de passe"""
+    # TODO: Implémenter la validation du token et le changement de mot de passe
+    return {"message": "Password reset confirmed"}
+
+
+@router.post("/change-password")
+async def change_password(
+    request: PasswordChange,
+    current_user = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Change le mot de passe de l'utilisateur connecté"""
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_id(current_user.user_id)
+    
+    if not user:
+        raise UserNotFoundError(str(current_user.user_id))
+    
+    # Vérifier le mot de passe actuel
+    if not verify_password(request.current_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Mettre à jour le mot de passe
+    user.hashed_password = hash_password(request.new_password)
+    await user_repo.update(user)
+    
+    return {"message": "Password changed successfully"}
+

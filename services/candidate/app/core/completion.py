@@ -1,0 +1,453 @@
+"""
+Logique de calcul du pourcentage de complétion du profil
+Algorithme pondéré : les sections obligatoires (Identité, CV, Expériences) pèsent plus lourd
+"""
+from typing import Optional
+from app.domain.models import Profile, Experience, Education, Certification, Skill, JobPreference
+
+
+def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> float:
+    """
+    Calcule le pourcentage de complétion du profil candidat avec algorithme pondéré
+    
+    Algorithme complexe de complétion :
+    - Identité : 20%
+    - Expériences : 30%
+    - Formations : 15%
+    - CV PDF : 25%
+    - Préférences : 10%
+    
+    Total: 100%
+    
+    Args:
+        profile: Le profil à évaluer
+        has_cv: True si un CV PDF a été uploadé (vérifié via service Document)
+    
+    Returns:
+        float: Pourcentage de complétion (0-100)
+    """
+    total_percentage = 0.0
+    
+    # ============================================
+    # 1. IDENTITÉ : 20%
+    # ============================================
+    identity_points = 0
+    identity_max = 0
+    
+    # Champs obligatoires d'identité
+    if profile.first_name:
+        identity_points += 1
+    identity_max += 1
+    
+    if profile.last_name:
+        identity_points += 1
+    identity_max += 1
+    
+    if profile.email:
+        identity_points += 1
+    identity_max += 1
+    
+    if profile.date_of_birth:
+        identity_points += 1
+    identity_max += 1
+    
+    if profile.nationality:
+        identity_points += 1
+    identity_max += 1
+    
+    if profile.phone:
+        identity_points += 1
+    identity_max += 1
+    
+    # Adresse complète
+    if profile.address:
+        identity_points += 0.5
+    identity_max += 0.5
+    
+    if profile.city:
+        identity_points += 0.5
+    identity_max += 0.5
+    
+    if profile.country:
+        identity_points += 0.5
+    identity_max += 0.5
+    
+    # Profil professionnel (partie identité)
+    if profile.profile_title:
+        identity_points += 1.5
+    identity_max += 1.5
+    
+    if profile.professional_summary:
+        # Résumé professionnel : minimum 300 caractères pour être considéré complet
+        if len(profile.professional_summary) >= 300:
+            identity_points += 2
+        elif len(profile.professional_summary) >= 150:
+            identity_points += 1
+        identity_max += 2
+    
+    if profile.sector:
+        identity_points += 1
+    identity_max += 1
+    
+    if profile.main_job:
+        identity_points += 1
+    identity_max += 1
+    
+    if profile.total_experience is not None and profile.total_experience >= 0:
+        identity_points += 1
+    identity_max += 1
+    
+    # Consentements (nécessaires pour l'identité complète)
+    if profile.accept_cgu:
+        identity_points += 0.5
+    identity_max += 0.5
+    
+    if profile.accept_rgpd:
+        identity_points += 0.5
+    identity_max += 0.5
+    
+    if profile.accept_verification:
+        identity_points += 0.5
+    identity_max += 0.5
+    
+    # Calcul du pourcentage pour l'identité
+    if identity_max > 0:
+        identity_percentage = (identity_points / identity_max) * 20.0
+        total_percentage += identity_percentage
+    
+    # ============================================
+    # 2. EXPÉRIENCES : 30% (minimum 1 avec document)
+    # ============================================
+    if profile.experiences and len(profile.experiences) > 0:
+        complete_experiences = 0
+        experiences_with_doc = 0
+        
+        for exp in profile.experiences:
+            # Une expérience est complète si elle a au minimum :
+            # - Nom de l'entreprise
+            # - Poste
+            # - Date de début
+            # - Date de fin OU is_current = True
+            is_complete = (
+                exp.company_name and
+                exp.position and
+                exp.start_date and
+                (exp.end_date or exp.is_current)
+            )
+            
+            if is_complete:
+                complete_experiences += 1
+                # Compter les expériences avec document justificatif
+                if exp.has_document or exp.document_id:
+                    experiences_with_doc += 1
+        
+        if complete_experiences > 0:
+            # Score basé sur le nombre d'expériences complètes
+            # - 1 expérience complète = 50% de la section (15% du total)
+            # - 2 expériences complètes = 75% de la section (22.5% du total)
+            # - 3+ expériences complètes = 100% de la section (30% du total)
+            if complete_experiences >= 3:
+                exp_score = 1.0
+            elif complete_experiences == 2:
+                exp_score = 0.75
+            elif complete_experiences == 1:
+                exp_score = 0.5
+            else:
+                exp_score = 0.0
+            
+            # Bonus si au moins 1 expérience a un document justificatif
+            if experiences_with_doc >= 1:
+                # Bonus de 10% si au moins 1 expérience a un document
+                exp_score = min(exp_score + 0.1, 1.0)
+            
+            # Bonus pour expériences avec description détaillée
+            detailed_experiences = sum(
+                1 for exp in profile.experiences
+                if exp.description and len(exp.description) >= 100
+            )
+            if detailed_experiences > 0 and complete_experiences >= 2:
+                # Bonus de 5% si au moins 2 expériences ont une description détaillée
+                exp_score = min(exp_score + 0.05, 1.0)
+            
+            total_percentage += exp_score * 30.0
+    # Si pas d'expériences, 0% pour cette section
+    
+    # ============================================
+    # 3. FORMATIONS : 15%
+    # ============================================
+    if profile.educations and len(profile.educations) > 0:
+        complete_educations = 0
+        total_educations = len(profile.educations)
+        
+        for edu in profile.educations:
+            # Une formation est complète si elle a :
+            # - Diplôme
+            # - Institution
+            # - Année d'obtention
+            # - Niveau
+            is_complete = (
+                edu.diploma and
+                edu.institution and
+                edu.graduation_year and
+                edu.level
+            )
+            
+            if is_complete:
+                complete_educations += 1
+        
+        if complete_educations > 0:
+            # Score basé sur le nombre de formations complètes
+            # - 1 formation complète = 60% de la section (9% du total)
+            # - 2+ formations complètes = 100% de la section (15% du total)
+            if complete_educations >= 2:
+                edu_score = 1.0
+            elif complete_educations == 1:
+                edu_score = 0.6
+            else:
+                edu_score = 0.0
+            
+            total_percentage += edu_score * 15.0
+    # Si pas de formations, 0% pour cette section
+    
+    # ============================================
+    # 4. CV PDF : 25%
+    # ============================================
+    if has_cv:
+        # Si un CV PDF existe, la section est complète à 100%
+        total_percentage += 25.0
+    # Si pas de CV, 0% pour cette section
+    
+    # ============================================
+    # 5. PRÉFÉRENCES : 10%
+    # ============================================
+    if profile.job_preferences:
+        pref_points = 0
+        pref_max = 0
+        
+        # Champs obligatoires
+        if profile.job_preferences.contract_type:
+            pref_points += 2
+        pref_max += 2
+        
+        if profile.job_preferences.desired_location:
+            pref_points += 2
+        pref_max += 2
+        
+        if profile.job_preferences.availability:
+            pref_points += 2
+        pref_max += 2
+        
+        if profile.job_preferences.salary_expectations is not None:
+            pref_points += 2
+        pref_max += 2
+        
+        # Champs optionnels (bonus)
+        if profile.job_preferences.desired_positions and len(profile.job_preferences.desired_positions) > 0:
+            pref_points += 1
+        pref_max += 1
+        
+        if profile.job_preferences.target_sectors and len(profile.job_preferences.target_sectors) > 0:
+            pref_points += 1
+        pref_max += 1
+        
+        if profile.job_preferences.mobility:
+            pref_points += 0.5
+        pref_max += 0.5
+        
+        # Calcul du pourcentage pour les préférences
+        if pref_max > 0:
+            pref_percentage = (pref_points / pref_max) * 10.0
+            total_percentage += pref_percentage
+    # Si pas de préférences, 0% pour cette section
+    
+    # Retourner le pourcentage total (max 100%)
+    return min(round(total_percentage, 2), 100.0)
+
+
+def calculate_completion_score(profile: Profile, has_cv: bool = False) -> float:
+    """
+    Alias pour calculate_completion_percentage
+    
+    Calcule le score de complétion du profil (0-100)
+    
+    Args:
+        profile: Le profil à évaluer
+        has_cv: True si un CV PDF a été uploadé
+    
+    Returns:
+        float: Score de complétion (0-100)
+    """
+    return calculate_completion_percentage(profile, has_cv)
+
+
+async def check_cv_exists(profile_id: int) -> bool:
+    """
+    Vérifie si un CV PDF existe pour le profil via le service Document
+    
+    Args:
+        profile_id: ID du profil
+    
+    Returns:
+        True si un CV PDF existe, False sinon
+    """
+    try:
+        import httpx
+        import sys
+        import os
+        
+        # Ajouter le chemin du module shared au PYTHONPATH
+        shared_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+            "shared"
+        )
+        if shared_path not in sys.path:
+            sys.path.insert(0, shared_path)
+        
+        # Importer depuis /shared
+        import sys
+        import os
+        import importlib.util
+        shared_path = "/shared"
+        if shared_path not in sys.path:
+            sys.path.insert(0, shared_path)
+        internal_auth_path = os.path.join(shared_path, "internal_auth.py")
+        if os.path.exists(internal_auth_path):
+            spec = importlib.util.spec_from_file_location("shared.internal_auth", internal_auth_path)
+            if spec and spec.loader:
+                internal_auth_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(internal_auth_module)
+                get_service_token_header = internal_auth_module.get_service_token_header
+            else:
+                from shared.internal_auth import get_service_token_header
+        else:
+            from shared.internal_auth import get_service_token_header
+        from app.core.config import settings
+        
+        # Générer les headers avec le token de service
+        headers = get_service_token_header("candidate-service")
+        
+        # Appeler le service Document pour vérifier la présence d'un CV
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"{settings.DOCUMENT_SERVICE_URL}/api/v1/documents/candidate/{profile_id}",
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                documents = response.json()
+                # Vérifier s'il y a un document de type CV
+                return any(doc.get("document_type") == "CV" for doc in documents)
+    except Exception as e:
+        # En cas d'erreur, on considère qu'il n'y a pas de CV
+        print(f"Warning: Could not check CV existence: {str(e)}")
+        return False
+    
+    return False
+
+
+def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: float = 80.0) -> tuple:
+    """
+    Vérifie si un profil peut être soumis pour validation
+    
+    Selon le cahier des charges, le statut passe de DRAFT à SUBMITTED uniquement si :
+    - Le score de complétion est > 80%
+    - Un CV PDF est présent (obligatoire)
+    - Les champs obligatoires de l'Étape 7 (Préférences) sont remplis
+    - Au moins une expérience avec document justificatif
+    
+    Args:
+        profile: Le profil à vérifier
+        has_cv: True si un CV PDF a été uploadé (vérifié via service Document)
+        min_completion: Pourcentage minimum requis (défaut: 80%)
+    
+    Returns:
+        Tuple (can_submit: bool, reason: str)
+    """
+    completion = calculate_completion_percentage(profile, has_cv)
+    
+    if completion < min_completion:
+        return False, f"Le profil n'est pas suffisamment complet ({completion:.1f}% < {min_completion}%). Score requis: {min_completion}%"
+    
+    # Vérification obligatoire : CV PDF doit être présent
+    if not has_cv:
+        return False, "Un CV PDF est obligatoire pour soumettre le profil"
+    
+    # Vérifications obligatoires - Étape 0 (Consentements)
+    if not profile.accept_cgu or not profile.accept_rgpd or not profile.accept_verification:
+        return False, "Les consentements (CGU, RGPD, vérification) doivent être acceptés"
+    
+    # Vérifications obligatoires - Étape 1 (Identité/Profil général)
+    if not profile.first_name or not profile.last_name:
+        return False, "Le prénom et le nom sont obligatoires"
+    
+    if not profile.email:
+        return False, "L'email est obligatoire"
+    
+    if not profile.date_of_birth:
+        return False, "La date de naissance est obligatoire"
+    
+    if not profile.nationality:
+        return False, "La nationalité est obligatoire"
+    
+    if not profile.phone:
+        return False, "Le téléphone est obligatoire"
+    
+    if not profile.address or not profile.city or not profile.country:
+        return False, "L'adresse complète (adresse, ville, pays) est obligatoire"
+    
+    if not profile.profile_title:
+        return False, "Le titre du profil est obligatoire"
+    
+    if not profile.professional_summary or len(profile.professional_summary) < 300:
+        return False, "Le résumé professionnel (minimum 300 caractères) est obligatoire"
+    
+    if not profile.sector:
+        return False, "Le secteur d'activité est obligatoire"
+    
+    if not profile.main_job:
+        return False, "Le métier principal est obligatoire"
+    
+    if profile.total_experience is None:
+        return False, "Les années d'expérience totale sont obligatoires"
+    
+    # Vérifications obligatoires - Étape 2 (Expériences)
+    if not profile.experiences or len(profile.experiences) == 0:
+        return False, "Au moins une expérience professionnelle est requise"
+    
+    # Vérifier que les expériences sont complètes
+    has_experience_with_doc = False
+    for exp in profile.experiences:
+        if not exp.company_name or not exp.position or not exp.start_date:
+            return False, "Toutes les expériences doivent avoir au minimum : entreprise, poste et date de début"
+        if not exp.is_current and not exp.end_date:
+            return False, "Les expériences terminées doivent avoir une date de fin"
+        # Vérifier qu'au moins une expérience a un document
+        if exp.has_document or exp.document_id:
+            has_experience_with_doc = True
+    
+    # Au moins une expérience doit avoir un document justificatif
+    if not has_experience_with_doc:
+        return False, "Au moins une expérience professionnelle doit avoir un document justificatif"
+    
+    # Vérifications obligatoires - Étape 6 (CV PDF)
+    if not has_cv:
+        return False, "Un CV PDF est obligatoire (Étape 6)"
+    
+    # Vérifications obligatoires - Étape 7 (Préférences)
+    if not profile.job_preferences:
+        return False, "Les préférences de recherche d'emploi sont requises (Étape 7)"
+    
+    if not profile.job_preferences.contract_type:
+        return False, "Le type de contrat souhaité est obligatoire (Étape 7)"
+    
+    if not profile.job_preferences.desired_location:
+        return False, "La localisation souhaitée est obligatoire (Étape 7)"
+    
+    if not profile.job_preferences.availability:
+        return False, "La disponibilité est obligatoire (Étape 7)"
+    
+    if profile.job_preferences.salary_expectations is None:
+        return False, "Les prétentions salariales sont obligatoires (Étape 7)"
+    
+    return True, "Le profil peut être soumis"
+
