@@ -18,6 +18,7 @@ export default defineConfig({
     hmr: {
       clientPort: 3000,
       protocol: 'ws',
+      overlay: true, // Afficher l'overlay pour les erreurs réelles, mais ignorer les warnings HMR
     },
   },
 })
