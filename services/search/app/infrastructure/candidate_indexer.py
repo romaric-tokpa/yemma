@@ -83,9 +83,15 @@ def index_candidate(candidate_data: Dict[str, Any]) -> Dict[str, Any]:
         "status": candidate_data.get("status", "VALIDATED"),  # Par défaut VALIDATED
     }
     
-    # Ajouter des métadonnées optionnelles si présentes
+    # Ajouter candidate_id - toujours présent car c'est l'ID du profil dans la base de données
+    # Si candidate_id n'est pas fourni, cela indique un problème dans l'indexation
     if candidate_id is not None:
         document["candidate_id"] = candidate_id
+    else:
+        # Logger un avertissement si candidate_id n'est pas fourni
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"candidate_id is None in candidate_data: {candidate_data.keys()}")
     
     # Ajouter les éducations si présentes (nested)
     educations = candidate_data.get("educations", [])
@@ -100,7 +106,7 @@ def index_candidate(candidate_data: Dict[str, Any]) -> Dict[str, Any]:
     # Ajouter d'autres champs optionnels si présents
     optional_fields = [
         "email", "phone", "sector", "contract_type", "main_job",
-        "salary_expectations", "availability", "created_at", "updated_at", "admin_score"
+        "salary_expectations", "availability", "created_at", "updated_at", "admin_score", "admin_report"
     ]
     for field in optional_fields:
         if field in candidate_data:

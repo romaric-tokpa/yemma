@@ -39,7 +39,7 @@ class Notification(SQLModel, table=True):
     error_message: Optional[str] = Field(default=None, max_length=1000, description="Message d'erreur si échec")
     sent_at: Optional[datetime] = Field(default=None, description="Date d'envoi")
     template_data: Optional[str] = Field(default=None, description="Données du template JSON")
-    metadata: Optional[str] = Field(default=None, description="Métadonnées JSON")
+    notification_metadata: Optional[str] = Field(default=None, description="Métadonnées JSON", sa_column_kwargs={"name": "metadata"})
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)
 

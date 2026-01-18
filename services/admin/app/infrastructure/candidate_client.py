@@ -82,7 +82,45 @@ async def update_candidate_status(candidate_id: int, status: str, report_data: O
     }
     
     if report_data:
-        update_data["admin_report"] = report_data
+        # Récupérer le profil actuel pour obtenir l'historique existant
+        try:
+            current_profile = await get_candidate_profile(candidate_id)
+            current_admin_report = current_profile.get("admin_report") or {}
+            evaluation_history = current_admin_report.get("evaluation_history") or []
+        except Exception:
+            # Si on ne peut pas récupérer le profil, initialiser avec un historique vide
+            current_admin_report = {}
+            evaluation_history = []
+        
+        # Ajouter la nouvelle évaluation à l'historique
+        history_entry = {
+            "overall_score": report_data.get("overall_score"),
+            "technical_skills_rating": report_data.get("technical_skills_rating"),
+            "soft_skills_rating": report_data.get("soft_skills_rating"),
+            "communication_rating": report_data.get("communication_rating"),
+            "motivation_rating": report_data.get("motivation_rating"),
+            "soft_skills_tags": report_data.get("soft_skills_tags", []),
+            "interview_notes": report_data.get("interview_notes"),
+            "recommendations": report_data.get("recommendations"),
+            "summary": report_data.get("summary"),
+            "status": status,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        
+        # Ajouter l'entrée à l'historique (les plus récents en premier)
+        evaluation_history.insert(0, history_entry)
+        
+        # Limiter l'historique aux 10 dernières évaluations
+        evaluation_history = evaluation_history[:10]
+        
+        # Construire le nouveau admin_report avec l'historique
+        new_admin_report = {
+            **current_admin_report,  # Conserver les données existantes
+            **report_data,  # Mettre à jour avec les nouvelles données
+            "evaluation_history": evaluation_history,  # Ajouter l'historique
+        }
+        
+        update_data["admin_report"] = new_admin_report
         # Ajouter le score admin si disponible
         if "overall_score" in report_data:
             update_data["admin_score"] = report_data["overall_score"]

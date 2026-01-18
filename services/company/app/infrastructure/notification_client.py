@@ -46,6 +46,7 @@ if get_service_token_header is None:
     )
 
 from app.core.config import settings
+from app.core.exceptions import InvitationError
 
 
 async def send_invitation_notification(
@@ -54,7 +55,7 @@ async def send_invitation_notification(
     company_name: str,
     invitation_token: str,
     invitation_url: Optional[str] = None
-) -> bool:
+) -> None:
     """
     Envoie une notification d'invitation via le Service Notification
     
@@ -65,9 +66,12 @@ async def send_invitation_notification(
         invitation_token: Token d'invitation
         invitation_url: URL d'acceptation (optionnel)
     
-    Returns:
-        bool: True si la notification a été envoyée avec succès
+    Raises:
+        InvitationError: Si l'envoi de la notification échoue
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         headers = get_service_token_header("company-service")
         
@@ -87,11 +91,17 @@ async def send_invitation_notification(
                 headers=headers
             )
             response.raise_for_status()
-            return True
-    except httpx.HTTPError as e:
-        print(f"⚠️ Erreur lors de l'envoi de la notification d'invitation: {str(e)}")
-        return False
+            logger.info(f"Invitation notification sent successfully to {recipient_email}")
+    except httpx.HTTPStatusError as e:
+        error_msg = f"HTTP error {e.response.status_code}: {e.response.text}"
+        logger.error(f"⚠️ Erreur HTTP lors de l'envoi de la notification d'invitation: {error_msg}")
+        raise InvitationError(f"Erreur lors de l'envoi de l'invitation: {error_msg}")
+    except httpx.RequestError as e:
+        error_msg = f"Request error: {str(e)}"
+        logger.error(f"⚠️ Erreur de requête lors de l'envoi de la notification d'invitation: {error_msg}")
+        raise InvitationError(f"Erreur lors de l'envoi de l'invitation: Impossible de contacter le service de notification")
     except Exception as e:
-        print(f"⚠️ Erreur inattendue lors de l'envoi de la notification: {str(e)}")
-        return False
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(f"⚠️ Erreur inattendue lors de l'envoi de la notification: {error_msg}")
+        raise InvitationError(f"Erreur lors de l'envoi de l'invitation: {str(e)}")
 

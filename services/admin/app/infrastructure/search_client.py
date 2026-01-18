@@ -124,7 +124,9 @@ async def index_candidate_in_search(candidate_id: int, profile_data: Dict[str, A
             "status": "VALIDATED",  # Seuls les candidats validés sont indexés
             "main_job": profile_data.get("main_job", ""),
             "sector": profile_data.get("sector", ""),
-            "admin_score": profile_data.get("admin_score"),
+            # Extraire admin_score depuis admin_report.overall_score ou directement depuis admin_score
+            "admin_score": profile_data.get("admin_score") or (profile_data.get("admin_report", {}) or {}).get("overall_score") if isinstance(profile_data.get("admin_report"), dict) else profile_data.get("admin_score"),
+            "admin_report": profile_data.get("admin_report"),  # Rapport admin complet si disponible
             "photo_url": profile_data.get("photo_url"),  # Photo de profil du candidat
             "availability": availability,  # Disponibilité du candidat
         }

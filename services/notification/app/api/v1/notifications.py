@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
 from app.domain.schemas import (
-    NotificationCreate,
     NotificationResponse,
     SendNotificationRequest,
 )

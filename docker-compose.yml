@@ -607,15 +607,15 @@ services:
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
       
       # Email Provider
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-fastapi_mail}
       
       # SMTP
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USER: ${SMTP_USER:-noreply.yemma@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-mszr byaj gzmp scfq}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@yemma.com}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply.yemma@gmail.com}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Yemma Solutions}
       
       # SendGrid
@@ -640,23 +640,26 @@ services:
       # Frontend
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       
-      # CORS
+      # CORS (format string séparée par virgules)
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      
+      # Server Port
+      PORT: ${NOTIFICATION_PORT:-8000}
     volumes:
       - ./services/notification:/app
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${NOTIFICATION_PORT:-8007}:8000"
+    # Port exposé pour le développement (accès direct)
+    ports:
+      - "${NOTIFICATION_PORT:-8007}:8000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:$$PORT/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

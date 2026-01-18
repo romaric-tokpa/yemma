@@ -203,6 +203,14 @@ async def get_candidate_profile(
     - La décrémentation du quota
     """
     try:
+        # Valider que candidate_id est valide
+        if not candidate_id or candidate_id <= 0:
+            logger.warning(f"Invalid candidate_id: {candidate_id}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid candidate ID"
+            )
+        
         # Récupérer company_id depuis current_user
         company_id = getattr(current_user, 'company_id', None)
         

@@ -1,6 +1,7 @@
 """
 Endpoints de recherche
 """
+import logging
 from typing import List
 from fastapi import APIRouter, Query, Depends
 from app.domain.schemas import (
@@ -15,6 +16,7 @@ from app.infrastructure.elasticsearch import es_client
 from app.infrastructure.search_builder import SearchQueryBuilder
 from app.infrastructure.post_search_builder import PostSearchQueryBuilder
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -198,8 +200,15 @@ async def post_search_candidates(request: PostSearchRequest):
         main_job = source.get("main_job", "")
         summary = source.get("summary", "")
         
+        # Extraire candidate_id - utiliser l'ID du document Elasticsearch si candidate_id n'est pas présent
+        candidate_id = source.get("candidate_id")
+        if not candidate_id:
+            # Si candidate_id n'est pas dans le document, utiliser l'ID du document Elasticsearch
+            candidate_id = int(hit.get("_id", 0))
+            logger.warning(f"candidate_id missing in document, using Elasticsearch document ID: {candidate_id}")
+        
         results.append(PostSearchResult(
-            candidate_id=source.get("candidate_id", 0),
+            candidate_id=candidate_id,
             full_name=full_name,
             title=title,
             main_job=main_job,
@@ -213,6 +222,8 @@ async def post_search_candidates(request: PostSearchRequest):
             skills=skills,
             is_verified=source.get("is_verified", False),
             photo_url=source.get("photo_url"),
+            admin_score=source.get("admin_score"),  # Score admin d'évaluation
+            admin_report=source.get("admin_report"),  # Rapport admin complet si disponible
             score=hit.get("_score"),
         ))
     

@@ -113,6 +113,8 @@ class PostSearchResult(BaseModel):
     skills: List[Dict[str, str]] = []
     is_verified: bool
     photo_url: Optional[str] = None  # Photo de profil du candidat
+    admin_score: Optional[float] = None  # Score d'évaluation admin
+    admin_report: Optional[Dict[str, Any]] = None  # Rapport d'évaluation admin complet
     score: Optional[float] = None
 
 

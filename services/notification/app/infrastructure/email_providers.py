@@ -14,14 +14,15 @@ class FastAPIMailProvider:
     """Provider FastAPI-Mail pour l'envoi d'emails"""
     
     def __init__(self):
+        # Format MAIL_FROM: "Name <email@example.com>" ou simplement l'email
+        mail_from = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>" if settings.SMTP_FROM_NAME else settings.SMTP_FROM_EMAIL
+        
         self.config = ConnectionConfig(
             MAIL_USERNAME=settings.SMTP_USER,
             MAIL_PASSWORD=settings.SMTP_PASSWORD,
-            MAIL_FROM=settings.SMTP_FROM_EMAIL,
-            MAIL_FROM_NAME=settings.SMTP_FROM_NAME,
+            MAIL_FROM=mail_from,
             MAIL_PORT=settings.SMTP_PORT,
             MAIL_SERVER=settings.SMTP_HOST,
-            MAIL_FROM_NAME=settings.SMTP_FROM_NAME,
             MAIL_STARTTLS=settings.SMTP_USE_TLS,
             MAIL_SSL_TLS=False,
             USE_CREDENTIALS=True,
