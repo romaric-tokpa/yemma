@@ -6,7 +6,10 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.domain.models import Company, Recruiter
+from app.domain.models import Company, TeamMember
+
+# Alias pour compatibilité
+Recruiter = TeamMember
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, TokenData
 from app.core.exceptions import PermissionDeniedError, CompanyNotFoundError
@@ -44,22 +47,22 @@ async def require_recruiter_access(
     company_id: Optional[int] = None,
     current_user: TokenData = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
-) -> Recruiter:
+) -> TeamMember:
     """
     Dependency qui vérifie que l'utilisateur est recruteur (ou admin) de l'entreprise
     Retourne le Recruiter si trouvé
     """
     # Vérifier si l'utilisateur est SUPER_ADMIN (accès total)
     if "ROLE_SUPER_ADMIN" in current_user.roles:
-        # Pour un super admin, on peut créer un Recruiter factice
+        # Pour un super admin, on peut créer un TeamMember factice
         # ou retourner None si company_id n'est pas fourni
         if company_id:
             statement = select(Company).where(Company.id == company_id)
             result = await session.execute(statement)
             company = result.scalar_one_or_none()
             if company:
-                # Créer un objet Recruiter factice pour le super admin
-                return Recruiter(
+                # Créer un objet TeamMember factice pour le super admin
+                return TeamMember(
                     id=0,
                     user_id=current_user.user_id,
                     company_id=company_id,
@@ -67,15 +70,15 @@ async def require_recruiter_access(
                 )
         return None
     
-    # Récupérer le recruteur
-    statement = select(Recruiter).where(
-        Recruiter.user_id == current_user.user_id,
-        Recruiter.deleted_at.is_(None),
-        Recruiter.status == "active"
+    # Récupérer le membre d'équipe
+    statement = select(TeamMember).where(
+        TeamMember.user_id == current_user.user_id,
+        TeamMember.deleted_at.is_(None),
+        TeamMember.status == "active"
     )
     
     if company_id:
-        statement = statement.where(Recruiter.company_id == company_id)
+        statement = statement.where(TeamMember.company_id == company_id)
     
     result = await session.execute(statement)
     recruiter = result.scalar_one_or_none()

@@ -1,6 +1,7 @@
 """
 Endpoints de gestion des entreprises
 """
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,14 +12,16 @@ from app.domain.schemas import (
     CompanyUpdate,
     CompanyResponse,
     CompanyDetailResponse,
+    RecruiterResponse,
 )
-from app.domain.models import Company, Recruiter
-from app.domain.exceptions import CompanyNotFoundError
+from app.domain.models import Company, TeamMember
+from app.core.exceptions import CompanyNotFoundError
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, TokenData
 from app.infrastructure.permissions import require_company_admin, require_company_master
-from app.infrastructure.repositories import CompanyRepository, RecruiterRepository
+from app.infrastructure.repositories import CompanyRepository, TeamMemberRepository
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -85,23 +88,23 @@ async def get_company(
     is_super_admin = "ROLE_SUPER_ADMIN" in current_user.roles
     
     if not is_admin and not is_super_admin:
-        # Vérifier si l'utilisateur est recruteur de cette entreprise
-        recruiter_repo = RecruiterRepository(session)
-        recruiter = await recruiter_repo.get_by_user_id(current_user.user_id)
-        if not recruiter or recruiter.company_id != company_id:
+        # Vérifier si l'utilisateur est membre de cette entreprise
+        team_member_repo = TeamMemberRepository(session)
+        team_member = await team_member_repo.get_by_user_id(current_user.user_id)
+        if not team_member or team_member.company_id != company_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have access to this company"
             )
     
-    # Compter les recruteurs
-    recruiter_repo = RecruiterRepository(session)
-    recruiters = await recruiter_repo.get_by_company_id(company_id)
-    active_recruiters = [r for r in recruiters if r.status == "active"]
+    # Compter les membres d'équipe
+    team_member_repo = TeamMemberRepository(session)
+    team_members = await team_member_repo.get_by_company_id(company_id)
+    active_team_members = [m for m in team_members if m.status == "active"]
     
     response = CompanyDetailResponse.model_validate(company)
-    response.recruiters_count = len(recruiters)
-    response.active_recruiters_count = len(active_recruiters)
+    response.team_members_count = len(team_members)
+    response.active_team_members_count = len(active_team_members)
     
     return response
 
@@ -125,6 +128,8 @@ async def update_company(
     # Mettre à jour les champs
     if company_data.name is not None:
         company.name = company_data.name
+    if company_data.adresse is not None:
+        company.adresse = company_data.adresse
     if company_data.logo_url is not None:
         company.logo_url = company_data.logo_url
     if company_data.status is not None:
@@ -142,14 +147,50 @@ async def get_my_company(
     """
     Récupère l'entreprise de l'utilisateur connecté
     """
-    repo = CompanyRepository(session)
-    company = await repo.get_by_admin_id(current_user.user_id)
-    
-    if not company:
+    try:
+        logger.info(f"get_my_company called for user_id={current_user.user_id}, email={current_user.email}")
+        repo = CompanyRepository(session)
+        company = await repo.get_by_admin_id(current_user.user_id)
+        
+        if not company:
+            logger.info(f"No company found for user_id={current_user.user_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="You don't have a company"
+            )
+        
+        logger.info(f"Company found: id={company.id}, name={company.name}")
+        return CompanyResponse.model_validate(company)
+    except HTTPException:
+        # Re-raise HTTP exceptions (comme 404)
+        raise
+    except Exception as e:
+        # Logger l'erreur pour le débogage
+        logger.error(f"Error in get_my_company for user_id={current_user.user_id}: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You don't have a company"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
         )
+
+
+@router.get("/{company_id}/team-members", response_model=List[RecruiterResponse])
+async def get_company_team_members(
+    company_id: int,
+    current_user: TokenData = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Récupère tous les membres de l'équipe d'une entreprise
     
-    return CompanyResponse.model_validate(company)
+    Accessible par :
+    - L'admin de l'entreprise
+    - Les super admins
+    """
+    # Vérifier que l'utilisateur est admin de l'entreprise
+    await require_company_admin(company_id, current_user, session)
+    
+    team_member_repo = TeamMemberRepository(session)
+    team_members = await team_member_repo.get_by_company_id(company_id)
+    
+    return [RecruiterResponse.model_validate(tm) for tm in team_members]
 

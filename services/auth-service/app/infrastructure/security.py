@@ -72,7 +72,9 @@ def get_token_data(token: str) -> TokenData:
     """Extrait les données d'un token"""
     payload = decode_token(token)
     
-    user_id: int = payload.get("sub")
+    # sub est une chaîne (exigence de python-jose), on la convertit en int
+    sub_value = payload.get("sub")
+    user_id: int = int(sub_value) if sub_value else None
     email: str = payload.get("email")
     roles: list = payload.get("roles", [])
     

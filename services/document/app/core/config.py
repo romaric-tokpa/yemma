@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
 
     # S3 / MinIO
-    S3_ENDPOINT: str = Field(default="http://localhost:9000", description="S3 endpoint (MinIO)")
+    S3_ENDPOINT: str = Field(default="http://localhost:9000", description="S3 endpoint (MinIO) - interne Docker")
+    S3_PUBLIC_ENDPOINT: str = Field(default="http://localhost:9000", description="S3 endpoint public (accessible depuis le navigateur)")
     S3_ACCESS_KEY: str = Field(default="minioadmin", description="S3 access key")
     S3_SECRET_KEY: str = Field(default="minioadmin", description="S3 secret key")
     S3_BUCKET_NAME: str = Field(default="documents", description="S3 bucket name")
@@ -35,9 +36,9 @@ class Settings(BaseSettings):
 
     # File Upload
     MAX_FILE_SIZE: int = Field(default=10485760, description="Max file size in bytes (10MB)")
-    ALLOWED_EXTENSIONS: List[str] = Field(
-        default=["pdf", "jpg", "jpeg", "png"],
-        description="Allowed file extensions"
+    ALLOWED_EXTENSIONS: str = Field(
+        default="pdf,jpg,jpeg,png",
+        description="Allowed file extensions (comma-separated string)"
     )
     ALLOWED_MIME_TYPES: List[str] = Field(
         default=["application/pdf", "image/jpeg", "image/png"],
@@ -53,16 +54,25 @@ class Settings(BaseSettings):
     AUTH_SERVICE_URL: str = "http://localhost:8001"
 
     # CORS
-    CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
-        description="Allowed CORS origins"
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:8000,http://localhost",
+        description="Allowed CORS origins (comma-separated string)"
     )
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        # Parser personnalisé pour ALLOWED_EXTENSIONS (string séparée par virgules)
+        env_parse_none_str="",
     )
+    
+    @classmethod
+    def parse_allowed_extensions(cls, v):
+        """Parser pour convertir une string séparée par virgules en liste"""
+        if isinstance(v, str):
+            return [ext.strip() for ext in v.split(',') if ext.strip()]
+        return v if isinstance(v, list) else []
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -72,6 +82,20 @@ class Settings(BaseSettings):
                 f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
                 f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
             )
+    
+    @property
+    def allowed_extensions_list(self) -> List[str]:
+        """Retourne ALLOWED_EXTENSIONS comme une liste"""
+        if isinstance(self.ALLOWED_EXTENSIONS, str):
+            return [ext.strip() for ext in self.ALLOWED_EXTENSIONS.split(',') if ext.strip()]
+        return self.ALLOWED_EXTENSIONS if isinstance(self.ALLOWED_EXTENSIONS, list) else []
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Retourne CORS_ORIGINS comme une liste"""
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
+        return self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else []
 
 
 settings = Settings()

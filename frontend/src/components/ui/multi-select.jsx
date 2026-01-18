@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { X, Check, ChevronDown } from 'lucide-react'
 import { Button } from './button'
 import { Badge } from './badge'
-import { cn } from '../../lib/utils'
+import { cn } from '@/lib/utils'
 
 export function MultiSelect({ options, selected, onChange, placeholder = "Sélectionner...", className }) {
   const [isOpen, setIsOpen] = useState(false)

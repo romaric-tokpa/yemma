@@ -51,27 +51,47 @@ async def verify_internal_token(
     Raises:
         HTTPException: Si le token est manquant ou invalide
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Si pas de token de service, retourner None (l'endpoint utilisera l'auth utilisateur)
     if not x_service_token:
+        logger.debug("No X-Service-Token header found, returning None")
         return None
     
+    logger.info(f"Received X-Service-Token header (length: {len(x_service_token)}), X-Service-Name: {x_service_name}")
+    
     # Vérifier le token
-    payload = verify_service_token(x_service_token)
-    
-    if not payload:
+    try:
+        payload = verify_service_token(x_service_token)
+        
+        if not payload:
+            logger.warning(f"Token verification failed for service: {x_service_name}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired service token",
+                headers={"WWW-Authenticate": "Service"},
+            )
+        
+        logger.info(f"Token verified successfully for service: {payload.get('service')}")
+        
+        # Optionnel: vérifier que le nom du service correspond
+        if x_service_name and payload.get("service") != x_service_name:
+            logger.warning(f"Service name mismatch: expected {x_service_name}, got {payload.get('service')}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Service name mismatch",
+                headers={"WWW-Authenticate": "Service"},
+            )
+        
+        return payload
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying service token: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired service token",
+            detail=f"Error verifying service token: {str(e)}",
             headers={"WWW-Authenticate": "Service"},
         )
-    
-    # Optionnel: vérifier que le nom du service correspond
-    if x_service_name and payload.get("service") != x_service_name:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Service name mismatch",
-            headers={"WWW-Authenticate": "Service"},
-        )
-    
-    return payload
 

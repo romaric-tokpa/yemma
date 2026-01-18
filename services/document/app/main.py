@@ -1,6 +1,7 @@
 """
 Document Service - Point d'entrée principal
 """
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,6 +10,13 @@ from app.core.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.infrastructure.storage import init_storage
 from app.infrastructure.database import init_db
+
+# Configuration du logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Document Service",
@@ -21,7 +29,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -2,6 +2,7 @@
 Admin Service - Point d'entrée principal
 """
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import validation, stats
@@ -19,7 +20,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,12 +44,8 @@ async def health_check():
     }
 
 
-@app.get("/", tags=["Root"])
+@app.get("/", tags=["Root"], include_in_schema=False)
 async def root():
-    """Root endpoint"""
-    return {
-        "message": "Admin Service API",
-        "version": "1.0.0",
-        "docs": "/docs",
-    }
+    """Root endpoint - Redirige vers la documentation"""
+    return RedirectResponse(url="/docs")
 

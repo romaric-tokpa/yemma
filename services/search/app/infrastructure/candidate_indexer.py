@@ -71,6 +71,7 @@ def index_candidate(candidate_data: Dict[str, Any]) -> Dict[str, Any]:
             })
     
     # Construire le document ElasticSearch
+    # Le statut doit être VALIDATED car seuls les candidats validés sont indexés
     document = {
         "full_name": full_name,
         "title": title,
@@ -79,16 +80,27 @@ def index_candidate(candidate_data: Dict[str, Any]) -> Dict[str, Any]:
         "location": location,
         "is_verified": bool(is_verified),
         "summary": summary,
+        "status": candidate_data.get("status", "VALIDATED"),  # Par défaut VALIDATED
     }
     
     # Ajouter des métadonnées optionnelles si présentes
     if candidate_id is not None:
         document["candidate_id"] = candidate_id
     
+    # Ajouter les éducations si présentes (nested)
+    educations = candidate_data.get("educations", [])
+    if educations:
+        document["educations"] = educations
+    
+    # Ajouter les langues si présentes (nested)
+    languages = candidate_data.get("languages", [])
+    if languages:
+        document["languages"] = languages
+    
     # Ajouter d'autres champs optionnels si présents
     optional_fields = [
-        "email", "phone", "sector", "contract_type", 
-        "salary_expectations", "availability", "created_at", "updated_at"
+        "email", "phone", "sector", "contract_type", "main_job",
+        "salary_expectations", "availability", "created_at", "updated_at", "admin_score"
     ]
     for field in optional_fields:
         if field in candidate_data:
@@ -119,12 +131,12 @@ async def index_candidate_async(candidate_data: Dict[str, Any]) -> bool:
         # Générer un ID basé sur le nom si pas d'ID
         document_id = candidate_data.get("full_name", "").lower().replace(" ", "_")
     
-    # Indexer le document dans l'index "candidates"
+    # Indexer le document dans l'index configuré (certified_candidates par défaut)
     await es_client.connect()
     
     try:
         await es_client.client.index(
-            index="candidates",
+            index=es_client.index_name,  # Utiliser le nom d'index configuré au lieu de "candidates" en dur
             id=document_id,
             document=document
         )
@@ -155,7 +167,7 @@ async def bulk_index_candidates(candidates_data: List[Dict[str, Any]]) -> Dict[s
             document_id = candidate_data.get("full_name", "").lower().replace(" ", "_")
         
         action = {
-            "_index": "candidates",
+            "_index": es_client.index_name,  # Utiliser le nom d'index configuré au lieu de "candidates" en dur
             "_id": document_id,
             "_source": document
         }

@@ -38,7 +38,7 @@ class Document(SQLModel, table=True):
     mime_type: str = Field(max_length=100, description="Type MIME du fichier")
     s3_key: str = Field(max_length=500, description="Clé S3 du fichier")
     status: DocumentStatus = Field(default=DocumentStatus.UPLOADED, description="Statut du document")
-    metadata: Optional[str] = Field(default=None, description="Métadonnées JSON (optionnel)")
+    document_metadata: Optional[str] = Field(default=None, sa_column_kwargs={'name': 'metadata'}, description="Métadonnées JSON (optionnel)")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Date de création")
     updated_at: Optional[datetime] = Field(default=None, description="Date de mise à jour")
     deleted_at: Optional[datetime] = Field(default=None, description="Date de suppression (soft delete)")

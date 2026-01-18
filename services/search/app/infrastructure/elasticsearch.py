@@ -17,14 +17,21 @@ class ElasticsearchClient:
     
     def _create_client(self) -> AsyncElasticsearch:
         """Crée le client ElasticSearch"""
-        hosts = [f"{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"]
+        # Construire l'URL avec le bon schéma (http ou https)
+        scheme = "https" if settings.ELASTICSEARCH_USE_SSL else "http"
+        host_url = f"{scheme}://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"
         
         config = {
-            "hosts": hosts,
-            "verify_certs": settings.ELASTICSEARCH_VERIFY_CERTS,
-            "use_ssl": settings.ELASTICSEARCH_USE_SSL,
+            "hosts": [host_url],
         }
         
+        # Configuration SSL/TLS pour Elasticsearch 8.x
+        # La vérification des certificats est gérée via urllib3 si nécessaire
+        if settings.ELASTICSEARCH_USE_SSL and not settings.ELASTICSEARCH_VERIFY_CERTS:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        # Authentification basique si fournie
         if settings.ELASTICSEARCH_USER and settings.ELASTICSEARCH_PASSWORD:
             config["basic_auth"] = (
                 settings.ELASTICSEARCH_USER,
@@ -57,6 +64,22 @@ class ElasticsearchClient:
                 "mappings": {
                     "properties": {
                         "candidate_id": {"type": "integer"},
+                        "full_name": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+                        "title": {
+                            "type": "text",
+                            "analyzer": "french",
+                            "fields": {
+                                "keyword": {"type": "keyword"}
+                            }
+                        },
+                        "summary": {
+                            "type": "text",
+                            "analyzer": "french"
+                        },
+                        "location": {"type": "keyword"},
+                        "years_of_experience": {"type": "integer"},
+                        "is_verified": {"type": "boolean"},
+                        # Champs de compatibilité (anciens noms)
                         "profile_title": {
                             "type": "text",
                             "analyzer": "french",
@@ -113,6 +136,13 @@ class ElasticsearchClient:
                                 "institution": {"type": "keyword"},
                                 "level": {"type": "keyword"},
                                 "graduation_year": {"type": "integer"}
+                            }
+                        },
+                        "languages": {
+                            "type": "nested",
+                            "properties": {
+                                "name": {"type": "keyword"},
+                                "level": {"type": "keyword"}
                             }
                         },
                         "desired_positions": {

@@ -5,13 +5,28 @@ import httpx
 from typing import Dict, Any, Optional
 import sys
 import os
+import importlib.util
 
 # Ajouter le chemin du module shared au PYTHONPATH
-shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
-if shared_path not in sys.path:
+# Le module shared est monté dans /shared via docker-compose
+# Utiliser la même approche que candidate/app/infrastructure/internal_auth.py
+shared_path = "/shared"
+if os.path.exists(shared_path) and shared_path not in sys.path:
     sys.path.insert(0, shared_path)
 
-from services.shared.internal_auth import get_service_token_header
+# Importer depuis shared en utilisant importlib pour éviter les problèmes de module
+internal_auth_path = os.path.join(shared_path, "internal_auth.py")
+if os.path.exists(internal_auth_path):
+    spec = importlib.util.spec_from_file_location("shared.internal_auth", internal_auth_path)
+    if spec and spec.loader:
+        internal_auth_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(internal_auth_module)
+        get_service_token_header = internal_auth_module.get_service_token_header
+    else:
+        from shared.internal_auth import get_service_token_header
+else:
+    from shared.internal_auth import get_service_token_header
+
 from app.core.config import settings
 from app.core.exceptions import CandidateNotFoundError
 
@@ -60,12 +75,25 @@ async def update_candidate_status(candidate_id: int, status: str, report_data: O
     Returns:
         Dict avec les données mises à jour
     """
+    from datetime import datetime
+    
     update_data = {
         "status": status,
     }
     
     if report_data:
         update_data["admin_report"] = report_data
+        # Ajouter le score admin si disponible
+        if "overall_score" in report_data:
+            update_data["admin_score"] = report_data["overall_score"]
+        # Ajouter la date de validation/rejet
+        if status == "VALIDATED":
+            update_data["validated_at"] = datetime.utcnow().isoformat()
+        elif status == "REJECTED":
+            update_data["rejected_at"] = datetime.utcnow().isoformat()
+            # Ajouter le motif de rejet si disponible dans report_data
+            if "rejection_reason" in report_data:
+                update_data["rejection_reason"] = report_data["rejection_reason"]
     
     try:
         # Générer les headers avec le token de service

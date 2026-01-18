@@ -5,13 +5,46 @@ import httpx
 from typing import Dict, Any, Optional
 import sys
 import os
+import importlib.util
 
 # Ajouter le chemin du module shared au PYTHONPATH
-shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
-if shared_path not in sys.path:
+# Le module shared est monté dans /shared via docker-compose
+# Utiliser la même approche que candidate/app/infrastructure/internal_auth.py
+shared_path = "/shared"
+if os.path.exists(shared_path) and shared_path not in sys.path:
     sys.path.insert(0, shared_path)
 
-from services.shared.internal_auth import get_service_token_header
+# Importer depuis shared en utilisant importlib pour éviter les problèmes de module
+get_service_token_header = None
+internal_auth_path = os.path.join(shared_path, "internal_auth.py")
+if os.path.exists(internal_auth_path):
+    try:
+        spec = importlib.util.spec_from_file_location("shared.internal_auth", internal_auth_path)
+        if spec and spec.loader:
+            internal_auth_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(internal_auth_module)
+            get_service_token_header = internal_auth_module.get_service_token_header
+        else:
+            from shared.internal_auth import get_service_token_header
+    except Exception as e:
+        print(f"Warning: Failed to load internal_auth from {internal_auth_path} using importlib: {e}")
+        try:
+            from shared.internal_auth import get_service_token_header
+        except ImportError:
+            pass
+else:
+    try:
+        from shared.internal_auth import get_service_token_header
+    except ImportError:
+        pass
+
+if get_service_token_header is None:
+    raise ImportError(
+        f"Could not import get_service_token_header from shared module. "
+        f"Tried paths: ['{shared_path}']. "
+        f"Make sure ./services/shared:/shared is mounted in docker-compose.yml and restart the container."
+    )
+
 from app.core.config import settings
 
 

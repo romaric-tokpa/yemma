@@ -107,7 +107,17 @@ export const step7Schema = z.object({
   desiredLocation: z.string().min(2, "La localisation souhaitée est requise"),
   mobility: z.string().optional(),
   availability: z.string().min(1, "La disponibilité est requise"),
-  salaryExpectations: z.number().min(0, "Les prétentions salariales doivent être positives"),
+  salaryMin: z.number().min(0, "Le salaire minimum doit être positif"),
+  salaryMax: z.number().min(0, "Le salaire maximum doit être positif"),
+}).refine((data) => {
+  // Vérifier que le maximum est supérieur ou égal au minimum
+  if (data.salaryMin && data.salaryMax) {
+    return data.salaryMax >= data.salaryMin
+  }
+  return true
+}, {
+  message: "Le salaire maximum doit être supérieur ou égal au salaire minimum",
+  path: ["salaryMax"],
 })
 
 // Schéma complet

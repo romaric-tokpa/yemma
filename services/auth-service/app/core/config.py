@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
+        default=["http://localhost:3000", "http://localhost:8000", "http://localhost"],
         description="Allowed CORS origins"
     )
 
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def build_urls(cls, data: dict) -> dict:
-        """Construit les URLs si non fournies"""
+        """Construit les URLs si non fournies et parse CORS_ORIGINS"""
         if isinstance(data, dict):
             # Construire DATABASE_URL si non fournie
             if not data.get("DATABASE_URL"):
@@ -80,6 +80,15 @@ class Settings(BaseSettings):
                     f"amqp://{rmq_user}:{rmq_password}"
                     f"@{rmq_host}:{rmq_port}{rmq_vhost}"
                 )
+            
+            # Parser CORS_ORIGINS depuis JSON si fourni comme chaîne
+            if "CORS_ORIGINS" in data and isinstance(data["CORS_ORIGINS"], str):
+                import json
+                try:
+                    data["CORS_ORIGINS"] = json.loads(data["CORS_ORIGINS"])
+                except json.JSONDecodeError:
+                    # Si ce n'est pas du JSON, essayer de split par virgule
+                    data["CORS_ORIGINS"] = [origin.strip() for origin in data["CORS_ORIGINS"].split(",")]
         return data
 
     # External Services

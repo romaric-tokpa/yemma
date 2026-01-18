@@ -12,10 +12,9 @@ from app.domain.schemas import (
     InvitationAcceptRequest,
 )
 from app.domain.models import Invitation, InvitationStatus, TeamMember, TeamMemberStatus, TeamMemberRole
-from app.domain.exceptions import InvitationError
+from app.core.exceptions import InvitationError
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, TokenData
-from app.infrastructure.company_middleware import require_company_admin_role
 from app.infrastructure.repositories import InvitationRepository, TeamMemberRepository, CompanyRepository
 from app.infrastructure.invitation import (
     create_invitation_token,
@@ -48,8 +47,17 @@ async def invite_recruiter(
             detail="Only company admin (ROLE_COMPANY_ADMIN) can invite recruiters"
         )
     
-    # Récupérer l'entreprise de l'utilisateur
-    company, team_member = await require_company_admin_role(current_user, session)
+    # Récupérer l'entreprise de l'utilisateur via get_current_company et vérifier le rôle
+    from app.infrastructure.company_middleware import get_current_company, get_current_team_member
+    company = await get_current_company(current_user, session)
+    team_member = await get_current_team_member(current_user, session)
+    
+    # Vérifier que le rôle est ADMIN_ENTREPRISE
+    if team_member.role_in_company != "ADMIN_ENTREPRISE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only company admin can perform this action"
+        )
     
     # Vérifier qu'il n'y a pas déjà une invitation en cours pour cet email
     invitation_repo = InvitationRepository(session)
@@ -135,7 +143,17 @@ async def get_company_invitations(
     
     Seul l'admin de l'entreprise peut voir les invitations
     """
-    company, _ = await require_company_admin_role(current_user, session)
+    # Vérifier que l'utilisateur est admin de l'entreprise
+    from app.infrastructure.company_middleware import get_current_company, get_current_team_member
+    company = await get_current_company(current_user, session)
+    team_member = await get_current_team_member(current_user, session)
+    
+    # Vérifier que le rôle est ADMIN_ENTREPRISE
+    if team_member.role_in_company != "ADMIN_ENTREPRISE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only company admin can perform this action"
+        )
     
     # Vérifier que l'entreprise correspond
     if company.id != company_id:

@@ -98,16 +98,38 @@ export default function Step7({ form, onNext, onPrevious, isFirstStep }) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="salaryExpectations">Prétentions salariales * (€/an)</Label>
-          <Input
-            id="salaryExpectations"
-            type="number"
-            min="0"
-            {...register('salaryExpectations', { valueAsNumber: true })}
-          />
-          {errors.salaryExpectations && (
-            <p className="text-sm text-destructive">{errors.salaryExpectations.message}</p>
-          )}
+          <Label>Prétentions salariales * (CFA/mois)</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="salaryMin" className="text-sm font-normal">Minimum (CFA/mois)</Label>
+              <Input
+                id="salaryMin"
+                type="number"
+                min="0"
+                placeholder="Ex: 250000"
+                {...register('salaryMin', { valueAsNumber: true })}
+              />
+              {errors.salaryMin && (
+                <p className="text-sm text-destructive">{errors.salaryMin.message}</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="salaryMax" className="text-sm font-normal">Maximum (CFA/mois)</Label>
+              <Input
+                id="salaryMax"
+                type="number"
+                min="0"
+                placeholder="Ex: 500000"
+                {...register('salaryMax', { valueAsNumber: true })}
+              />
+              {errors.salaryMax && (
+                <p className="text-sm text-destructive">{errors.salaryMax.message}</p>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Indiquez la fourchette salariale mensuelle que vous souhaitez (minimum et maximum)
+          </p>
         </div>
       </div>
 

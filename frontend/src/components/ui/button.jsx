@@ -7,13 +7,15 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Bouton principal selon charte : Vert émeraude #1ABC9C, texte blanc, border-radius 8px
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 rounded-md",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // Bouton secondaire selon charte : transparent, bordure bleu profond, texte bleu profond
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border-2 border-blue-deep bg-transparent text-blue-deep hover:bg-blue-deep/10 hover:text-blue-deep rounded-md",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "bg-transparent border-2 border-blue-deep text-blue-deep hover:bg-blue-deep/10 rounded-md",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },

@@ -3,7 +3,8 @@ Configuration de l'application
 """
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, model_validator
+import json
 
 
 class Settings(BaseSettings):
@@ -23,17 +24,19 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
 
     # Service URLs
-    CANDIDATE_SERVICE_URL: str = Field(default="http://localhost:8002", description="Candidate service URL")
-    SEARCH_SERVICE_URL: str = Field(default="http://localhost:8004", description="Search service URL")
-    PAYMENT_SERVICE_URL: str = Field(default="http://localhost:8006", description="Payment service URL")
-    NOTIFICATION_SERVICE_URL: str = Field(default="http://localhost:8007", description="Notification service URL")
-    AUDIT_SERVICE_URL: str = Field(default="http://localhost:8008", description="Audit service URL")
+    # Par défaut, utiliser les noms de conteneurs Docker (pour fonctionnement dans Docker)
+    # En local, ces valeurs seront surchargées par les variables d'environnement
+    CANDIDATE_SERVICE_URL: str = Field(default="http://candidate:8000", description="Candidate service URL")
+    SEARCH_SERVICE_URL: str = Field(default="http://search:8000", description="Search service URL")
+    PAYMENT_SERVICE_URL: str = Field(default="http://payment:8000", description="Payment service URL")
+    NOTIFICATION_SERVICE_URL: str = Field(default="http://notification:8000", description="Notification service URL")
+    AUDIT_SERVICE_URL: str = Field(default="http://audit:8000", description="Audit service URL")
     FRONTEND_URL: str = Field(default="http://localhost:3000", description="Frontend URL for profile links")
 
-    # CORS
-    CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
-        description="Allowed CORS origins"
+    # CORS (défini comme string pour éviter les problèmes de parsing)
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:8000",
+        description="Allowed CORS origins (comma-separated string)"
     )
 
     model_config = SettingsConfigDict(
@@ -41,6 +44,13 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Retourne CORS_ORIGINS comme une liste"""
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
+        return self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else []
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

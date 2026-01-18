@@ -7,11 +7,25 @@ import sys
 import os
 
 # Ajouter le chemin du module shared au PYTHONPATH
-shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
-if shared_path not in sys.path:
+# Le module shared est monté dans /shared via docker-compose
+# Utiliser la même approche que candidate/app/infrastructure/internal_auth.py
+import importlib.util
+shared_path = "/shared"
+if os.path.exists(shared_path) and shared_path not in sys.path:
     sys.path.insert(0, shared_path)
 
-from services.shared.internal_auth import verify_service_token
+# Importer depuis shared en utilisant importlib pour éviter les problèmes de module
+internal_auth_path = os.path.join(shared_path, "internal_auth.py")
+if os.path.exists(internal_auth_path):
+    spec = importlib.util.spec_from_file_location("shared.internal_auth", internal_auth_path)
+    if spec and spec.loader:
+        internal_auth_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(internal_auth_module)
+        verify_service_token = internal_auth_module.verify_service_token
+    else:
+        from shared.internal_auth import verify_service_token
+else:
+    from shared.internal_auth import verify_service_token
 
 
 async def verify_internal_token(

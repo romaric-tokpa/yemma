@@ -35,7 +35,7 @@ class Role(SQLModel, table=True):
     updated_at: Optional[datetime] = Field(default=None)
     
     # Relations
-    user_roles: List["UserRole"] = Relationship(back_populates="role")
+    user_roles: List["UserRoleLink"] = Relationship(back_populates="role")
 
 
 class UserRoleLink(SQLModel, table=True):

@@ -1,6 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
+// Générer un avatar par défaut basé sur les initiales
+const generateAvatarUrl = (firstName, lastName) => {
+  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U'
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=200&background=random&color=fff&bold=true`
+}
+
 export default function CandidateDataView({ data }) {
   if (!data) {
     return <div className="text-muted-foreground">Aucune donnée disponible</div>
@@ -8,9 +14,35 @@ export default function CandidateDataView({ data }) {
 
   // Les données viennent directement de l'API Candidate Service (format backend)
   // Format: { first_name, last_name, email, experiences: [...], educations: [...], etc. }
+  
+  // Générer l'avatar par défaut si pas de photo
+  const defaultAvatar = generateAvatarUrl(data.first_name, data.last_name)
+  const displayPhoto = data.photo_url || defaultAvatar
 
   return (
     <div className="space-y-6">
+      {/* Photo de profil */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Photo de profil</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center">
+            <img
+              src={displayPhoto}
+              alt={`${data.first_name} ${data.last_name}`}
+              className="w-32 h-32 rounded-full object-cover border-4 border-primary/20"
+              onError={(e) => {
+                // Si l'image échoue, utiliser l'avatar par défaut
+                if (e.target.src !== defaultAvatar) {
+                  e.target.src = defaultAvatar
+                }
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Profil Général */}
       <Card>
         <CardHeader>
@@ -101,45 +133,89 @@ export default function CandidateDataView({ data }) {
             <CardTitle>Expériences Professionnelles</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {data.experiences.map((exp, index) => (
-              <div key={exp.id || index} className="border rounded-lg p-4 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium">{exp.position}</h4>
-                    <p className="text-sm text-muted-foreground">{exp.company_name}</p>
-                    {exp.company_sector && (
-                      <p className="text-xs text-muted-foreground">{exp.company_sector}</p>
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground text-right">
-                    <p>
-                      {new Date(exp.start_date).toLocaleDateString('fr-FR')} - {
-                        exp.is_current 
-                          ? 'En cours' 
-                          : exp.end_date 
-                            ? new Date(exp.end_date).toLocaleDateString('fr-FR')
-                            : 'N/A'
-                      }
-                    </p>
-                    {exp.contract_type && (
-                      <Badge variant="outline" className="mt-1">{exp.contract_type}</Badge>
-                    )}
+            {data.experiences.map((exp, index) => {
+              // Générer un avatar par défaut pour le logo de l'entreprise
+              const defaultCompanyLogo = `https://ui-avatars.com/api/?name=${encodeURIComponent(exp.company_name || 'Company')}&size=100&background=random&color=fff&bold=true`
+              const displayCompanyLogo = exp.company_logo_url || defaultCompanyLogo
+              
+              return (
+                <div key={exp.id || index} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex gap-4 items-start">
+                    {/* Logo de l'entreprise */}
+                    <div className="flex-shrink-0">
+                      <img
+                        src={displayCompanyLogo}
+                        alt={exp.company_name}
+                        className="w-16 h-16 rounded-lg object-cover border-2 border-muted"
+                        onError={(e) => {
+                          // Si l'image échoue, utiliser l'avatar par défaut
+                          if (e.target.src !== defaultCompanyLogo) {
+                            e.target.src = defaultCompanyLogo
+                          }
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Informations de l'expérience */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{exp.position}</h4>
+                          <p className="text-sm text-muted-foreground">{exp.company_name}</p>
+                          {exp.company_sector && (
+                            <p className="text-xs text-muted-foreground">{exp.company_sector}</p>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground text-right ml-4">
+                          <p>
+                            {new Date(exp.start_date).toLocaleDateString('fr-FR')} - {
+                              exp.is_current 
+                                ? 'En cours' 
+                                : exp.end_date 
+                                  ? new Date(exp.end_date).toLocaleDateString('fr-FR')
+                                  : 'N/A'
+                            }
+                          </p>
+                          {exp.contract_type && (
+                            <Badge variant="outline" className="mt-1">{exp.contract_type}</Badge>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {exp.description && (
+                        <div className="mb-2">
+                          <label className="text-xs font-medium text-muted-foreground block mb-1">Description des missions:</label>
+                          <div 
+                            className="text-sm rich-text-content"
+                            style={{
+                              lineHeight: '1.6',
+                            }}
+                            dangerouslySetInnerHTML={{ __html: exp.description }}
+                          />
+                        </div>
+                      )}
+                      
+                      {exp.achievements && (
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground block mb-1">Réalisations majeures:</label>
+                          <div 
+                            className="text-sm rich-text-content"
+                            style={{
+                              lineHeight: '1.6',
+                            }}
+                            dangerouslySetInnerHTML={{ __html: exp.achievements }}
+                          />
+                        </div>
+                      )}
+                      
+                      {exp.has_document && (
+                        <Badge variant="outline" className="mt-2">Document justificatif disponible</Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-                {exp.description && (
-                  <p className="text-sm whitespace-pre-wrap">{exp.description}</p>
-                )}
-                {exp.achievements && (
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Réalisations:</label>
-                    <p className="text-sm whitespace-pre-wrap">{exp.achievements}</p>
-                  </div>
-                )}
-                {exp.has_document && (
-                  <Badge variant="outline">Document justificatif disponible</Badge>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </CardContent>
         </Card>
       )}

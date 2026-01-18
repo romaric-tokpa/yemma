@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.domain.models import Company, TeamMember, TeamMemberStatus
+from app.domain.models import Company, TeamMember, TeamMemberStatus, CompanyStatus
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, TokenData
 from app.core.exceptions import CompanyNotFoundError, PermissionDeniedError
@@ -54,7 +54,7 @@ async def get_current_company(
     statement = select(Company).where(
         Company.id == team_member.company_id,
         Company.deleted_at.is_(None),
-        Company.status == "active"
+        Company.status == CompanyStatus.ACTIVE
     )
     result = await session.execute(statement)
     company = result.scalar_one_or_none()

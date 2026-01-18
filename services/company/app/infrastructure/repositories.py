@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.domain.models import Company, TeamMember, Invitation
-from app.domain.exceptions import CompanyNotFoundError
+from app.core.exceptions import CompanyNotFoundError
 
 
 class CompanyRepository:
@@ -30,9 +30,10 @@ class CompanyRepository:
         statement = select(Company).where(
             Company.admin_id == admin_id,
             Company.deleted_at.is_(None)
-        )
+        ).order_by(Company.created_at.desc())  # Prendre la plus récente en cas de doublons
         result = await self.session.execute(statement)
-        return result.scalar_one_or_none()
+        # Utiliser scalars().first() au lieu de scalar_one_or_none() pour gérer les doublons
+        return result.scalars().first()
     
     async def get_by_legal_id(self, legal_id: str) -> Optional[Company]:
         """Récupère une entreprise par legal_id"""
@@ -161,4 +162,9 @@ class InvitationRepository:
         await self.session.commit()
         await self.session.refresh(invitation)
         return invitation
+
+
+# Alias pour compatibilité avec le code existant
+# TODO: Migrer progressivement vers TeamMemberRepository
+RecruiterRepository = TeamMemberRepository
 

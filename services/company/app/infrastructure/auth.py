@@ -43,14 +43,30 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
     """Dependency pour obtenir l'utilisateur actuel depuis le token"""
     payload = decode_token(token)
     
-    user_id: int = payload.get("sub")
+    # Le JWT "sub" est généralement une string, on doit le convertir en int
+    sub = payload.get("sub")
+    if sub is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload: missing 'sub'"
+        )
+    
+    # Convertir sub en int si c'est une string
+    try:
+        user_id: int = int(sub) if isinstance(sub, str) else sub
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token payload: 'sub' must be a valid integer, got {type(sub)}"
+        )
+    
     email: str = payload.get("email")
     roles: list = payload.get("roles", [])
     
-    if user_id is None or email is None:
+    if email is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
+            detail="Invalid token payload: missing 'email'"
         )
     
     return TokenData(user_id=user_id, email=email, roles=roles)

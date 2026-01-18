@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.schemas import RecruiterResponse, RecruiterDetailResponse, CandidateSearchRequest
 from app.domain.models import Recruiter
-from app.domain.exceptions import RecruiterNotFoundError
+from app.core.exceptions import RecruiterNotFoundError
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, TokenData
 from app.infrastructure.permissions import require_company_admin, require_recruiter_access, can_view_validated_candidates

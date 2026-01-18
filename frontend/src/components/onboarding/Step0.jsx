@@ -1,17 +1,26 @@
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { Controller } from 'react-hook-form'
 
 export default function Step0({ form, onNext, isFirstStep }) {
-  const { register, handleSubmit, formState: { errors } } = form
+  const { handleSubmit, formState: { errors }, control } = form
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-6">
       <div className="space-y-4">
         <div className="flex items-start space-x-3">
-          <Checkbox
-            id="acceptCGU"
-            {...register('acceptCGU')}
+          <Controller
+            name="acceptCGU"
+            control={control}
+            defaultValue={false}
+            render={({ field }) => (
+              <Checkbox
+                id="acceptCGU"
+                checked={field.value || false}
+                onCheckedChange={(checked) => field.onChange(checked === true)}
+              />
+            )}
           />
           <div className="space-y-1">
             <Label htmlFor="acceptCGU" className="text-sm font-medium leading-none">
@@ -24,9 +33,17 @@ export default function Step0({ form, onNext, isFirstStep }) {
         </div>
 
         <div className="flex items-start space-x-3">
-          <Checkbox
-            id="acceptRGPD"
-            {...register('acceptRGPD')}
+          <Controller
+            name="acceptRGPD"
+            control={control}
+            defaultValue={false}
+            render={({ field }) => (
+              <Checkbox
+                id="acceptRGPD"
+                checked={field.value || false}
+                onCheckedChange={(checked) => field.onChange(checked === true)}
+              />
+            )}
           />
           <div className="space-y-1">
             <Label htmlFor="acceptRGPD" className="text-sm font-medium leading-none">
@@ -39,9 +56,17 @@ export default function Step0({ form, onNext, isFirstStep }) {
         </div>
 
         <div className="flex items-start space-x-3">
-          <Checkbox
-            id="acceptVerification"
-            {...register('acceptVerification')}
+          <Controller
+            name="acceptVerification"
+            control={control}
+            defaultValue={false}
+            render={({ field }) => (
+              <Checkbox
+                id="acceptVerification"
+                checked={field.value || false}
+                onCheckedChange={(checked) => field.onChange(checked === true)}
+              />
+            )}
           />
           <div className="space-y-1">
             <Label htmlFor="acceptVerification" className="text-sm font-medium leading-none">

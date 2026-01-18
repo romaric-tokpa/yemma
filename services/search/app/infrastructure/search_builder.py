@@ -33,6 +33,19 @@ class SearchQueryBuilder:
             # Si pas de query, match all
             must_clauses.append({"match_all": {}})
         
+        # FILTER : Statut VALIDATED (seuls les candidats validés doivent apparaître)
+        # Utiliser bool should pour gérer les documents sans champ status (anciens documents)
+        # Si pas de champ status, on considère qu'ils sont validés (car dans l'index)
+        filter_clauses.append({
+            "bool": {
+                "should": [
+                    {"term": {"status": "VALIDATED"}},
+                    {"bool": {"must_not": {"exists": {"field": "status"}}}}
+                ],
+                "minimum_should_match": 1
+            }
+        })
+        
         # Filtres par facettes
         if search_request.sectors:
             filter_clauses.append({

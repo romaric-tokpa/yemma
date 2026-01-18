@@ -1,6 +1,7 @@
 """
 Repositories pour les opérations de base de données
 """
+import logging
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -12,6 +13,8 @@ from app.domain.models import (
 )
 from app.core.exceptions import ProfileNotFoundError, ProfileAlreadyExistsError
 from app.core.completion import calculate_completion_percentage
+
+logger = logging.getLogger(__name__)
 
 
 class ProfileRepository:
@@ -82,16 +85,56 @@ class ProfileRepository:
         if not profile:
             return None
         
+        from datetime import datetime
+        
         for key, value in update_data.items():
+            # Convertir les chaînes ISO datetime en objets datetime pour les champs de date
+            if key in ["validated_at", "rejected_at", "date_of_birth"] and isinstance(value, str):
+                try:
+                    value = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                except (ValueError, AttributeError):
+                    # Si la conversion échoue, garder la valeur originale
+                    pass
+            # Gérer le statut comme une chaîne ou un enum
+            if key == "status" and value:
+                from app.domain.models import ProfileStatus
+                # Essayer de convertir en enum si c'est une chaîne
+                if isinstance(value, str):
+                    try:
+                        value = ProfileStatus(value)
+                    except ValueError:
+                        # Si la conversion échoue, garder la valeur originale
+                        pass
             setattr(profile, key, value)
         
         # Recalculer le pourcentage de complétion
         # Recharger le profil avec les relations pour le calcul
-        profile_with_relations = await ProfileRepository.get_with_relations(session, profile_id)
-        if profile_with_relations:
-            from app.core.completion import check_cv_exists
-            has_cv = await check_cv_exists(profile_id)
-            profile.completion_percentage = calculate_completion_percentage(profile_with_relations, has_cv=has_cv)
+        try:
+            profile_with_relations = await ProfileRepository.get_with_relations(session, profile_id)
+            if profile_with_relations:
+                from app.core.completion import check_cv_exists
+                # Gérer les erreurs de check_cv_exists (timeout, réseau, etc.)
+                has_cv = False
+                try:
+                    has_cv = await check_cv_exists(profile_id)
+                except Exception as cv_error:
+                    # Si on ne peut pas vérifier le CV (timeout, réseau, etc.), supposer False
+                    # Logger l'erreur mais ne pas bloquer la mise à jour
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Erreur lors de la vérification du CV pour le profil {profile_id}: {str(cv_error)}")
+                    has_cv = False
+                
+                profile.completion_percentage = calculate_completion_percentage(profile_with_relations, has_cv=has_cv)
+        except Exception as completion_error:
+            # Si le calcul de complétion échoue, logger l'erreur mais ne pas bloquer la mise à jour
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Erreur lors du calcul du pourcentage de complétion pour le profil {profile_id}: {str(completion_error)}", exc_info=True)
+            # Garder le pourcentage de complétion actuel ou 0 si non défini
+            if not hasattr(profile, 'completion_percentage') or profile.completion_percentage is None:
+                profile.completion_percentage = 0.0
+        
         from datetime import datetime
         profile.updated_at = datetime.utcnow()
         
@@ -105,6 +148,7 @@ class ProfileRepository:
         profile_id: int
     ) -> Optional[Profile]:
         """Soumet un profil pour validation"""
+        # Recharger le profil avec toutes les relations pour avoir les données à jour
         profile = await ProfileRepository.get_with_relations(session, profile_id)
         if not profile:
             return None
@@ -114,12 +158,31 @@ class ProfileRepository:
             raise ValueError(f"Cannot submit profile with status {profile.status}")
         
         from datetime import datetime
-        from app.core.completion import can_submit_profile, check_cv_exists
+        from app.core.completion import can_submit_profile, check_cv_exists, calculate_completion_percentage
         
         # Vérifier la présence du CV via le service Document
         has_cv = await check_cv_exists(profile_id)
+        logger.info(f"Soumission du profil {profile_id}: has_cv={has_cv}, expériences={len(profile.experiences) if profile.experiences else 0}, formations={len(profile.educations) if profile.educations else 0}")
         
+        # Recalculer explicitement le completion_percentage juste avant la vérification
+        # pour s'assurer qu'il est à jour avec toutes les données
+        try:
+            calculated_completion = calculate_completion_percentage(profile, has_cv=has_cv)
+            logger.info(f"Calcul du completion_percentage pour le profil {profile_id}: {calculated_completion}%")
+            profile.completion_percentage = calculated_completion
+            profile.updated_at = datetime.utcnow()
+            await session.commit()
+            await session.refresh(profile)
+            # Recharger le profil après la mise à jour pour avoir les relations à jour
+            profile = await ProfileRepository.get_with_relations(session, profile_id)
+            logger.info(f"Profil {profile_id} rechargé: completion_percentage={profile.completion_percentage}%")
+        except Exception as e:
+            logger.warning(f"Erreur lors du recalcul du completion_percentage: {str(e)}", exc_info=True)
+            # Continuer même en cas d'erreur, can_submit_profile recalcule de toute façon
+        
+        # Vérifier si le profil peut être soumis
         can_submit, reason = can_submit_profile(profile, has_cv=has_cv)
+        logger.info(f"Vérification soumission profil {profile_id}: can_submit={can_submit}, reason={reason}")
         if not can_submit:
             raise ValueError(reason)
         

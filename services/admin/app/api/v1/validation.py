@@ -154,25 +154,26 @@ async def validate_candidate(
         profile_url = f"{settings.FRONTEND_URL}/candidate/{candidate_id}" if hasattr(settings, 'FRONTEND_URL') else None
         
         # ============================================
-        # DÉCLENCHER LES TROIS ACTIONS ASYNCHRONES
+        # ACTION SYNCHRONE : Mettre à jour le statut
         # ============================================
-        
-        # Action 1 : Mettre à jour le statut dans Candidate Service
-        background_tasks.add_task(
-            update_candidate_status_task,
+        # Mettre à jour le statut de façon synchrone pour que le frontend voie le changement immédiatement
+        await update_candidate_status(
             candidate_id=candidate_id,
             status="VALIDATED",
             report_data=report_data
         )
         
-        # Action 2 : Indexer dans ElasticSearch (avec gestion d'erreur dans Audit)
+        # ============================================
+        # ACTIONS ASYNCHRONES : Indexation et notification
+        # ============================================
+        # Action 1 : Indexer dans ElasticSearch (avec gestion d'erreur dans Audit)
         background_tasks.add_task(
             index_candidate_task,
             candidate_id=candidate_id,
             profile_data=profile_data
         )
         
-        # Action 3 : Envoyer la notification au candidat
+        # Action 2 : Envoyer la notification au candidat
         background_tasks.add_task(
             send_notification_task,
             recipient_email=recipient_email,
@@ -182,15 +183,15 @@ async def validate_candidate(
         )
         
         return {
-            "message": "Candidate profile validation initiated",
+            "message": "Candidate profile validated successfully",
             "candidate_id": candidate_id,
             "status": "VALIDATED",
             "actions": {
-                "status_update": "pending",
+                "status_update": "completed",
                 "indexation": "pending",
                 "notification": "pending"
             },
-            "note": "All actions are being processed asynchronously. Check Audit Service logs for any errors."
+            "note": "Status updated. Indexation and notification are being processed asynchronously. Check Audit Service logs for any errors."
         }
         
     except HTTPException:

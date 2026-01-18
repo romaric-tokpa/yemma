@@ -28,6 +28,7 @@ class CompanyCreate(CompanyBase):
 class CompanyUpdate(BaseModel):
     """Schéma pour la mise à jour d'une entreprise"""
     name: Optional[str] = None
+    adresse: Optional[str] = Field(None, max_length=500, description="Adresse de l'entreprise")
     logo_url: Optional[str] = None
     status: Optional[CompanyStatus] = None
 
@@ -91,6 +92,12 @@ class TeamMemberDetailResponse(TeamMemberResponse):
     """Schéma de réponse détaillé pour TeamMember"""
     company_name: Optional[str] = None
     user_email: Optional[str] = None
+
+
+# Alias pour compatibilité avec le code existant
+# TODO: Migrer progressivement vers TeamMemberResponse
+RecruiterResponse = TeamMemberResponse
+RecruiterDetailResponse = TeamMemberDetailResponse
 
 
 # ============================================

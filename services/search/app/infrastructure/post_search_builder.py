@@ -114,11 +114,164 @@ class PostSearchQueryBuilder:
                 }
             })
         
-        # FILTER : Localisation (exact match, plus performant)
+        # FILTER : Tranches d'expérience (OR entre les tranches)
+        if search_request.experience_ranges:
+            experience_range_filters = []
+            for exp_range in search_request.experience_ranges:
+                range_query = {"years_of_experience": {"gte": exp_range.min}}
+                if exp_range.max is not None:
+                    range_query["years_of_experience"]["lte"] = exp_range.max
+                experience_range_filters.append({"range": range_query})
+            
+            if experience_range_filters:
+                filter_clauses.append({
+                    "bool": {
+                        "should": experience_range_filters,
+                        "minimum_should_match": 1
+                    }
+                })
+        
+        # FILTER : Titre de poste recherché (recherche dans title et main_job)
+        if search_request.job_title:
+            filter_clauses.append({
+                "bool": {
+                    "should": [
+                        {"match": {"title": {"query": search_request.job_title, "operator": "and"}}},
+                        {"match": {"main_job": {"query": search_request.job_title, "operator": "and"}}}
+                    ],
+                    "minimum_should_match": 1
+                }
+            })
+        
+        # FILTER : Disponibilité
+        if search_request.availability:
+            filter_clauses.append({
+                "terms": {
+                    "availability": search_request.availability
+                }
+            })
+        
+        # FILTER : Niveaux d'étude (nested query sur educations.level)
+        if search_request.education_levels:
+            education_filters = []
+            for edu_level in search_request.education_levels:
+                # Normaliser le niveau d'étude (ex: "BAC" -> "Bac", "LICENCE" -> "Licence")
+                # Le champ level dans educations peut contenir "Bac", "Bac+2", "Bac+5", etc.
+                # On cherche une correspondance partielle
+                education_filters.append({
+                    "wildcard": {
+                        "educations.level": f"*{edu_level.upper()}*"
+                    }
+                })
+            
+            if education_filters:
+                filter_clauses.append({
+                    "nested": {
+                        "path": "educations",
+                        "query": {
+                            "bool": {
+                                "should": education_filters,
+                                "minimum_should_match": 1
+                            }
+                        }
+                    }
+                })
+        
+        # FILTER : Tranches salariales (range sur salary_expectations)
+        if search_request.salary_ranges:
+            salary_range_filters = []
+            for salary_range in search_request.salary_ranges:
+                # Parser les tranches (ex: "0-500k", "500k-1m", "5m+")
+                if salary_range == "0-500k":
+                    salary_range_filters.append({"range": {"salary_expectations": {"gte": 0, "lt": 500000}}})
+                elif salary_range == "500k-1m":
+                    salary_range_filters.append({"range": {"salary_expectations": {"gte": 500000, "lt": 1000000}}})
+                elif salary_range == "1m-2m":
+                    salary_range_filters.append({"range": {"salary_expectations": {"gte": 1000000, "lt": 2000000}}})
+                elif salary_range == "2m-3m":
+                    salary_range_filters.append({"range": {"salary_expectations": {"gte": 2000000, "lt": 3000000}}})
+                elif salary_range == "3m-5m":
+                    salary_range_filters.append({"range": {"salary_expectations": {"gte": 3000000, "lt": 5000000}}})
+                elif salary_range == "5m+":
+                    salary_range_filters.append({"range": {"salary_expectations": {"gte": 5000000}}})
+            
+            if salary_range_filters:
+                filter_clauses.append({
+                    "bool": {
+                        "should": salary_range_filters,
+                        "minimum_should_match": 1
+                    }
+                })
+        
+        # FILTER : Langues avec niveaux (nested query sur languages)
+        if search_request.languages:
+            language_filters = []
+            for lang_name, lang_level in search_request.languages.items():
+                # Construire une query qui matche la langue ET le niveau minimum
+                # Si le niveau demandé est "notions", on accepte tous les niveaux
+                # Si c'est "courant", on accepte "courant", "professionnel", "natif"
+                # Si c'est "professionnel", on accepte "professionnel", "natif"
+                # Si c'est "natif", on accepte seulement "natif"
+                min_levels = []
+                if lang_level == "notions":
+                    min_levels = ["BEGINNER", "INTERMEDIATE", "ADVANCED", "EXPERT"]
+                elif lang_level == "courant":
+                    min_levels = ["INTERMEDIATE", "ADVANCED", "EXPERT"]
+                elif lang_level == "professionnel":
+                    min_levels = ["ADVANCED", "EXPERT"]
+                elif lang_level == "natif":
+                    min_levels = ["EXPERT"]
+                else:
+                    # Par défaut, utiliser le niveau tel quel
+                    min_levels = [lang_level.upper()]
+                
+                if min_levels:
+                    language_filters.append({
+                        "bool": {
+                            "must": [
+                                {"term": {"languages.name": lang_name}}
+                            ],
+                            "should": [
+                                {"term": {"languages.level": level}} for level in min_levels
+                            ],
+                            "minimum_should_match": 1
+                        }
+                    })
+            
+            if language_filters:
+                filter_clauses.append({
+                    "nested": {
+                        "path": "languages",
+                        "query": {
+                            "bool": {
+                                "should": language_filters,
+                                "minimum_should_match": 1
+                            }
+                        }
+                    }
+                })
+        
+        # FILTER : Statut VALIDATED (seuls les candidats validés doivent apparaître)
+        # Accepter les documents avec status=VALIDATED ou sans champ status (anciens documents indexés)
+        # Les documents sans status sont considérés comme validés car ils sont dans l'index
+        filter_clauses.append({
+            "bool": {
+                "should": [
+                    {"term": {"status": "VALIDATED"}},
+                    {"bool": {"must_not": {"exists": {"field": "status"}}}}
+                ],
+                "minimum_should_match": 1
+            }
+        })
+        
+        # FILTER : Localisation (match partiel pour plus de flexibilité)
         if search_request.location:
             filter_clauses.append({
-                "term": {
-                    "location": search_request.location
+                "match": {
+                    "location": {
+                        "query": search_request.location,
+                        "operator": "and"
+                    }
                 }
             })
         

@@ -14,16 +14,20 @@ services:
     networks:
       - yemma-network
     depends_on:
-      - auth
-      - candidate
-      - document
-      - search
-      - company
-      - payment
-      - notification
-      - audit
-      - admin
-      - frontend
+      auth:
+        condition: service_healthy
+      candidate:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+      # Les autres services sont optionnels pour nginx
+      # - document
+      # - search
+      # - company
+      # - payment
+      # - notification
+      # - audit
+      # - admin
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
@@ -137,8 +141,12 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     restart: unless-stopped
 
   kibana:
@@ -206,6 +214,9 @@ services:
       # OAuth2
       OAUTH2_SECRET_KEY: ${OAUTH2_SECRET_KEY:-your-oauth2-secret-key-change-in-production}
       
+      # CORS (format JSON pour les listes Pydantic)
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
+      
       # Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -217,9 +228,10 @@ services:
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${AUTH_PORT:-8001}:8000"
+    # Port exposé pour le développement (accès direct)
+    # En production, utiliser uniquement via Nginx Gateway
+    ports:
+      - "${AUTH_PORT:-8001}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -257,6 +269,12 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
       
+      # Document Service
+      DOCUMENT_SERVICE_URL: http://document:8000
+      
+      # CORS (format JSON pour les listes Pydantic)
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
+      
       # Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -268,9 +286,10 @@ services:
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${CANDIDATE_PORT:-8002}:8000"
+    # Port exposé pour le développement (accès direct)
+    # En production, utiliser uniquement via Nginx Gateway
+    ports:
+      - "${CANDIDATE_PORT:-8002}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -307,6 +326,7 @@ services:
       
       # S3 / MinIO
       S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-documents}
@@ -316,21 +336,24 @@ services:
       
       # File Upload
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
-      ALLOWED_EXTENSIONS: ${ALLOWED_EXTENSIONS:-pdf,jpg,jpeg,png}
+      ALLOWED_EXTENSIONS: "pdf,jpg,jpeg,png"
       TEMP_LINK_EXPIRE_HOURS: ${TEMP_LINK_EXPIRE_HOURS:-24}
       
       # JWT Validation
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
+      
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-"http://localhost:3000,http://localhost:8000,http://localhost"}
     volumes:
       - ./services/document:/app
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${DOCUMENT_PORT:-8003}:8000"
+    # Port exposé pour accès direct (dev) - accès aussi via Nginx Gateway
+    ports:
+      - "${DOCUMENT_PORT:-8003}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -374,16 +397,33 @@ services:
       # Service URLs
       CANDIDATE_SERVICE_URL: http://candidate:8000
       ADMIN_SERVICE_URL: http://admin:8000
+      AUTH_SERVICE_URL: http://auth:8000
+      PAYMENT_SERVICE_URL: http://payment:8000
+      AUDIT_SERVICE_URL: http://audit:8000
+      COMPANY_SERVICE_URL: http://company:8000
+
+      # JWT Validation (pour le fallback si AUTH_SERVICE_URL ne répond pas)
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
     volumes:
       - ./services/search:/app
+      - ./services/shared:/shared
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${SEARCH_PORT:-8004}:8000"
+    # Port exposé pour le développement (accès direct)
+    # En production, utiliser uniquement via Nginx Gateway
+    ports:
+      - "${SEARCH_PORT:-8004}:8000"
     depends_on:
       elasticsearch:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+      candidate:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -413,17 +453,20 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
     volumes:
       - ./services/admin:/app
+      - ./services/shared:/shared
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${ADMIN_PORT:-8009}:8000"
+    # Port exposé pour le développement (accès direct)
+    # En production, utiliser uniquement via Nginx Gateway
+    ports:
+      - "${ADMIN_PORT:-8009}:8000"
     depends_on:
       candidate:
         condition: service_healthy
-      search:
-        condition: service_healthy
+      # search peut être unhealthy, on démarre quand même
+      # search:
+      #   condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -463,21 +506,29 @@ services:
       # Service URLs
       SEARCH_SERVICE_URL: http://search:8000
       SUBSCRIPTION_SERVICE_URL: http://subscription:8000
+      NOTIFICATION_SERVICE_URL: http://notification:8000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000,http://localhost}
     volumes:
       - ./services/company:/app
+      - ./services/shared:/shared
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${COMPANY_PORT:-8005}:8000"
+    # Port exposé pour le développement (accès direct)
+    # En production, utiliser uniquement via Nginx Gateway
+    ports:
+      - "${COMPANY_PORT:-8005}:8000"
     depends_on:
       postgres:
         condition: service_healthy
       auth:
         condition: service_healthy
-      search:
-        condition: service_healthy
+      # search peut être unhealthy, on démarre quand même
+      # search:
+      #   condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -713,25 +764,27 @@ services:
     container_name: yemma-frontend
     environment:
       # Variables d'environnement pour Vite (préfixe VITE_)
-      # Toutes les URLs pointent vers le Gateway Nginx
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost}
-      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-http://localhost/api/v1/auth}
-      VITE_CANDIDATE_API_URL: ${VITE_CANDIDATE_API_URL:-http://localhost/api/v1/candidates}
-      VITE_DOCUMENT_API_URL: ${VITE_DOCUMENT_API_URL:-http://localhost/api/v1/documents}
-      VITE_SEARCH_API_URL: ${VITE_SEARCH_API_URL:-http://localhost/api/v1/search}
-      VITE_COMPANY_API_URL: ${VITE_COMPANY_API_URL:-http://localhost/api/v1/companies}
-      VITE_PAYMENT_API_URL: ${VITE_PAYMENT_API_URL:-http://localhost/api/v1/payments}
-      VITE_NOTIFICATION_API_URL: ${VITE_NOTIFICATION_API_URL:-http://localhost/api/v1/notifications}
-      VITE_AUDIT_API_URL: ${VITE_AUDIT_API_URL:-http://localhost/api/v1/audit}
-      VITE_ADMIN_API_URL: ${VITE_ADMIN_API_URL:-http://localhost/api/v1/admin}
+      # Utilise des chemins relatifs vides pour passer par nginx (chemins dans api.js)
+      # Si besoin d'utiliser nginx directement, définir: VITE_API_BASE_URL=http://nginx
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-}
+      VITE_CANDIDATE_API_URL: ${VITE_CANDIDATE_API_URL:-}
+      VITE_DOCUMENT_API_URL: ${VITE_DOCUMENT_API_URL:-}
+      VITE_SEARCH_API_URL: ${VITE_SEARCH_API_URL:-}
+      VITE_COMPANY_API_URL: ${VITE_COMPANY_API_URL:-}
+      VITE_PAYMENT_API_URL: ${VITE_PAYMENT_API_URL:-}
+      VITE_NOTIFICATION_API_URL: ${VITE_NOTIFICATION_API_URL:-}
+      VITE_AUDIT_API_URL: ${VITE_AUDIT_API_URL:-}
+      VITE_ADMIN_API_URL: ${VITE_ADMIN_API_URL:-}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${FRONTEND_PORT:-3000}:3000"
+    # Port exposé pour le développement (accès direct)
+    # En production, utiliser uniquement via Nginx Gateway
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - auth
       - candidate

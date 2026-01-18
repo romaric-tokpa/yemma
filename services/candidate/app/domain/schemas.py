@@ -20,8 +20,10 @@ class ProfileBase(BaseModel):
 
 class ProfileCreate(ProfileBase):
     """Schéma pour la création d'un profil"""
-    user_id: int
+    # user_id est rempli automatiquement depuis current_user dans l'endpoint, ne pas l'inclure dans la requête
     email: EmailStr
+    # user_id est optionnel car il est rempli automatiquement
+    user_id: Optional[int] = None
 
 
 class ProfileUpdate(BaseModel):
@@ -39,10 +41,15 @@ class ProfileUpdate(BaseModel):
     sector: Optional[str] = None
     main_job: Optional[str] = None
     total_experience: Optional[int] = None
+    photo_url: Optional[str] = None
     last_step_completed: Optional[int] = None
     accept_cgu: Optional[bool] = None
     accept_rgpd: Optional[bool] = None
     accept_verification: Optional[bool] = None
+    status: Optional[str] = None  # Permettre la mise à jour du statut par les services internes
+    admin_score: Optional[float] = None
+    admin_report: Optional[dict] = None
+    rejection_reason: Optional[str] = None
 
 
 class ProfileResponse(ProfileBase):
@@ -88,6 +95,7 @@ class ProfileDetailResponse(ProfileResponse):
 class ExperienceCreate(BaseModel):
     """Schéma pour la création d'une expérience"""
     company_name: str
+    company_logo_url: Optional[str] = None
     company_sector: Optional[str] = None
     position: str
     contract_type: Optional[str] = None
@@ -192,7 +200,9 @@ class JobPreferenceCreate(BaseModel):
     desired_location: Optional[str] = None
     mobility: Optional[str] = None
     availability: Optional[str] = None
-    salary_expectations: Optional[float] = None
+    salary_min: Optional[float] = Field(default=None, description="Salaire minimum (CFA/mois)")
+    salary_max: Optional[float] = Field(default=None, description="Salaire maximum (CFA/mois)")
+    salary_expectations: Optional[float] = Field(default=None, description="Prétentions salariales (pour compatibilité)")
 
 
 class JobPreferenceResponse(JobPreferenceCreate):

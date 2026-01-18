@@ -3,7 +3,9 @@ Endpoints API pour la gestion des profils candidats
 """
 from typing import List, Optional
 from datetime import datetime
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import get_session
@@ -31,6 +33,7 @@ from app.core.exceptions import (
 from app.core.completion import can_submit_profile
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+logger = logging.getLogger(__name__)
 
 
 # ============================================
@@ -63,39 +66,124 @@ async def get_my_profile(
     current_user: TokenData = Depends(get_current_user)
 ):
     """Récupère le profil de l'utilisateur connecté"""
-    profile = await ProfileRepository.get_by_user_id(session, current_user.user_id)
-    if not profile:
-        raise ProfileNotFoundError(str(current_user.user_id))
+    try:
+        profile = await ProfileRepository.get_by_user_id(session, current_user.user_id)
+        if not profile:
+            raise ProfileNotFoundError(str(current_user.user_id))
+        
+        profile = await ProfileRepository.get_with_relations(session, profile.id)
+        if not profile:
+            raise ProfileNotFoundError(str(current_user.user_id))
+        
+        # Construire la réponse avec les relations
+        response_data = ProfileResponse.model_validate(profile).model_dump()
+        
+        # Ajouter les relations
+        response_data["experiences"] = [ExperienceResponse.model_validate(exp).model_dump() for exp in profile.experiences]
+        response_data["educations"] = [EducationResponse.model_validate(edu).model_dump() for edu in profile.educations]
+        response_data["certifications"] = [CertificationResponse.model_validate(cert).model_dump() for cert in profile.certifications]
+        response_data["skills"] = [SkillResponse.model_validate(skill).model_dump() for skill in profile.skills]
+        if profile.job_preferences:
+            try:
+                job_pref_dict = JobPreferenceResponse.model_validate(profile.job_preferences).model_dump()
+                response_data["job_preferences"] = job_pref_dict
+            except Exception as job_pref_error:
+                logger.error(f"Error validating job_preferences for profile {profile.id}: {str(job_pref_error)}", exc_info=True)
+                # Si la validation échoue (colonnes manquantes, etc.), essayer de construire manuellement
+                response_data["job_preferences"] = {
+                    "desired_positions": profile.job_preferences.desired_positions or [],
+                    "contract_type": profile.job_preferences.contract_type,
+                    "target_sectors": profile.job_preferences.target_sectors or [],
+                    "desired_location": profile.job_preferences.desired_location,
+                    "mobility": profile.job_preferences.mobility,
+                    "availability": profile.job_preferences.availability,
+                    "salary_expectations": getattr(profile.job_preferences, 'salary_expectations', None),
+                    "salary_min": getattr(profile.job_preferences, 'salary_min', None),
+                    "salary_max": getattr(profile.job_preferences, 'salary_max', None),
+                }
+        
+        # Ajouter les champs supplémentaires
+        response_data.update({
+            "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
+            "nationality": profile.nationality,
+            "phone": profile.phone,
+            "address": profile.address,
+            "city": profile.city,
+            "country": profile.country,
+            "sector": profile.sector,
+            "main_job": profile.main_job,
+            "total_experience": profile.total_experience,
+            "admin_report": profile.admin_report,
+            "validated_at": profile.validated_at.isoformat() if profile.validated_at else None,
+            # Consentements (étape 0)
+            "accept_cgu": profile.accept_cgu,
+            "accept_rgpd": profile.accept_rgpd,
+            "accept_verification": profile.accept_verification,
+        })
+        
+        return response_data
+    except (ProfileNotFoundError, HTTPException):
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_my_profile for user {current_user.user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.get("", response_model=List[ProfileResponse])
+async def list_profiles(
+    status: Optional[str] = None,
+    page: int = 1,
+    size: int = 20,
+    session: AsyncSession = Depends(get_session),
+    current_user: TokenData = Depends(get_current_user)
+):
+    """
+    Liste les profils (réservé aux administrateurs)
     
-    profile = await ProfileRepository.get_with_relations(session, profile.id)
+    Permet de filtrer par statut et paginer les résultats.
+    """
+    # Vérifier que l'utilisateur est admin
+    if not current_user or not current_user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authentication required"
+        )
     
-    # Construire la réponse avec les relations
-    response_data = ProfileResponse.model_validate(profile).model_dump()
+    if "ROLE_ADMIN" not in current_user.roles and "ROLE_SUPER_ADMIN" not in current_user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can list profiles"
+        )
     
-    # Ajouter les relations
-    response_data["experiences"] = [ExperienceResponse.model_validate(exp).model_dump() for exp in profile.experiences]
-    response_data["educations"] = [EducationResponse.model_validate(edu).model_dump() for edu in profile.educations]
-    response_data["certifications"] = [CertificationResponse.model_validate(cert).model_dump() for cert in profile.certifications]
-    response_data["skills"] = [SkillResponse.model_validate(skill).model_dump() for skill in profile.skills]
-    if profile.job_preferences:
-        response_data["job_preferences"] = JobPreferenceResponse.model_validate(profile.job_preferences).model_dump()
+    from sqlalchemy import select, and_
+    from app.domain.models import Profile
     
-    # Ajouter les champs supplémentaires
-    response_data.update({
-        "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
-        "nationality": profile.nationality,
-        "phone": profile.phone,
-        "address": profile.address,
-        "city": profile.city,
-        "country": profile.country,
-        "sector": profile.sector,
-        "main_job": profile.main_job,
-        "total_experience": profile.total_experience,
-        "admin_report": profile.admin_report,
-        "validated_at": profile.validated_at.isoformat() if profile.validated_at else None,
-    })
+    # Construire la requête
+    query = select(Profile).where(Profile.deleted_at.is_(None))
     
-    return response_data
+    # Filtrer par statut si fourni
+    if status:
+        try:
+            status_enum = ProfileStatus(status.upper())
+            query = query.where(Profile.status == status_enum)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status: {status}. Valid values: DRAFT, SUBMITTED, IN_REVIEW, VALIDATED, REJECTED, ARCHIVED"
+            )
+    
+    # Pagination
+    offset = (page - 1) * size
+    query = query.order_by(Profile.submitted_at.desc().nullsfirst(), Profile.created_at.desc())
+    query = query.offset(offset).limit(size)
+    
+    result = await session.execute(query)
+    profiles = result.scalars().all()
+    
+    return [ProfileResponse.model_validate(profile) for profile in profiles]
 
 
 @router.patch("/me", response_model=ProfileResponse)
@@ -261,6 +349,7 @@ async def partial_update_my_profile(
 @router.get("/{profile_id}", response_model=ProfileDetailResponse)
 async def get_profile(
     profile_id: int,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     service_info: Optional[dict] = Depends(verify_internal_token),
     current_user: Optional[TokenData] = Depends(get_current_user)
@@ -271,25 +360,101 @@ async def get_profile(
     Accepte soit un token utilisateur (Bearer) soit un token de service (X-Service-Token).
     Si un token de service est fourni, les vérifications de permissions utilisateur sont ignorées.
     """
-    profile = await ProfileRepository.get_with_relations(session, profile_id)
-    if not profile:
-        raise ProfileNotFoundError(str(profile_id))
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # Si c'est un appel inter-service (service_info est présent), autoriser l'accès
-    # Sinon, vérifier les permissions utilisateur
-    if not service_info:
-        if not current_user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required"
-            )
-        if profile.user_id != current_user.user_id and "ROLE_ADMIN" not in current_user.roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this profile"
-            )
+    # Logger les headers pour débogage
+    x_service_token = request.headers.get("X-Service-Token") or request.headers.get("x-service-token")
+    x_service_name = request.headers.get("X-Service-Name") or request.headers.get("x-service-name")
+    logger.info(f"get_profile called for profile_id={profile_id}, service_info={service_info is not None}, current_user={current_user.user_id if current_user else None}")
+    logger.info(f"Headers - X-Service-Token present: {x_service_token is not None}, X-Service-Name: {x_service_name}")
     
-    return ProfileDetailResponse.model_validate(profile)
+    try:
+        profile = await ProfileRepository.get_with_relations(session, profile_id)
+        if not profile:
+            raise ProfileNotFoundError(str(profile_id))
+        
+        # Si c'est un appel inter-service (service_info est présent), autoriser l'accès
+        # Sinon, vérifier les permissions utilisateur
+        if not service_info:
+            logger.info(f"No service_info, checking user permissions for profile_id={profile_id}")
+            if not current_user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required"
+                )
+            # Vérifier que l'utilisateur est le propriétaire du profil ou un administrateur
+            is_owner = profile.user_id == current_user.user_id
+            # S'assurer que roles est une liste
+            user_roles = current_user.roles if isinstance(current_user.roles, list) else []
+            is_admin = "ROLE_ADMIN" in user_roles or "ROLE_SUPER_ADMIN" in user_roles
+            if not is_owner and not is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to access this profile"
+                )
+        
+        # Construire la réponse avec les relations - convertir les objets SQLModel en dictionnaires
+        response_data = ProfileResponse.model_validate(profile).model_dump()
+        
+        # Ajouter les relations en convertissant les objets SQLModel en dictionnaires
+        response_data["experiences"] = [ExperienceResponse.model_validate(exp).model_dump() for exp in profile.experiences]
+        response_data["educations"] = [EducationResponse.model_validate(edu).model_dump() for edu in profile.educations]
+        response_data["certifications"] = [CertificationResponse.model_validate(cert).model_dump() for cert in profile.certifications]
+        response_data["skills"] = [SkillResponse.model_validate(skill).model_dump() for skill in profile.skills]
+        
+        # Traiter job_preferences
+        if profile.job_preferences:
+            try:
+                job_pref_dict = JobPreferenceResponse.model_validate(profile.job_preferences).model_dump()
+                response_data["job_preferences"] = job_pref_dict
+            except Exception as job_pref_error:
+                logger.error(f"Error validating job_preferences for profile {profile.id}: {str(job_pref_error)}", exc_info=True)
+                # Si la validation échoue, construire manuellement
+                response_data["job_preferences"] = {
+                    "id": profile.job_preferences.id,
+                    "profile_id": profile.job_preferences.profile_id,
+                    "desired_positions": profile.job_preferences.desired_positions or [],
+                    "contract_type": profile.job_preferences.contract_type,
+                    "target_sectors": profile.job_preferences.target_sectors or [],
+                    "desired_location": profile.job_preferences.desired_location,
+                    "mobility": profile.job_preferences.mobility,
+                    "availability": profile.job_preferences.availability,
+                    "salary_min": getattr(profile.job_preferences, 'salary_min', None),
+                    "salary_max": getattr(profile.job_preferences, 'salary_max', None),
+                    "salary_expectations": getattr(profile.job_preferences, 'salary_expectations', None),
+                    "created_at": profile.job_preferences.created_at.isoformat() if profile.job_preferences.created_at else None,
+                }
+        else:
+            response_data["job_preferences"] = None
+        
+        # Ajouter les champs supplémentaires pour ProfileDetailResponse
+        response_data.update({
+            "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
+            "nationality": profile.nationality,
+            "phone": profile.phone,
+            "address": profile.address,
+            "city": profile.city,
+            "country": profile.country,
+            "sector": profile.sector,
+            "main_job": profile.main_job,
+            "total_experience": profile.total_experience,
+            "admin_report": profile.admin_report,
+            "validated_at": profile.validated_at.isoformat() if profile.validated_at else None,
+            "accept_cgu": profile.accept_cgu,
+            "accept_rgpd": profile.accept_rgpd,
+            "accept_verification": profile.accept_verification,
+        })
+        
+        return response_data
+    except (ProfileNotFoundError, HTTPException):
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_profile for profile_id {profile_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 @router.put("/{profile_id}", response_model=ProfileResponse)
@@ -297,7 +462,7 @@ async def update_profile(
     profile_id: int,
     update_data: ProfileUpdate,
     session: AsyncSession = Depends(get_session),
-    current_user: TokenData = Depends(get_current_user),
+    current_user: Optional[TokenData] = Depends(get_current_user),
     service_info: Optional[dict] = Depends(verify_internal_token)
 ):
     """
@@ -313,18 +478,32 @@ async def update_profile(
     # Si c'est un appel inter-service (service_info est présent), autoriser l'accès
     # Sinon, vérifier les permissions utilisateur
     if not service_info:
+        # Vérifier que current_user existe et a un user_id
+        if not current_user or not hasattr(current_user, 'user_id'):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
         if profile.user_id != current_user.user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to update this profile"
             )
     
-    # Vérifier le statut
-    if profile.status not in [ProfileStatus.DRAFT, ProfileStatus.REJECTED]:
-        raise InvalidProfileStatusError(
-            profile.status.value,
-            "DRAFT or REJECTED"
-        )
+    # Vérifier le statut - permettre la mise à jour du statut uniquement pour les services internes
+    # Les utilisateurs normaux ne peuvent modifier que les profils en DRAFT ou REJECTED
+    update_dict = update_data.model_dump(exclude_unset=True)
+    is_status_update = "status" in update_dict
+    is_internal_service = service_info is not None
+    
+    if not is_internal_service:
+        # Pour les utilisateurs normaux, vérifier que le profil est en DRAFT ou REJECTED
+        if profile.status not in [ProfileStatus.DRAFT, ProfileStatus.REJECTED]:
+            raise InvalidProfileStatusError(
+                profile.status.value,
+                "DRAFT or REJECTED"
+            )
+    # Pour les services internes, permettre la mise à jour du statut même si le profil est déjà validé/rejeté
     
     updated_profile = await ProfileRepository.update(
         session,
@@ -381,24 +560,54 @@ async def create_experience(
     current_user: TokenData = Depends(get_current_user)
 ):
     """Crée une expérience pour un profil"""
-    profile = await ProfileRepository.get_by_id(session, profile_id)
-    if not profile:
-        raise ProfileNotFoundError(str(profile_id))
-    
-    if profile.user_id != current_user.user_id:
+    try:
+        profile = await ProfileRepository.get_by_id(session, profile_id)
+        if not profile:
+            raise ProfileNotFoundError(str(profile_id))
+        
+        if profile.user_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized"
+            )
+        
+        # Convertir les données en dict et ajouter profile_id
+        experience_dict = experience_data.model_dump(exclude_unset=True)
+        experience_dict["profile_id"] = profile_id
+        
+        # Convertir les dates timezone-aware en timezone-naive si nécessaire
+        # (pour éviter l'erreur "can't subtract offset-naive and offset-aware datetimes")
+        from datetime import timezone
+        if "start_date" in experience_dict and experience_dict["start_date"]:
+            start_dt = experience_dict["start_date"]
+            if hasattr(start_dt, 'tzinfo') and start_dt.tzinfo is not None:
+                # Convertir en UTC puis retirer timezone info (timezone-naive)
+                experience_dict["start_date"] = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        if "end_date" in experience_dict and experience_dict["end_date"]:
+            end_dt = experience_dict["end_date"]
+            if hasattr(end_dt, 'tzinfo') and end_dt.tzinfo is not None:
+                # Convertir en UTC puis retirer timezone info (timezone-naive)
+                experience_dict["end_date"] = end_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        # Créer l'expérience
+        experience = await ExperienceRepository.create(session, experience_dict)
+        
+        # Recalculer le pourcentage de complétion
+        await ProfileRepository.update(session, profile_id, {})
+        
+        return ExperienceResponse.model_validate(experience)
+    except HTTPException:
+        # Re-raise les HTTPException (elles ont déjà le bon format)
+        raise
+    except Exception as e:
+        # Logger l'erreur et la retourner avec un message clair
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error creating experience: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating experience: {str(e)}"
         )
-    
-    experience_dict = experience_data.model_dump()
-    experience_dict["profile_id"] = profile_id
-    experience = await ExperienceRepository.create(session, experience_dict)
-    
-    # Recalculer le pourcentage de complétion
-    await ProfileRepository.update(session, profile_id, {})
-    
-    return ExperienceResponse.model_validate(experience)
 
 
 @router.get("/{profile_id}/experiences", response_model=List[ExperienceResponse])

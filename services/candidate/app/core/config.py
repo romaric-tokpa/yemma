@@ -3,6 +3,7 @@ Configuration de l'application
 """
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, model_validator
 
 
 class Settings(BaseSettings):
@@ -37,13 +38,30 @@ class Settings(BaseSettings):
     REDIS_URL: str = ""
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    CORS_ORIGINS: List[str] = Field(
+        default=["http://localhost:3000", "http://localhost:8000", "http://localhost"],
+        description="Allowed CORS origins"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
+    
+    @model_validator(mode="before")
+    @classmethod
+    def parse_cors_origins(cls, data: dict) -> dict:
+        """Parse CORS_ORIGINS from JSON string if provided"""
+        if isinstance(data, dict) and "CORS_ORIGINS" in data:
+            if isinstance(data["CORS_ORIGINS"], str):
+                import json
+                try:
+                    data["CORS_ORIGINS"] = json.loads(data["CORS_ORIGINS"])
+                except json.JSONDecodeError:
+                    # Si ce n'est pas du JSON, essayer de split par virgule
+                    data["CORS_ORIGINS"] = [origin.strip() for origin in data["CORS_ORIGINS"].split(",")]
+        return data
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

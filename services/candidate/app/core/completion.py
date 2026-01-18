@@ -26,6 +26,8 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
     Returns:
         float: Pourcentage de complétion (0-100)
     """
+    import logging
+    logger = logging.getLogger(__name__)
     total_percentage = 0.0
     
     # ============================================
@@ -114,10 +116,12 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
     if identity_max > 0:
         identity_percentage = (identity_points / identity_max) * 20.0
         total_percentage += identity_percentage
+        logger.debug(f"Identité: {identity_points}/{identity_max} = {identity_percentage:.2f}%")
     
     # ============================================
     # 2. EXPÉRIENCES : 30% (minimum 1 avec document)
     # ============================================
+    exp_score = 0.0  # Initialiser pour le logging
     if profile.experiences and len(profile.experiences) > 0:
         complete_experiences = 0
         experiences_with_doc = 0
@@ -170,11 +174,13 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
                 exp_score = min(exp_score + 0.05, 1.0)
             
             total_percentage += exp_score * 30.0
+            logger.debug(f"Expériences: {complete_experiences} complètes, {experiences_with_doc} avec doc, score={exp_score} = {exp_score * 30.0:.2f}%")
     # Si pas d'expériences, 0% pour cette section
     
     # ============================================
     # 3. FORMATIONS : 15%
     # ============================================
+    edu_score = 0.0  # Initialiser pour le logging
     if profile.educations and len(profile.educations) > 0:
         complete_educations = 0
         total_educations = len(profile.educations)
@@ -207,6 +213,7 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
                 edu_score = 0.0
             
             total_percentage += edu_score * 15.0
+            logger.debug(f"Formations: {complete_educations} complètes, score={edu_score} = {edu_score * 15.0:.2f}%")
     # Si pas de formations, 0% pour cette section
     
     # ============================================
@@ -215,11 +222,15 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
     if has_cv:
         # Si un CV PDF existe, la section est complète à 100%
         total_percentage += 25.0
+        logger.debug(f"CV PDF: présent = 25.0%")
+    else:
+        logger.debug(f"CV PDF: absent = 0.0%")
     # Si pas de CV, 0% pour cette section
     
     # ============================================
     # 5. PRÉFÉRENCES : 10%
     # ============================================
+    pref_percentage = 0.0  # Initialiser pour le logging
     if profile.job_preferences:
         pref_points = 0
         pref_max = 0
@@ -237,9 +248,15 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
             pref_points += 2
         pref_max += 2
         
+        # Accepter salary_expectations (ancien format) ou salary_min/salary_max (nouveau format)
         if profile.job_preferences.salary_expectations is not None:
             pref_points += 2
-        pref_max += 2
+            pref_max += 2
+        elif (profile.job_preferences.salary_min is not None or 
+              profile.job_preferences.salary_max is not None):
+            # Si salary_min ou salary_max est défini, considérer comme complété
+            pref_points += 2
+            pref_max += 2
         
         # Champs optionnels (bonus)
         if profile.job_preferences.desired_positions and len(profile.job_preferences.desired_positions) > 0:
@@ -258,10 +275,21 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
         if pref_max > 0:
             pref_percentage = (pref_points / pref_max) * 10.0
             total_percentage += pref_percentage
+            logger.debug(f"Préférences: {pref_points}/{pref_max} = {pref_percentage:.2f}%")
     # Si pas de préférences, 0% pour cette section
     
     # Retourner le pourcentage total (max 100%)
-    return min(round(total_percentage, 2), 100.0)
+    final_percentage = min(round(total_percentage, 2), 100.0)
+    
+    # Calculer les pourcentages pour le logging (même si les sections sont à 0)
+    identity_pct = (identity_points / identity_max) * 20.0 if identity_max > 0 else 0.0
+    exp_pct = exp_score * 30.0
+    edu_pct = edu_score * 15.0
+    cv_pct = 25.0 if has_cv else 0.0
+    pref_pct = pref_percentage
+    
+    logger.info(f"Completion total calculé: {final_percentage}% (Identité: {identity_pct:.1f}%, Exp: {exp_pct:.1f}%, Form: {edu_pct:.1f}%, CV: {cv_pct:.1f}%, Préf: {pref_pct:.1f}%)")
+    return final_percentage
 
 
 def calculate_completion_score(profile: Profile, has_cv: bool = False) -> float:
@@ -290,6 +318,8 @@ async def check_cv_exists(profile_id: int) -> bool:
     Returns:
         True si un CV PDF existe, False sinon
     """
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         import httpx
         import sys
@@ -327,19 +357,23 @@ async def check_cv_exists(profile_id: int) -> bool:
         headers = get_service_token_header("candidate-service")
         
         # Appeler le service Document pour vérifier la présence d'un CV
+        document_url = f"{settings.DOCUMENT_SERVICE_URL}/api/v1/documents/candidate/{profile_id}"
+        logger.debug(f"Vérification CV pour profil {profile_id}: GET {document_url}")
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(
-                f"{settings.DOCUMENT_SERVICE_URL}/api/v1/documents/candidate/{profile_id}",
-                headers=headers
-            )
+            response = await client.get(document_url, headers=headers)
             
             if response.status_code == 200:
                 documents = response.json()
-                # Vérifier s'il y a un document de type CV
-                return any(doc.get("document_type") == "CV" for doc in documents)
+                cv_documents = [doc for doc in documents if doc.get("document_type") == "CV"]
+                has_cv = len(cv_documents) > 0
+                logger.info(f"Vérification CV pour profil {profile_id}: {len(cv_documents)} CV trouvé(s), has_cv={has_cv}")
+                return has_cv
+            else:
+                logger.warning(f"Erreur lors de la vérification du CV pour profil {profile_id}: status_code={response.status_code}")
+                return False
     except Exception as e:
         # En cas d'erreur, on considère qu'il n'y a pas de CV
-        print(f"Warning: Could not check CV existence: {str(e)}")
+        logger.warning(f"Erreur lors de la vérification du CV pour profil {profile_id}: {str(e)}", exc_info=True)
         return False
     
     return False
@@ -349,25 +383,21 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     """
     Vérifie si un profil peut être soumis pour validation
     
-    Selon le cahier des charges, le statut passe de DRAFT à SUBMITTED uniquement si :
-    - Le score de complétion est > 80%
-    - Un CV PDF est présent (obligatoire)
-    - Les champs obligatoires de l'Étape 7 (Préférences) sont remplis
-    - Au moins une expérience avec document justificatif
+    Vérifie uniquement les champs obligatoires (marqués avec *) :
+    - Étape 0 : Consentements (CGU, RGPD, vérification)
+    - Étape 1 : Identité complète (prénom, nom, email, date de naissance, nationalité, téléphone, adresse, titre, résumé, secteur, métier, expérience)
+    - Étape 2 : Au moins une expérience professionnelle complète
+    - Étape 6 : CV PDF obligatoire
+    - Étape 7 : Préférences (type de contrat, localisation, disponibilité, prétentions salariales)
     
     Args:
         profile: Le profil à vérifier
         has_cv: True si un CV PDF a été uploadé (vérifié via service Document)
-        min_completion: Pourcentage minimum requis (défaut: 80%)
+        min_completion: Paramètre ignoré (conservé pour compatibilité)
     
     Returns:
         Tuple (can_submit: bool, reason: str)
     """
-    completion = calculate_completion_percentage(profile, has_cv)
-    
-    if completion < min_completion:
-        return False, f"Le profil n'est pas suffisamment complet ({completion:.1f}% < {min_completion}%). Score requis: {min_completion}%"
-    
     # Vérification obligatoire : CV PDF doit être présent
     if not has_cv:
         return False, "Un CV PDF est obligatoire pour soumettre le profil"
@@ -399,7 +429,7 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
         return False, "Le titre du profil est obligatoire"
     
     if not profile.professional_summary or len(profile.professional_summary) < 300:
-        return False, "Le résumé professionnel (minimum 300 caractères) est obligatoire"
+        return False, "Le résumé professionnel (minimum 300 caractères) est obligatoire (Étape 1)"
     
     if not profile.sector:
         return False, "Le secteur d'activité est obligatoire"
@@ -408,30 +438,36 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
         return False, "Le métier principal est obligatoire"
     
     if profile.total_experience is None:
-        return False, "Les années d'expérience totale sont obligatoires"
+        return False, "Les années d'expérience totale sont obligatoires (Étape 1)"
     
     # Vérifications obligatoires - Étape 2 (Expériences)
     if not profile.experiences or len(profile.experiences) == 0:
         return False, "Au moins une expérience professionnelle est requise"
     
-    # Vérifier que les expériences sont complètes
-    has_experience_with_doc = False
+    # Vérifier que les expériences sont complètes (champs obligatoires uniquement)
     for exp in profile.experiences:
         if not exp.company_name or not exp.position or not exp.start_date:
             return False, "Toutes les expériences doivent avoir au minimum : entreprise, poste et date de début"
         if not exp.is_current and not exp.end_date:
             return False, "Les expériences terminées doivent avoir une date de fin"
-        # Vérifier qu'au moins une expérience a un document
-        if exp.has_document or exp.document_id:
-            has_experience_with_doc = True
     
-    # Au moins une expérience doit avoir un document justificatif
-    if not has_experience_with_doc:
-        return False, "Au moins une expérience professionnelle doit avoir un document justificatif"
+    # Vérifications obligatoires - Étape 3 (Formations)
+    if not profile.educations or len(profile.educations) == 0:
+        return False, "Au moins une formation est requise (Étape 3)"
     
-    # Vérifications obligatoires - Étape 6 (CV PDF)
-    if not has_cv:
-        return False, "Un CV PDF est obligatoire (Étape 6)"
+    # Vérifier que les formations sont complètes
+    for edu in profile.educations:
+        if not edu.diploma or not edu.institution or not edu.graduation_year or not edu.level:
+            return False, "Toutes les formations doivent avoir : diplôme, établissement, année d'obtention et niveau (Étape 3)"
+    
+    # Vérifications obligatoires - Étape 5 (Compétences)
+    if not profile.skills or len(profile.skills) == 0:
+        return False, "Au moins une compétence technique est requise (Étape 5)"
+    
+    # Vérifier que les compétences sont complètes
+    for skill in profile.skills:
+        if not skill.name or not skill.level:
+            return False, "Toutes les compétences doivent avoir un nom et un niveau (Étape 5)"
     
     # Vérifications obligatoires - Étape 7 (Préférences)
     if not profile.job_preferences:
@@ -446,8 +482,18 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     if not profile.job_preferences.availability:
         return False, "La disponibilité est obligatoire (Étape 7)"
     
-    if profile.job_preferences.salary_expectations is None:
-        return False, "Les prétentions salariales sont obligatoires (Étape 7)"
+    # Vérifier les postes recherchés (au moins 1 requis selon le schéma frontend)
+    if not profile.job_preferences.desired_positions or len(profile.job_preferences.desired_positions) == 0:
+        return False, "Au moins un poste recherché est obligatoire (Étape 7)"
+    
+    # Accepter salary_expectations (ancien format) ou salary_min/salary_max (nouveau format)
+    has_salary = (
+        profile.job_preferences.salary_expectations is not None or
+        profile.job_preferences.salary_min is not None or
+        profile.job_preferences.salary_max is not None
+    )
+    if not has_salary:
+        return False, "Les prétentions salariales (min ou max) sont obligatoires (Étape 7)"
     
     return True, "Le profil peut être soumis"
 

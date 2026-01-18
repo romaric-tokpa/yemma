@@ -9,6 +9,7 @@ from app.api.v1 import auth, users, anonymization
 from app.core.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.infrastructure.database import init_db
+from app.infrastructure.seed import seed_admin_user
 
 
 @asynccontextmanager
@@ -16,6 +17,12 @@ async def lifespan(app: FastAPI):
     """Gestion du cycle de vie de l'application"""
     # Startup
     await init_db()
+    # Créer l'utilisateur administrateur par défaut si nécessaire
+    try:
+        await seed_admin_user()
+    except Exception as e:
+        # Ne pas bloquer le démarrage si le seed échoue
+        print(f"⚠️  Erreur lors de la création de l'utilisateur administrateur: {e}")
     yield
     # Shutdown
     pass

@@ -52,14 +52,15 @@ class Step1IdentitySchema(BaseModel):
 class Step2ExperienceSchema(BaseModel):
     """Schéma pour une expérience professionnelle"""
     company_name: str = Field(description="Nom de l'entreprise")
+    company_logo_url: Optional[str] = Field(None, description="URL du logo de l'entreprise")
     company_sector: Optional[str] = Field(None, description="Secteur d'activité")
     position: str = Field(description="Poste occupé")
     contract_type: Optional[str] = Field(None, description="Type de contrat (CDI, CDD, etc.)")
     start_date: datetime = Field(description="Date de début")
     end_date: Optional[datetime] = Field(None, description="Date de fin")
     is_current: bool = Field(False, description="Poste actuel")
-    description: Optional[str] = Field(None, description="Description des missions")
-    achievements: Optional[str] = Field(None, description="Réalisations majeures")
+    description: Optional[str] = Field(None, description="Description des missions (HTML)")
+    achievements: Optional[str] = Field(None, description="Réalisations majeures (HTML)")
     has_document: bool = Field(False, description="Cette expérience est justifiable par un document")
     document_id: Optional[int] = Field(None, description="ID du document justificatif")
 

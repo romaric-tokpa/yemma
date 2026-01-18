@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from app.core.config import settings
 
 
 class CompanyError(Exception):
@@ -42,25 +43,47 @@ class PermissionDeniedError(CompanyError):
 
 async def company_error_handler(request: Request, exc: CompanyError):
     """Handler pour les erreurs du service entreprise"""
+    origin = request.headers.get("origin")
+    headers = {}
+    
+    # Ajouter les en-têtes CORS si l'origine est autorisée
+    if origin and origin in settings.cors_origins_list:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+    
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "error": True,
             "message": exc.message,
             "path": str(request.url),
-        }
+        },
+        headers=headers
     )
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handler pour les exceptions HTTP standard"""
+    origin = request.headers.get("origin")
+    headers = {}
+    
+    # Ajouter les en-têtes CORS si l'origine est autorisée
+    if origin and origin in settings.cors_origins_list:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+    
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "error": True,
             "message": exc.detail,
             "path": str(request.url),
-        }
+        },
+        headers=headers
     )
 
 
@@ -74,6 +97,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "type": error["type"],
         })
     
+    origin = request.headers.get("origin")
+    headers = {}
+    
+    # Ajouter les en-têtes CORS si l'origine est autorisée
+    if origin and origin in settings.cors_origins_list:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+    
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
@@ -81,7 +114,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "message": "Validation error",
             "details": {"validation_errors": errors},
             "path": str(request.url),
-        }
+        },
+        headers=headers
     )
 
 

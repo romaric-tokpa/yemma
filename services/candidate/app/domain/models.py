@@ -51,8 +51,8 @@ class Profile(SQLModel, table=True):
     user_id: int = Field(unique=True, index=True, description="ID utilisateur (auth-service)")
     
     # Informations d'identité
-    first_name: str = Field(max_length=100, description="Prénom")
-    last_name: str = Field(max_length=100, description="Nom")
+    first_name: Optional[str] = Field(default=None, max_length=100, description="Prénom")
+    last_name: Optional[str] = Field(default=None, max_length=100, description="Nom")
     date_of_birth: Optional[datetime] = Field(default=None, description="Date de naissance")
     nationality: Optional[str] = Field(default=None, max_length=100, description="Nationalité")
     photo_url: Optional[str] = Field(default=None, max_length=500, description="URL de la photo")
@@ -110,6 +110,7 @@ class Experience(SQLModel, table=True):
     profile_id: int = Field(foreign_key="profiles.id", index=True, description="ID du profil")
     
     company_name: str = Field(max_length=255, description="Nom de l'entreprise")
+    company_logo_url: Optional[str] = Field(default=None, max_length=500, description="URL du logo de l'entreprise")
     company_sector: Optional[str] = Field(default=None, max_length=100, description="Secteur d'activité")
     position: str = Field(max_length=255, description="Poste occupé")
     contract_type: Optional[ContractType] = Field(default=None, description="Type de contrat")
@@ -202,7 +203,9 @@ class JobPreference(SQLModel, table=True):
     desired_location: Optional[str] = Field(default=None, max_length=255, description="Localisation souhaitée")
     mobility: Optional[str] = Field(default=None, max_length=100, description="Mobilité géographique")
     availability: Optional[str] = Field(default=None, max_length=100, description="Disponibilité")
-    salary_expectations: Optional[float] = Field(default=None, description="Prétentions salariales")
+    salary_min: Optional[float] = Field(default=None, description="Salaire minimum (CFA/mois)")
+    salary_max: Optional[float] = Field(default=None, description="Salaire maximum (CFA/mois)")
+    salary_expectations: Optional[float] = Field(default=None, description="Prétentions salariales (pour compatibilité, moyenne de la fourchette)")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)

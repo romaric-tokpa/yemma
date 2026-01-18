@@ -6,6 +6,7 @@ python-dotenv==1.0.0
 
 # ElasticSearch
 elasticsearch==8.11.0
+aiohttp==3.9.1  # Requis pour AsyncElasticsearch dans Elasticsearch 8.x
 
 # HTTP Client (pour appels inter-services)
 httpx==0.25.2

@@ -44,7 +44,7 @@ class Company(SQLModel, table=True):
     adresse: Optional[str] = Field(default=None, max_length=500, description="Adresse de l'entreprise")
     legal_id: str = Field(unique=True, index=True, max_length=50, description="SIRET ou ID légal")
     logo_url: Optional[str] = Field(default=None, max_length=500, description="URL du logo")
-    admin_id: int = Field(foreign_key="users.id", index=True, description="ID du compte maître (admin)")
+    admin_id: int = Field(index=True, description="ID du compte maître (admin) - Référence vers users dans auth-service, sans contrainte FK")
     status: CompanyStatus = Field(default=CompanyStatus.ACTIVE, description="Statut de l'entreprise")
     subscription_id: Optional[int] = Field(default=None, description="ID de l'abonnement")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -61,7 +61,7 @@ class TeamMember(SQLModel, table=True):
     __tablename__ = "team_members"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True, description="ID utilisateur (auth-service)")
+    user_id: int = Field(index=True, description="ID utilisateur (auth-service) - Référence vers users dans auth-service, sans contrainte FK")
     company_id: int = Field(foreign_key="companies.id", index=True, description="ID de l'entreprise")
     role_in_company: TeamMemberRole = Field(default=TeamMemberRole.RECRUTEUR, description="Rôle dans l'entreprise")
     status: TeamMemberStatus = Field(default=TeamMemberStatus.PENDING, description="Statut du membre")
@@ -90,10 +90,15 @@ class Invitation(SQLModel, table=True):
     role: TeamMemberRole = Field(default=TeamMemberRole.RECRUTEUR, description="Rôle assigné (RECRUTEUR par défaut)")
     status: InvitationStatus = Field(default=InvitationStatus.PENDING, description="Statut de l'invitation")
     expires_at: datetime = Field(index=True, description="Date d'expiration")
-    invited_by: int = Field(foreign_key="users.id", description="ID de l'utilisateur qui a envoyé l'invitation")
+    invited_by: int = Field(description="ID de l'utilisateur qui a envoyé l'invitation - Référence vers users dans auth-service, sans contrainte FK")
     accepted_at: Optional[datetime] = Field(default=None, description="Date d'acceptation")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relations
     company: Company = Relationship(back_populates="invitations")
+
+
+# Alias pour compatibilité avec le code existant
+# TODO: Migrer progressivement vers TeamMember
+Recruiter = TeamMember
 

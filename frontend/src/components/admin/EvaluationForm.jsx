@@ -43,26 +43,28 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
       
       if (currentAction === 'validate') {
         // Appeler l'endpoint Admin Service pour valider
-        await adminApi.validateProfile(candidateId, {
+        const response = await adminApi.validateProfile(candidateId, {
           overallScore: data.overallScore,
           softSkills: data.softSkills,
           summary: data.summary,
         })
         
-        alert('Profil validé avec succès ! L\'indexation dans ElasticSearch est en cours.')
+        // Le statut est maintenant mis à jour de façon synchrone
+        // Attendre un peu pour laisser le temps à la réponse d'arriver
         if (onSuccess) {
-          onSuccess()
+          await onSuccess()
         }
       } else if (currentAction === 'reject') {
         // Pour le rejet, on utilise le résumé comme motif de rejet
-        await adminApi.rejectProfile(candidateId, {
+        const response = await adminApi.rejectProfile(candidateId, {
           rejectionReason: data.summary || 'Non spécifié',
           overallScore: data.overallScore || null,
         })
         
-        alert('Profil rejeté avec succès.')
+        // Le statut est maintenant mis à jour de façon synchrone
+        // Attendre un peu pour laisser le temps à la réponse d'arriver
         if (onSuccess) {
-          onSuccess()
+          await onSuccess()
         }
       }
       

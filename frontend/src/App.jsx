@@ -1,99 +1,217 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { ThemeProvider } from './contexts/ThemeContext'
 import OnboardingStepper from './components/OnboardingStepper'
 import OnboardingComplete from './pages/OnboardingComplete'
 import CandidateDashboard from './pages/CandidateDashboard'
 import AdminReview from './pages/AdminReview'
+import AdminDashboard from './pages/AdminDashboard'
 import { SearchPage } from './pages/SearchPage'
 import { ProSearchPage } from './pages/ProSearchPage'
 import { CandidateDetailPage } from './pages/CandidateDetailPage'
 import { CompanyManagement } from './pages/CompanyManagement'
+import CompanyDashboard from './pages/CompanyDashboard'
+import CompanyOnboarding from './pages/CompanyOnboarding'
+import Home from './pages/Home'
+import Login from './pages/Login'
+import RegisterCandidat from './pages/RegisterCandidat'
+import RegisterCompany from './pages/RegisterCompany'
+import AuthGuard from './components/AuthGuard'
 import './index.css'
 
 function App() {
   return (
-    <Router>
+    <ThemeProvider>
+      <Router>
       <Routes>
-        <Route path="/" element={
-          <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
-            <h1>Yemma Solutions - Plateforme de Recrutement</h1>
-            <p>Frontend React - En développement</p>
-            
-            <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-              {/* Section Candidat */}
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem' }}>
-                <h2 style={{ marginBottom: '1rem' }}>Candidat</h2>
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  <li style={{ marginBottom: '0.5rem' }}>
-                    <a href="/candidate/dashboard" style={{ color: '#2563eb', textDecoration: 'none' }}>
-                      Mon Dashboard
-                    </a>
-                  </li>
-                  <li style={{ marginBottom: '0.5rem' }}>
-                    <a href="/onboarding" style={{ color: '#2563eb', textDecoration: 'none' }}>
-                      Créer/Modifier mon profil
-                    </a>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Section Recruteur */}
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem' }}>
-                <h2 style={{ marginBottom: '1rem' }}>Recruteur</h2>
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  <li style={{ marginBottom: '0.5rem' }}>
-                    <a href="/search" style={{ color: '#2563eb', textDecoration: 'none' }}>
-                      Rechercher des candidats
-                    </a>
-                  </li>
-                  <li style={{ marginBottom: '0.5rem' }}>
-                    <a href="/search/pro" style={{ color: '#2563eb', textDecoration: 'none' }}>
-                      Recherche avancée
-                    </a>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Section Admin */}
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '1.5rem' }}>
-                <h2 style={{ marginBottom: '1rem' }}>Administrateur</h2>
-                <ul style={{ listStyle: 'none', padding: 0 }}>
-                  <li style={{ marginBottom: '0.5rem' }}>
-                    <a href="/admin/review/1" style={{ color: '#2563eb', textDecoration: 'none' }}>
-                      Valider un profil
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '2rem' }}>
-              <h2>Services API disponibles :</h2>
-              <ul>
-                <li>
-                  <a href="http://localhost:8001/docs" target="_blank" rel="noopener noreferrer">
-                    Auth Service API
-                  </a>
-                </li>
-                <li>
-                  <a href="http://localhost:8002/docs" target="_blank" rel="noopener noreferrer">
-                    Candidate Service API
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        } />
-        <Route path="/onboarding" element={<OnboardingStepper />} />
-        <Route path="/onboarding/complete" element={<OnboardingComplete />} />
-        <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
-        <Route path="/admin/review/:candidateId" element={<AdminReview />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/search/pro" element={<ProSearchPage />} />
-        <Route path="/candidates/:candidateId" element={<CandidateDetailPage />} />
-        <Route path="/company/management" element={<CompanyManagement />} />
+        {/* Page d'accueil publique */}
+        <Route path="/" element={<Home />} />
+        
+        {/* Routes d'authentification (publiques) */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register/candidat" element={<RegisterCandidat />} />
+        <Route path="/register/company" element={<RegisterCompany />} />
+        
+        {/* Routes protégées - Candidat */}
+        {/* Routes pour chaque étape de l'onboarding */}
+        <Route 
+          path="/onboarding" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <Navigate to="/onboarding/step0" replace />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step0" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step1" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step2" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step3" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step4" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step5" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step6" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step7" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/step8" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingStepper />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/onboarding/complete" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <OnboardingComplete />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/candidate/dashboard" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+              <CandidateDashboard />
+            </AuthGuard>
+          } 
+        />
+        
+        {/* Routes protégées - Recruteur / Entreprise */}
+        <Route 
+          path="/company/onboarding" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
+              <CompanyOnboarding />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/company/dashboard" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+              <CompanyDashboard />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/company/search" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+              <CompanyDashboard />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/company/management" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+              <CompanyDashboard />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/search" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_RECRUITER', 'ROLE_COMPANY_ADMIN']}>
+              <SearchPage />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/search/pro" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_RECRUITER', 'ROLE_COMPANY_ADMIN']}>
+              <ProSearchPage />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/candidates/:candidateId" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_RECRUITER', 'ROLE_COMPANY_ADMIN']}>
+              <CandidateDetailPage />
+            </AuthGuard>
+          } 
+        />
+        
+        {/* Routes protégées - Admin */}
+        <Route 
+          path="/admin/dashboard" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+              <AdminDashboard />
+            </AuthGuard>
+          } 
+        />
+        <Route 
+          path="/admin/review/:candidateId" 
+          element={
+            <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+              <AdminReview />
+            </AuthGuard>
+          } 
+        />
+        
+        {/* Redirection par défaut */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </ThemeProvider>
   )
 }
 

@@ -37,10 +37,10 @@ class Settings(BaseSettings):
     NOTIFICATION_SERVICE_URL: str = Field(default="http://localhost:8007", description="Notification service URL")
     FRONTEND_URL: str = Field(default="http://localhost:3000", description="Frontend URL")
 
-    # CORS
-    CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
-        description="Allowed CORS origins"
+    # CORS (défini comme string pour éviter les problèmes de parsing)
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:8000,http://localhost",
+        description="Allowed CORS origins (comma-separated string)"
     )
 
     model_config = SettingsConfigDict(
@@ -48,6 +48,13 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Retourne CORS_ORIGINS comme une liste"""
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
+        return self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else []
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

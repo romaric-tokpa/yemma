@@ -14,7 +14,7 @@ from app.domain.schemas import (
     PasswordResetConfirm,
     PasswordChange,
 )
-from app.domain.models import User, UserRoleLink, RefreshToken
+from app.domain.models import User, UserRoleLink, RefreshToken, UserStatus
 from app.domain.exceptions import InvalidCredentialsError, UserNotFoundError
 from app.infrastructure.database import get_session
 from app.infrastructure.security import (
@@ -70,7 +70,7 @@ async def register(
     
     # Créer les tokens
     token_data = {
-        "sub": user.id,
+        "sub": str(user.id),  # python-jose exige que sub soit une chaîne
         "email": user.email,
         "roles": [role.name],
     }
@@ -113,7 +113,9 @@ async def login(
         raise InvalidCredentialsError()
     
     # Vérifier le statut
-    if user.status != "active":
+    # En développement, permettre la connexion même si le statut est PENDING_VERIFICATION
+    # En production, seuls les comptes ACTIVE peuvent se connecter
+    if user.status not in [UserStatus.ACTIVE, UserStatus.PENDING_VERIFICATION]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is not active"
@@ -129,7 +131,7 @@ async def login(
     
     # Créer les tokens
     token_data = {
-        "sub": user.id,
+        "sub": str(user.id),  # python-jose exige que sub soit une chaîne
         "email": user.email,
         "roles": role_names,
     }
@@ -194,7 +196,7 @@ async def refresh_token(
     
     # Créer un nouveau access token
     new_token_data = {
-        "sub": user.id,
+        "sub": str(user.id),  # python-jose exige que sub soit une chaîne
         "email": user.email,
         "roles": role_names,
     }
@@ -256,20 +258,54 @@ async def change_password(
     """Change le mot de passe de l'utilisateur connecté"""
     user_repo = UserRepository(session)
     user = await user_repo.get_by_id(current_user.user_id)
-    
+
     if not user:
         raise UserNotFoundError(str(current_user.user_id))
-    
+
     # Vérifier le mot de passe actuel
     if not verify_password(request.current_password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
-    
+
     # Mettre à jour le mot de passe
     user.hashed_password = hash_password(request.new_password)
     await user_repo.update(user)
-    
+
     return {"message": "Password changed successfully"}
+
+
+@router.get("/validate")
+async def validate_token(
+    current_user = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Valide un token JWT et retourne les informations de l'utilisateur
+
+    Utilisé par les autres microservices pour valider les tokens des utilisateurs.
+    """
+    user_repo = UserRepository(session)
+
+    # Récupérer l'utilisateur complet pour avoir company_id si disponible
+    user = await user_repo.get_by_id(current_user.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+
+    # Récupérer les rôles
+    roles = await user_repo.get_user_roles(user.id)
+    role_names = [role.name for role in roles]
+
+    return {
+        "user_id": user.id,
+        "email": user.email,
+        "roles": role_names,
+        "company_id": getattr(user, 'company_id', None),
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+    }
 

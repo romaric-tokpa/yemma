@@ -209,8 +209,10 @@ async def post_search_candidates(request: PostSearchRequest):
             main_job_highlight=main_job_highlight,
             years_of_experience=source.get("years_of_experience", 0),
             location=source.get("location"),
+            availability=source.get("availability"),
             skills=skills,
             is_verified=source.get("is_verified", False),
+            photo_url=source.get("photo_url"),
             score=hit.get("_score"),
         ))
     

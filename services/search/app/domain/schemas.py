@@ -59,13 +59,25 @@ class SearchRequest(BaseModel):
     size: int = Field(20, ge=1, le=100, description="Taille de la page")
 
 
+class ExperienceRange(BaseModel):
+    """Schéma pour une tranche d'expérience"""
+    min: int = Field(ge=0, description="Années d'expérience minimum")
+    max: Optional[int] = Field(None, description="Années d'expérience maximum (None = pas de limite)")
+
+
 class PostSearchRequest(BaseModel):
     """Schéma de requête POST pour la recherche avec highlight"""
     query: Optional[str] = Field(None, description="Recherche texte libre (titre, résumé, compétences)")
     min_experience: Optional[int] = Field(None, ge=0, description="Expérience minimum (années)")
+    experience_ranges: Optional[List[ExperienceRange]] = Field(None, description="Tranches d'expérience")
     skills: Optional[List[str]] = Field(default=[], description="Liste de compétences (format: 'Python' ou 'Python:Expert')")
     skills_with_level: Optional[List[SkillFilter]] = Field(None, description="Filtre par compétences avec niveau précis")
     location: Optional[str] = Field(None, description="Localisation")
+    job_title: Optional[str] = Field(None, description="Titre de poste recherché")
+    availability: Optional[List[str]] = Field(None, description="Disponibilités (immediate, within_1_month, etc.)")
+    education_levels: Optional[List[str]] = Field(None, description="Niveaux d'étude (BAC, BTS, LICENCE, etc.)")
+    salary_ranges: Optional[List[str]] = Field(None, description="Tranches salariales (0-500k, 500k-1m, etc.)")
+    languages: Optional[Dict[str, str]] = Field(None, description="Langues avec niveaux (ex: {'Français': 'courant'})")
     page: int = Field(1, ge=1, description="Numéro de page")
     size: int = Field(20, ge=1, le=100, description="Taille de la page")
 
@@ -97,8 +109,10 @@ class PostSearchResult(BaseModel):
     main_job_highlight: Optional[str] = None  # Métier principal avec highlight
     years_of_experience: int
     location: Optional[str] = None
+    availability: Optional[str] = None  # Disponibilité du candidat
     skills: List[Dict[str, str]] = []
     is_verified: bool
+    photo_url: Optional[str] = None  # Photo de profil du candidat
     score: Optional[float] = None
 
 

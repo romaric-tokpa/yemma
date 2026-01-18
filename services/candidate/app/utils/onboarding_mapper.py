@@ -64,6 +64,8 @@ def map_step2_to_experiences(step2_data: Dict[str, Any]) -> List[Dict[str, Any]]
             "position": exp.get("position", ""),
         }
         
+        if "companyLogoUrl" in exp and exp["companyLogoUrl"]:
+            exp_data["company_logo_url"] = exp["companyLogoUrl"]
         if "companySector" in exp:
             exp_data["company_sector"] = exp["companySector"]
         if "contractType" in exp:
