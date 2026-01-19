@@ -31,6 +31,15 @@ async def send_notification_task(
         template_data: Données pour le template
         notification_id: ID de la notification en base (optionnel)
     """
+    logger.info("=" * 80)
+    logger.info(f"📧 STARTING send_notification_task")
+    logger.info(f"   notification_type: {notification_type}")
+    logger.info(f"   recipient_email: {recipient_email}")
+    logger.info(f"   recipient_name: {recipient_name}")
+    logger.info(f"   notification_id: {notification_id}")
+    logger.info(f"   template_data keys: {list(template_data.keys())}")
+    logger.info("=" * 80)
+    
     try:
         # Récupérer le template (utilise les templates simples pour les 3 types principaux)
         template_data_with_name = {
@@ -40,12 +49,17 @@ async def send_notification_task(
         
         # Utiliser les templates simples pour validation, rejection, invitation
         if notification_type in ["profile_validated", "profile_rejected", "recruiter_invitation"]:
+            logger.info(f"Using simple template for notification type: {notification_type}")
             subject, html_body, text_body = get_email_template_simple(notification_type, template_data_with_name)
         else:
             # Utiliser les anciens templates pour les autres types
+            logger.info(f"Using legacy template for notification type: {notification_type}")
             subject, html_body, text_body = get_email_template_legacy(notification_type, template_data_with_name)
         
+        logger.info(f"Prepared email for {recipient_email}: subject='{subject}', html_body_length={len(html_body)}, text_body_length={len(text_body) if text_body else 0}")
+        
         # Envoyer l'email
+        logger.info(f"Calling EmailSender.send_email for {recipient_email}...")
         success = await EmailSender.send_email(
             to_email=recipient_email,
             subject=subject,
@@ -53,6 +67,7 @@ async def send_notification_task(
             text_body=text_body,
             to_name=recipient_name
         )
+        logger.info(f"EmailSender.send_email returned: {success}")
         
         # Mettre à jour le statut de la notification en base
         if notification_id:

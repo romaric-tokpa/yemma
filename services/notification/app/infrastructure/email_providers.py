@@ -17,6 +17,10 @@ class FastAPIMailProvider:
         # Format MAIL_FROM: "Name <email@example.com>" ou simplement l'email
         mail_from = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>" if settings.SMTP_FROM_NAME else settings.SMTP_FROM_EMAIL
         
+        # Log de la configuration (sans afficher le mot de passe complet)
+        logger.info(f"Initializing FastAPI-Mail with SMTP_HOST={settings.SMTP_HOST}, SMTP_PORT={settings.SMTP_PORT}, SMTP_USER={settings.SMTP_USER}, SMTP_FROM={mail_from}")
+        logger.debug(f"SMTP_PASSWORD length: {len(settings.SMTP_PASSWORD) if settings.SMTP_PASSWORD else 0}")
+        
         self.config = ConnectionConfig(
             MAIL_USERNAME=settings.SMTP_USER,
             MAIL_PASSWORD=settings.SMTP_PASSWORD,
@@ -29,6 +33,7 @@ class FastAPIMailProvider:
             VALIDATE_CERTS=True
         )
         self.fastmail = FastMail(self.config)
+        logger.info("FastAPI-Mail provider initialized successfully")
     
     async def send_email(
         self,
@@ -40,6 +45,8 @@ class FastAPIMailProvider:
     ) -> bool:
         """Envoie un email via FastAPI-Mail"""
         try:
+            logger.info(f"Attempting to send email via FastAPI-Mail to {to_email} with subject: {subject}")
+            
             message = MessageSchema(
                 subject=subject,
                 recipients=[to_email],
@@ -51,11 +58,12 @@ class FastAPIMailProvider:
                 # FastAPI-Mail gère automatiquement le texte alternatif
                 pass
             
+            logger.debug(f"Sending message to {to_email}...")
             await self.fastmail.send_message(message)
-            logger.info(f"Email sent via FastAPI-Mail to {to_email}")
+            logger.info(f"✅ Email sent successfully via FastAPI-Mail to {to_email}")
             return True
         except Exception as e:
-            logger.error(f"Failed to send email via FastAPI-Mail: {str(e)}")
+            logger.error(f"❌ Failed to send email via FastAPI-Mail to {to_email}: {str(e)}", exc_info=True)
             raise EmailError(f"Failed to send email via FastAPI-Mail: {str(e)}")
 
 
@@ -109,13 +117,17 @@ class MockEmailProvider:
 def get_email_provider():
     """Retourne le provider d'email configuré"""
     provider_name = settings.EMAIL_PROVIDER.lower()
+    logger.info(f"Getting email provider: {provider_name} (from EMAIL_PROVIDER={settings.EMAIL_PROVIDER})")
     
     if provider_name == "fastapi_mail":
+        logger.info("Using FastAPIMailProvider")
         return FastAPIMailProvider()
     elif provider_name == "mock":
+        logger.info("Using MockEmailProvider")
         return MockEmailProvider()
     else:
         # Pour smtp, sendgrid, mailgun, on utilise l'ancien EmailSender
+        logger.info(f"Using EmailSender for provider: {provider_name}")
         from app.infrastructure.email_sender import EmailSender
         return EmailSender()
 

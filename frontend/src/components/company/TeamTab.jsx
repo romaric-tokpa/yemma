@@ -119,7 +119,7 @@ export function TeamTab({ companyId, onUpdate }) {
             <div className="divide-y divide-border">
               {teamMembers.map((member, index) => (
                 <div 
-                  key={member.id} 
+                  key={`${member.type}-${member.id}`}
                   className="p-6 hover:bg-gray-light transition-colors"
                 >
                   <div className="flex items-center justify-between">
@@ -133,7 +133,7 @@ export function TeamTab({ companyId, onUpdate }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <h3 className="font-semibold text-lg text-gray-anthracite font-heading truncate">
-                            {member.user_email || member.email || 'Membre'}
+                            {member.email || member.user_email || 'Membre'}
                           </h3>
                           
                           {/* Badge rôle */}
@@ -149,7 +149,12 @@ export function TeamTab({ companyId, onUpdate }) {
                           </Badge>
                           
                           {/* Badge statut */}
-                          {member.status === 'active' ? (
+                          {member.type === 'invitation' ? (
+                            <Badge variant="outline" className="text-xs text-orange-600 border-orange-600 bg-orange-50">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Invitation en attente
+                            </Badge>
+                          ) : member.status === 'active' ? (
                             <Badge variant="outline" className="text-xs text-green-600 border-green-600 bg-green-50">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Actif
@@ -162,8 +167,28 @@ export function TeamTab({ companyId, onUpdate }) {
                           )}
                         </div>
                         
-                        {/* Date de jointure */}
-                        {member.joined_at && (
+                        {/* Date de jointure ou date d'invitation */}
+                        {member.type === 'invitation' ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Mail className="h-4 w-4" />
+                            <span>
+                              Invité le {new Date(member.created_at).toLocaleDateString('fr-FR', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                              {member.expires_at && (
+                                <span className="ml-2">
+                                  • Expire le {new Date(member.expires_at).toLocaleDateString('fr-FR', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  })}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        ) : member.joined_at ? (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Mail className="h-4 w-4" />
                             <span>
@@ -174,12 +199,16 @@ export function TeamTab({ companyId, onUpdate }) {
                               })}
                             </span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                     
                     {/* Bouton de suppression */}
-                    {member.role_in_company !== 'ADMIN_ENTREPRISE' && (
+                    {member.type === 'invitation' ? (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        En attente de réponse
+                      </Badge>
+                    ) : member.role_in_company !== 'ADMIN_ENTREPRISE' && (
                       <Button
                         variant="destructive"
                         size="sm"

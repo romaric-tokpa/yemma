@@ -39,8 +39,11 @@ export default function AuthGuard({ children, allowedRoles = [], requireAuth = t
                 // Rediriger selon le rôle de l'utilisateur
                 if (roles.includes('ROLE_CANDIDAT')) {
                   navigate('/candidate/dashboard')
-                } else if (roles.includes('ROLE_COMPANY_ADMIN') || roles.includes('ROLE_RECRUITER')) {
-                  navigate('/company/management')
+                } else if (roles.includes('ROLE_RECRUITER')) {
+                  // Les recruteurs ont accès uniquement à la recherche
+                  navigate('/company/search')
+                } else if (roles.includes('ROLE_COMPANY_ADMIN')) {
+                  navigate('/company/dashboard')
                 } else if (roles.includes('ROLE_ADMIN') || roles.includes('ROLE_SUPER_ADMIN')) {
                   navigate('/admin/review/1')
                 } else {

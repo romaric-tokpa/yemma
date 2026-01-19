@@ -67,7 +67,7 @@ export default function Login() {
             navigate('/onboarding')
           }
         }
-      } else if (roles.includes('ROLE_COMPANY_ADMIN') || roles.includes('ROLE_RECRUITER')) {
+      } else if (roles.includes('ROLE_COMPANY_ADMIN')) {
         // Vérifier si l'entreprise existe
         try {
           await companyApi.getMyCompany()
@@ -82,6 +82,18 @@ export default function Login() {
             // En cas d'erreur, rediriger vers l'onboarding par sécurité
             navigate('/company/onboarding')
           }
+        }
+      } else if (roles.includes('ROLE_RECRUITER')) {
+        // Les recruteurs ont accès uniquement à la recherche de candidats
+        // Vérifier si l'entreprise existe (pour s'assurer que le TeamMember est bien créé)
+        try {
+          await companyApi.getMyCompany()
+          // L'entreprise existe, rediriger directement vers la recherche
+          navigate('/company/search')
+        } catch (companyError) {
+          // Si l'entreprise n'existe pas, il y a un problème
+          console.error('Erreur: Le recruteur n\'est pas associé à une entreprise:', companyError)
+          setError('Votre compte n\'est pas encore associé à une entreprise. Contactez votre administrateur.')
         }
       } else if (roles.includes('ROLE_ADMIN') || roles.includes('ROLE_SUPER_ADMIN')) {
         navigate('/admin/dashboard')

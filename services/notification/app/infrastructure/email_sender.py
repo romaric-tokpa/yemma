@@ -33,10 +33,15 @@ class EmailSender:
             text_body: Corps texte (optionnel)
             to_name: Nom du destinataire (optionnel)
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         provider_name = settings.EMAIL_PROVIDER.lower()
+        logger.info(f"EmailSender.send_email called with provider: {provider_name} (EMAIL_PROVIDER={settings.EMAIL_PROVIDER})")
         
         # Utiliser les nouveaux providers (FastAPI-Mail, Mock)
         if provider_name in ["fastapi_mail", "mock"]:
+            logger.info(f"Using new provider system for: {provider_name}")
             provider = get_email_provider()
             return await provider.send_email(to_email, subject, html_body, text_body, to_name)
         

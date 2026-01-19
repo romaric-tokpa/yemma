@@ -16,6 +16,7 @@ import Home from './pages/Home'
 import Login from './pages/Login'
 import RegisterCandidat from './pages/RegisterCandidat'
 import RegisterCompany from './pages/RegisterCompany'
+import AcceptInvitation from './pages/AcceptInvitation'
 import AuthGuard from './components/AuthGuard'
 import './index.css'
 
@@ -31,6 +32,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register/candidat" element={<RegisterCandidat />} />
         <Route path="/register/company" element={<RegisterCompany />} />
+        <Route path="/invitation/accept" element={<AcceptInvitation />} />
         
         {/* Routes protégées - Candidat */}
         {/* Routes pour chaque étape de l'onboarding */}
@@ -143,7 +145,7 @@ function App() {
         <Route 
           path="/company/dashboard" 
           element={
-            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
               <CompanyDashboard />
             </AuthGuard>
           } 
@@ -152,14 +154,14 @@ function App() {
           path="/company/search" 
           element={
             <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
-              <CompanyDashboard />
+              <ProSearchPage />
             </AuthGuard>
           } 
         />
         <Route 
           path="/company/management" 
           element={
-            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
               <CompanyDashboard />
             </AuthGuard>
           } 

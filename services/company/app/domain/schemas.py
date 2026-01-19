@@ -100,6 +100,24 @@ RecruiterResponse = TeamMemberResponse
 RecruiterDetailResponse = TeamMemberDetailResponse
 
 
+class TeamMemberOrInvitationResponse(BaseModel):
+    """Schéma unifié pour TeamMember ou Invitation (pour l'affichage dans la section équipe)"""
+    id: int
+    type: str = Field(..., description="Type: 'member' ou 'invitation'")
+    email: str = Field(..., description="Email du membre ou de l'invité")
+    role_in_company: TeamMemberRole
+    status: str = Field(..., description="Status du membre ou de l'invitation")
+    joined_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    user_id: Optional[int] = None  # Pour les TeamMember
+    invitation_id: Optional[int] = None  # Pour les Invitation
+    expires_at: Optional[datetime] = None  # Pour les Invitation
+
+    class Config:
+        from_attributes = True
+
+
 # ============================================
 # Invitation Schemas
 # ============================================
@@ -128,11 +146,11 @@ class InvitationResponse(BaseModel):
 
 
 class InvitationAcceptRequest(BaseModel):
-    """Schéma pour accepter une invitation"""
+    """Schéma pour accepter une invitation et créer le compte"""
     token: str = Field(..., description="Token d'invitation")
-    password: str = Field(..., min_length=8, description="Mot de passe pour créer le compte (si compte n'existe pas)")
-    first_name: Optional[str] = Field(None, max_length=100, description="Prénom (requis si création de compte)")
-    last_name: Optional[str] = Field(None, max_length=100, description="Nom (requis si création de compte)")
+    password: str = Field(..., min_length=8, description="Mot de passe pour créer le compte")
+    first_name: str = Field(..., min_length=1, max_length=100, description="Prénom")
+    last_name: str = Field(..., min_length=1, max_length=100, description="Nom")
 
 
 # ============================================

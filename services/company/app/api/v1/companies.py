@@ -13,13 +13,16 @@ from app.domain.schemas import (
     CompanyResponse,
     CompanyDetailResponse,
     RecruiterResponse,
+    TeamMemberOrInvitationResponse,
 )
-from app.domain.models import Company, TeamMember
+from app.domain.models import Company, TeamMember, Invitation, InvitationStatus
+from app.infrastructure.repositories import InvitationRepository
 from app.core.exceptions import CompanyNotFoundError
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, TokenData
 from app.infrastructure.permissions import require_company_admin, require_company_master
 from app.infrastructure.repositories import CompanyRepository, TeamMemberRepository
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -173,24 +176,82 @@ async def get_my_company(
         )
 
 
-@router.get("/{company_id}/team-members", response_model=List[RecruiterResponse])
+@router.get("/{company_id}/team-members", response_model=List[TeamMemberOrInvitationResponse])
 async def get_company_team_members(
     company_id: int,
     current_user: TokenData = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Récupère tous les membres de l'équipe d'une entreprise
+    Récupère tous les membres de l'équipe d'une entreprise, y compris les invitations en attente
     
     Accessible par :
     - L'admin de l'entreprise
     - Les super admins
     """
+    import httpx
+    
     # Vérifier que l'utilisateur est admin de l'entreprise
     await require_company_admin(company_id, current_user, session)
     
     team_member_repo = TeamMemberRepository(session)
     team_members = await team_member_repo.get_by_company_id(company_id)
     
-    return [RecruiterResponse.model_validate(tm) for tm in team_members]
+    # Récupérer aussi les invitations en attente
+    invitation_repo = InvitationRepository(session)
+    pending_invitations = await invitation_repo.get_by_company_id(company_id)
+    # Filtrer seulement les invitations PENDING
+    pending_invitations = [inv for inv in pending_invitations if inv.status == InvitationStatus.PENDING]
+    
+    result = []
+    
+    # Ajouter les TeamMember
+    for tm in team_members:
+        # Récupérer l'email de l'utilisateur depuis auth-service si possible
+        user_email = None
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"{settings.AUTH_SERVICE_URL}/api/v1/users/{tm.user_id}"
+                )
+                if response.status_code == 200:
+                    user_data = response.json()
+                    user_email = user_data.get("email")
+        except Exception:
+            pass
+        
+        result.append(TeamMemberOrInvitationResponse(
+            id=tm.id,
+            type="member",
+            email=user_email or f"user_{tm.user_id}",
+            role_in_company=tm.role_in_company,
+            status=tm.status.value if hasattr(tm.status, 'value') else str(tm.status),
+            joined_at=tm.joined_at,
+            created_at=tm.created_at,
+            updated_at=tm.updated_at,
+            user_id=tm.user_id,
+            invitation_id=None,
+            expires_at=None
+        ))
+    
+    # Ajouter les invitations en attente
+    for inv in pending_invitations:
+        result.append(TeamMemberOrInvitationResponse(
+            id=inv.id,
+            type="invitation",
+            email=inv.email,
+            role_in_company=inv.role,
+            status="pending",
+            joined_at=None,
+            created_at=inv.created_at,
+            updated_at=None,
+            user_id=None,
+            invitation_id=inv.id,
+            expires_at=inv.expires_at
+        ))
+    
+    # Trier par date de création (les plus récents en premier)
+    result.sort(key=lambda x: x.created_at, reverse=True)
+    
+    return result
 

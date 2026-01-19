@@ -597,6 +597,7 @@ services:
       APP_NAME: notification-service
       APP_ENV: ${APP_ENV:-development}
       DEBUG: ${DEBUG:-true}
+      PORT: ${NOTIFICATION_PORT:-8000}
       
       # Database
       DB_HOST: postgres
@@ -642,9 +643,6 @@ services:
       
       # CORS (format string séparée par virgules)
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
-      
-      # Server Port
-      PORT: ${NOTIFICATION_PORT:-8000}
     volumes:
       - ./services/notification:/app
       - /app/__pycache__
@@ -686,7 +684,16 @@ services:
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
       
       # Email Provider
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-sendgrid}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-fastapi_mail}
+      
+      # SMTP
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-noreply.yemma@gmail.com}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-mszr byaj gzmp scfq}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply.yemma@gmail.com}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Yemma Solutions}
       
       # SendGrid
       SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}

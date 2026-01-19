@@ -1,6 +1,7 @@
 """
 Notification Service - Point d'entrée principal
 """
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +9,13 @@ from app.api.v1 import notifications, health, triggers
 from app.core.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.infrastructure.database import init_db
+
+# Configuration du logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Notification Service",
@@ -39,6 +47,8 @@ app.include_router(triggers.router, prefix="/api/v1/triggers", tags=["Triggers"]
 async def startup_event():
     """Initialisation au démarrage"""
     await init_db()
+    logger.info(f"Notification Service started with EMAIL_PROVIDER={settings.EMAIL_PROVIDER}")
+    logger.info(f"SMTP configuration: HOST={settings.SMTP_HOST}, PORT={settings.SMTP_PORT}, USER={settings.SMTP_USER}, FROM={settings.SMTP_FROM_EMAIL}")
 
 
 @app.get("/", tags=["Root"])

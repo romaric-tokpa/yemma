@@ -2,10 +2,10 @@
 Endpoints internes pour les triggers de notification
 Ces endpoints sont appelés par les autres services de la plateforme
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.infrastructure.database import get_session
 from app.infrastructure.background_tasks import send_notification_task
@@ -53,11 +53,14 @@ class RejectionNotificationRequest(BaseModel):
 
 class InvitationNotificationRequest(BaseModel):
     """Requête pour notifier une invitation de recruteur"""
+    model_config = ConfigDict(from_attributes=True)
+    
     recipient_email: str = Field(..., description="Email du recruteur invité")
     recipient_name: str = Field(..., description="Nom du recruteur")
     company_name: str = Field(..., description="Nom de l'entreprise")
     invitation_token: str = Field(..., description="Token d'invitation")
     invitation_url: str = Field(default="", description="URL d'acceptation de l'invitation")
+    temporary_password: Optional[str] = Field(default=None, description="Mot de passe temporaire (si le compte a été créé)")
 
 
 @router.post("/notify_validation", status_code=status.HTTP_202_ACCEPTED)
@@ -179,6 +182,11 @@ async def notify_invitation(
     
     Appelé par le Company Service lors de l'invitation d'un recruteur.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received invitation notification request for {request.recipient_email}")
+    logger.debug(f"Request data: recipient_name={request.recipient_name}, company_name={request.company_name}, temporary_password={'***' if request.temporary_password else None}")
+    
     try:
         # Créer l'enregistrement de notification
         notification_repo = NotificationRepository(session)
@@ -186,9 +194,11 @@ async def notify_invitation(
         invitation_url = request.invitation_url or f"{settings.FRONTEND_URL}/invitation/accept?token={request.invitation_token}"
         
         template_data = {
+            "recipient_email": request.recipient_email,
             "company_name": request.company_name,
             "invitation_token": request.invitation_token,
-            "invitation_url": invitation_url
+            "invitation_url": invitation_url,
+            "temporary_password": request.temporary_password
         }
         
         notification = Notification(

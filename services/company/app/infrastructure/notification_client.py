@@ -54,7 +54,8 @@ async def send_invitation_notification(
     recipient_name: str,
     company_name: str,
     invitation_token: str,
-    invitation_url: Optional[str] = None
+    invitation_url: Optional[str] = None,
+    temporary_password: Optional[str] = None
 ) -> None:
     """
     Envoie une notification d'invitation via le Service Notification
@@ -76,20 +77,34 @@ async def send_invitation_notification(
         headers = get_service_token_header("company-service")
         
         if not invitation_url:
-            invitation_url = f"{settings.FRONTEND_URL}/invitation/accept?token={invitation_token}"
+            invitation_url = f"{settings.FRONTEND_URL}/login"
+        
+        # Construire le payload JSON, en excluant temporary_password si None
+        payload = {
+            "recipient_email": recipient_email,
+            "recipient_name": recipient_name,
+            "company_name": company_name,
+            "invitation_token": invitation_token,
+            "invitation_url": invitation_url or f"{settings.FRONTEND_URL}/login",
+        }
+        # Ajouter temporary_password seulement s'il n'est pas None et non vide
+        if temporary_password is not None and temporary_password.strip():
+            payload["temporary_password"] = temporary_password
+        
+        logger.info(f"Sending invitation notification to {recipient_email} with temporary_password={'present' if temporary_password else 'none'}")
+        logger.debug(f"Payload keys: {list(payload.keys())}")
         
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 f"{settings.NOTIFICATION_SERVICE_URL}/api/v1/triggers/notify_invitation",
-                json={
-                    "recipient_email": recipient_email,
-                    "recipient_name": recipient_name,
-                    "company_name": company_name,
-                    "invitation_token": invitation_token,
-                    "invitation_url": invitation_url
-                },
+                json=payload,
                 headers=headers
             )
+            
+            # Log la réponse en cas d'erreur
+            if response.status_code != 202:
+                logger.error(f"Notification service returned {response.status_code}: {response.text}")
+            
             response.raise_for_status()
             logger.info(f"Invitation notification sent successfully to {recipient_email}")
     except httpx.HTTPStatusError as e:

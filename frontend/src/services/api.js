@@ -23,11 +23,11 @@ const getBaseUrl = (envVar, defaultPort) => {
       return '' // Chemins relatifs via nginx
     }
     
-    // Si on accède directement au frontend (port 3000), utiliser nginx sur le port 80
-    // car en Docker les services passent par nginx
+    // Si on accède directement au frontend (port 3000), utiliser le port direct du service
+    // car nginx pourrait ne pas être accessible sur le port 80 depuis le navigateur
     if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '3000') {
-      // Utiliser nginx sur le port 80 pour accéder aux services
-      return 'http://localhost'
+      // Utiliser le port direct du service pour le développement local
+      return `http://localhost:${defaultPort}`
     }
     
     // Pour le développement local sans Docker, utiliser les ports directs
@@ -624,6 +624,18 @@ export const companyApi = {
     const response = await companyApiClient.post(`/api/v1/invitations/invite`, {
       email,
     })
+    return response.data
+  },
+
+  // Valider un token d'invitation (récupérer les infos)
+  validateInvitation: async (token) => {
+    const response = await companyApiClient.get(`/api/v1/invitations/validate/${token}`)
+    return response.data
+  },
+
+  // Accepter une invitation et créer le compte
+  acceptInvitation: async (data) => {
+    const response = await companyApiClient.post(`/api/v1/invitations/accept-invite`, data)
     return response.data
   },
 

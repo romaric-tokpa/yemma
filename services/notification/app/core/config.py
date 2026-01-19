@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
 
     # Email Provider (smtp, sendgrid, mailgun, fastapi_mail, mock)
-    EMAIL_PROVIDER: str = Field(default="mock", description="Email provider: smtp, sendgrid, mailgun, fastapi_mail, mock")
+    EMAIL_PROVIDER: str = Field(default="fastapi_mail", description="Email provider: smtp, sendgrid, mailgun, fastapi_mail, mock")
     
     # SMTP Configuration
     SMTP_HOST: str = Field(default="smtp.gmail.com", description="SMTP host")
