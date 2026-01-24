@@ -413,8 +413,21 @@ class PostSearchQueryBuilder:
                 })
 
         # ============================================
-        # FILTRE TRANCHES SALARIALES
+        # FILTRE TRANCHES SALARIALES ET SALAIRES MIN/MAX
         # ============================================
+        # Support pour min_salary et max_salary (depuis le frontend)
+        salary_range_filter = None
+        if search_request.min_salary is not None or search_request.max_salary is not None:
+            salary_range_filter = {"salary_expectations": {}}
+            if search_request.min_salary is not None:
+                salary_range_filter["salary_expectations"]["gte"] = search_request.min_salary
+            if search_request.max_salary is not None:
+                salary_range_filter["salary_expectations"]["lte"] = search_request.max_salary
+            
+            if salary_range_filter["salary_expectations"]:
+                filter_clauses.append({"range": salary_range_filter})
+        
+        # Support pour salary_ranges (tranches prédéfinies)
         if search_request.salary_ranges:
             salary_filters = []
             salary_mapping = {

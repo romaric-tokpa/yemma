@@ -18,6 +18,12 @@ class CompanyBase(BaseModel):
     adresse: Optional[str] = Field(None, max_length=500, description="Adresse de l'entreprise")
     legal_id: str = Field(..., max_length=50, description="SIRET ou ID légal")
     logo_url: Optional[str] = None
+    # Champs de contact du référent
+    contact_first_name: Optional[str] = Field(None, max_length=100, description="Prénom du référent")
+    contact_last_name: Optional[str] = Field(None, max_length=100, description="Nom du référent")
+    contact_email: Optional[str] = Field(None, max_length=255, description="Email du référent")
+    contact_phone: Optional[str] = Field(None, max_length=50, description="Téléphone du référent")
+    contact_function: Optional[str] = Field(None, max_length=100, description="Fonction du référent")
 
 
 class CompanyCreate(CompanyBase):
@@ -31,6 +37,12 @@ class CompanyUpdate(BaseModel):
     adresse: Optional[str] = Field(None, max_length=500, description="Adresse de l'entreprise")
     logo_url: Optional[str] = None
     status: Optional[CompanyStatus] = None
+    # Champs de contact du référent
+    contact_first_name: Optional[str] = Field(None, max_length=100, description="Prénom du référent")
+    contact_last_name: Optional[str] = Field(None, max_length=100, description="Nom du référent")
+    contact_email: Optional[str] = Field(None, max_length=255, description="Email du référent")
+    contact_phone: Optional[str] = Field(None, max_length=50, description="Téléphone du référent")
+    contact_function: Optional[str] = Field(None, max_length=100, description="Fonction du référent")
 
 
 class CompanyResponse(CompanyBase):

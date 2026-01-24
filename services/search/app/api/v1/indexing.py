@@ -21,28 +21,48 @@ async def index_candidate(request: IndexRequest):
     try:
         profile_data = request.profile_data
         
-        # Construire le document pour ElasticSearch
-        document = CandidateDocument(
-            candidate_id=request.candidate_id,
-            profile_title=profile_data.get("step1", {}).get("profileTitle", ""),
-            professional_summary=profile_data.get("step1", {}).get("professionalSummary", ""),
-            first_name=profile_data.get("step1", {}).get("firstName", ""),
-            last_name=profile_data.get("step1", {}).get("lastName", ""),
-            email=profile_data.get("step1", {}).get("email", ""),
-            photo_url=profile_data.get("photo_url") or profile_data.get("step1", {}).get("photoUrl"),
-            sector=profile_data.get("step1", {}).get("sector", ""),
-            main_job=profile_data.get("step1", {}).get("mainJob", ""),
-            total_experience=profile_data.get("step1", {}).get("totalExperience", 0),
-            admin_score=profile_data.get("admin_score"),
-            skills=[
+        # Extraire les données de base
+        step1 = profile_data.get("step1", {})
+        step2 = profile_data.get("step2", {})
+        step3 = profile_data.get("step3", {})
+        step5 = profile_data.get("step5", {})
+        step7 = profile_data.get("step7", {})
+        
+        first_name = step1.get("firstName", "")
+        last_name = step1.get("lastName", "")
+        full_name = f"{first_name} {last_name}".strip()
+        
+        # Construire le document complet pour ElasticSearch avec TOUS les champs
+        document_data = {
+            "candidate_id": request.candidate_id,
+            "full_name": full_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": step1.get("email", ""),
+            "title": step1.get("profileTitle", ""),
+            "profile_title": step1.get("profileTitle", ""),  # Alias
+            "summary": step1.get("professionalSummary", ""),
+            "professional_summary": step1.get("professionalSummary", ""),  # Alias
+            "photo_url": profile_data.get("photo_url") or step1.get("photoUrl"),
+            "sector": step1.get("sector", ""),
+            "main_job": step1.get("mainJob", ""),
+            "years_of_experience": step1.get("totalExperience", 0),
+            "total_experience": step1.get("totalExperience", 0),  # Alias
+            "admin_score": profile_data.get("admin_score"),
+            "admin_report": profile_data.get("admin_report"),
+            "is_verified": profile_data.get("is_verified", False),
+            "status": "VALIDATED",
+            "created_at": profile_data.get("created_at", datetime.utcnow().isoformat()),
+            "validated_at": datetime.utcnow().isoformat(),
+            "skills": [
                 {
                     "name": skill.get("name", ""),
                     "level": skill.get("level", ""),
                     "years_of_practice": skill.get("yearsOfPractice"),
                 }
-                for skill in profile_data.get("step5", {}).get("technicalSkills", [])
+                for skill in step5.get("technicalSkills", [])
             ],
-            experiences=[
+            "experiences": [
                 {
                     "position": exp.get("position", ""),
                     "company_name": exp.get("companyName", ""),
@@ -50,30 +70,32 @@ async def index_candidate(request: IndexRequest):
                     "end_date": exp.get("endDate"),
                     "is_current": exp.get("isCurrent", False),
                 }
-                for exp in profile_data.get("step2", {}).get("experiences", [])
+                for exp in step2.get("experiences", [])
             ],
-            educations=[
+            "educations": [
                 {
                     "diploma": edu.get("diploma", ""),
                     "institution": edu.get("institution", ""),
                     "level": edu.get("level", ""),
                     "graduation_year": edu.get("graduationYear"),
                 }
-                for edu in profile_data.get("step3", {}).get("educations", [])
+                for edu in step3.get("educations", [])
             ],
-            desired_positions=profile_data.get("step7", {}).get("desiredPositions", []),
-            contract_type=profile_data.get("step7", {}).get("contractType"),
-            desired_location=profile_data.get("step7", {}).get("desiredLocation"),
-            availability=profile_data.get("step7", {}).get("availability"),
-            salary_expectations=profile_data.get("step7", {}).get("salaryExpectations"),
-            status="VALIDATED",
-            created_at=profile_data.get("created_at", datetime.utcnow().isoformat()),
-            validated_at=datetime.utcnow().isoformat(),
-        )
+            "desired_positions": step7.get("desiredPositions", []),
+            "contract_type": step7.get("contractType"),
+            "desired_location": step7.get("desiredLocation"),
+            "availability": step7.get("availability"),
+            "salary_expectations": step7.get("salaryExpectations"),
+            "location": step1.get("city", "") or step1.get("address", ""),  # Utiliser city ou address comme location
+        }
         
-        # Indexer le document
+        # Utiliser la fonction d'indexation améliorée
+        from app.infrastructure.candidate_indexer import index_candidate
+        document = index_candidate(document_data)
+        
+        # Indexer le document (document est déjà un dict depuis index_candidate)
         await es_client.index_document(
-            document=document.dict(),
+            document=document,
             document_id=str(request.candidate_id)
         )
         

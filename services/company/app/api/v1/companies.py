@@ -60,6 +60,12 @@ async def create_company(
         legal_id=company_data.legal_id,
         logo_url=company_data.logo_url,
         admin_id=company_data.admin_id,
+        adresse=company_data.adresse,
+        contact_first_name=company_data.contact_first_name,
+        contact_last_name=company_data.contact_last_name,
+        contact_email=company_data.contact_email,
+        contact_phone=company_data.contact_phone,
+        contact_function=company_data.contact_function,
     )
     
     company = await repo.create(company)
@@ -184,6 +190,17 @@ async def update_company(
         company.logo_url = company_data.logo_url
     if company_data.status is not None:
         company.status = company_data.status
+    # Mettre à jour les champs de contact du référent
+    if company_data.contact_first_name is not None:
+        company.contact_first_name = company_data.contact_first_name
+    if company_data.contact_last_name is not None:
+        company.contact_last_name = company_data.contact_last_name
+    if company_data.contact_email is not None:
+        company.contact_email = company_data.contact_email
+    if company_data.contact_phone is not None:
+        company.contact_phone = company_data.contact_phone
+    if company_data.contact_function is not None:
+        company.contact_function = company_data.contact_function
     
     company = await repo.update(company)
     return CompanyResponse.model_validate(company)

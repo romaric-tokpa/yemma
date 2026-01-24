@@ -70,48 +70,70 @@ def index_candidate(candidate_data: Dict[str, Any]) -> Dict[str, Any]:
                 "level": ""
             })
     
-    # Construire le document ElasticSearch
+    # Construire le document ElasticSearch complet avec TOUS les champs nécessaires
     # Le statut doit être VALIDATED car seuls les candidats validés sont indexés
     document = {
+        "candidate_id": candidate_id,
         "full_name": full_name,
         "title": title,
+        "profile_title": title,  # Alias pour compatibilité
+        "summary": summary,
+        "professional_summary": summary,  # Alias pour compatibilité
         "skills": formatted_skills,
         "years_of_experience": int(years_of_experience) if years_of_experience else 0,
+        "total_experience": int(years_of_experience) if years_of_experience else 0,  # Alias
         "location": location,
         "is_verified": bool(is_verified),
-        "summary": summary,
         "status": candidate_data.get("status", "VALIDATED"),  # Par défaut VALIDATED
     }
     
-    # Ajouter candidate_id - toujours présent car c'est l'ID du profil dans la base de données
-    # Si candidate_id n'est pas fourni, cela indique un problème dans l'indexation
-    if candidate_id is not None:
-        document["candidate_id"] = candidate_id
-    else:
-        # Logger un avertissement si candidate_id n'est pas fourni
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"candidate_id is None in candidate_data: {candidate_data.keys()}")
+    # Ajouter les champs de base (first_name, last_name, email)
+    if candidate_data.get("first_name"):
+        document["first_name"] = candidate_data.get("first_name")
+    if candidate_data.get("last_name"):
+        document["last_name"] = candidate_data.get("last_name")
+    if candidate_data.get("email"):
+        document["email"] = candidate_data.get("email")
     
     # Ajouter les éducations si présentes (nested)
     educations = candidate_data.get("educations", [])
     if educations:
         document["educations"] = educations
     
+    # Ajouter les expériences si présentes (nested)
+    experiences = candidate_data.get("experiences", [])
+    if experiences:
+        document["experiences"] = experiences
+    
     # Ajouter les langues si présentes (nested)
     languages = candidate_data.get("languages", [])
     if languages:
         document["languages"] = languages
     
-    # Ajouter d'autres champs optionnels si présents
+    # Ajouter les positions désirées
+    desired_positions = candidate_data.get("desired_positions", [])
+    if desired_positions:
+        document["desired_positions"] = desired_positions
+    
+    # Ajouter tous les autres champs optionnels importants pour la recherche
     optional_fields = [
-        "email", "phone", "sector", "contract_type", "main_job",
-        "salary_expectations", "availability", "created_at", "updated_at", "admin_score", "admin_report",
-        "photo_url"
+        "phone", "sector", "contract_type", "main_job",
+        "salary_expectations", "availability", "desired_location",
+        "created_at", "updated_at", "validated_at", 
+        "admin_score", "admin_report", "photo_url"
     ]
     for field in optional_fields:
-        if field in candidate_data:
+        if field in candidate_data and candidate_data[field] is not None:
             document[field] = candidate_data[field]
+    
+    # S'assurer que candidate_id est toujours présent
+    if document.get("candidate_id") is None:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"candidate_id is None in candidate_data: {candidate_data.keys()}")
+        # Essayer de récupérer depuis d'autres sources
+        if "candidate_id" in candidate_data:
+            document["candidate_id"] = candidate_data["candidate_id"]
     
     return document
 

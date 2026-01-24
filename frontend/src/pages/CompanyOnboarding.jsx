@@ -9,20 +9,45 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import React from 'react'
-import { Building, Upload, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Loader2, Save, FileText, Image as ImageIcon } from 'lucide-react'
+import { Building, Upload, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Loader2, Save, FileText, Image as ImageIcon, User, Mail, Phone, Briefcase } from 'lucide-react'
 import { companyApi, documentApi } from '@/services/api'
 
 const companyOnboardingSchema = z.object({
   name: z.string().min(2, 'Le nom de l\'entreprise doit contenir au moins 2 caractères'),
   legal_id: z.string().min(9, 'Le RCCM doit contenir au moins 9 caractères'),
-  adresse: z.string().min(10, 'L\'adresse doit contenir au moins 10 caractères').optional(),
+  adresse: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().min(10, 'L\'adresse doit contenir au moins 10 caractères').optional()
+  ),
   logo: z.instanceof(FileList).optional(),
+  // Champs de contact du référent
+  contact_first_name: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().min(2, 'Le prénom doit contenir au moins 2 caractères').optional()
+  ),
+  contact_last_name: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().min(2, 'Le nom doit contenir au moins 2 caractères').optional()
+  ),
+  contact_email: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().email('Email invalide').optional()
+  ),
+  contact_phone: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().optional()
+  ),
+  contact_function: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z.string().min(2, 'La fonction doit contenir au moins 2 caractères').optional()
+  ),
 })
 
 const STEPS = [
   { id: 1, title: 'Informations générales', description: 'Nom, RCCM et adresse', icon: Building },
-  { id: 2, title: 'Logo de l\'entreprise', description: 'Téléchargez le logo de votre entreprise', icon: ImageIcon },
-  { id: 3, title: 'Récapitulatif', description: 'Vérifiez vos informations avant de finaliser', icon: CheckCircle2 },
+  { id: 2, title: 'Contact du référent', description: 'Informations du référent de l\'entreprise', icon: Building },
+  { id: 3, title: 'Logo de l\'entreprise', description: 'Téléchargez le logo de votre entreprise', icon: ImageIcon },
+  { id: 4, title: 'Récapitulatif', description: 'Vérifiez vos informations avant de finaliser', icon: CheckCircle2 },
 ]
 
 export default function CompanyOnboarding() {
@@ -62,6 +87,11 @@ export default function CompanyOnboarding() {
         setValue('name', companyData.name || '')
         setValue('legal_id', companyData.legal_id || '')
         setValue('adresse', companyData.adresse || '')
+        setValue('contact_first_name', companyData.contact_first_name || '')
+        setValue('contact_last_name', companyData.contact_last_name || '')
+        setValue('contact_email', companyData.contact_email || '')
+        setValue('contact_phone', companyData.contact_phone || '')
+        setValue('contact_function', companyData.contact_function || '')
       }
     } catch (error) {
       console.error('Error loading company:', error)
@@ -115,6 +145,11 @@ export default function CompanyOnboarding() {
             legal_id: formData.legal_id,
             adresse: formData.adresse || null,
             admin_id: user.id,
+            contact_first_name: formData.contact_first_name || null,
+            contact_last_name: formData.contact_last_name || null,
+            contact_email: formData.contact_email || null,
+            contact_phone: formData.contact_phone || null,
+            contact_function: formData.contact_function || null,
           })
           companyId = newCompany.id
           setCompany(newCompany)
@@ -152,8 +187,13 @@ export default function CompanyOnboarding() {
         setCurrentStep(2)
         setLastSaved(new Date())
       } else if (currentStep === 2) {
+        // Étape contact du référent - peut être vide, on passe à l'étape suivante
         setCurrentStep(3)
+        setLastSaved(new Date())
       } else if (currentStep === 3) {
+        // Étape logo - on passe au récapitulatif
+        setCurrentStep(4)
+      } else if (currentStep === 4) {
         await finalizeOnboarding(data)
       }
     } catch (err) {
@@ -172,6 +212,11 @@ export default function CompanyOnboarding() {
           legal_id: data.legal_id,
           adresse: data.adresse || null,
           logo_url: logoUrl || null,
+          contact_first_name: data.contact_first_name || null,
+          contact_last_name: data.contact_last_name || null,
+          contact_email: data.contact_email || null,
+          contact_phone: data.contact_phone || null,
+          contact_function: data.contact_function || null,
         })
       } else {
         const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -181,6 +226,11 @@ export default function CompanyOnboarding() {
           adresse: data.adresse || null,
           logo_url: logoUrl || null,
           admin_id: user.id,
+          contact_first_name: data.contact_first_name || null,
+          contact_last_name: data.contact_last_name || null,
+          contact_email: data.contact_email || null,
+          contact_phone: data.contact_phone || null,
+          contact_function: data.contact_function || null,
         })
       }
 
@@ -354,8 +404,105 @@ export default function CompanyOnboarding() {
                 </div>
               )}
 
-              {/* Step 2: Logo */}
+              {/* Step 2: Contact du référent */}
               {currentStep === 2 && (
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 mb-4">
+                    <p className="text-xs sm:text-sm text-blue-800">
+                      <strong>Information :</strong> Ces informations concernent le référent principal de l'entreprise. Tous les champs sont optionnels.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="contact_first_name" className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Prénom du référent
+                      </Label>
+                      <Input
+                        id="contact_first_name"
+                        {...register('contact_first_name')}
+                        placeholder="Ex: Jean"
+                        className="h-10 sm:h-12 text-sm sm:text-base"
+                      />
+                      {errors.contact_first_name && (
+                        <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.contact_first_name.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="contact_last_name" className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Nom du référent
+                      </Label>
+                      <Input
+                        id="contact_last_name"
+                        {...register('contact_last_name')}
+                        placeholder="Ex: Dupont"
+                        className="h-10 sm:h-12 text-sm sm:text-base"
+                      />
+                      {errors.contact_last_name && (
+                        <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.contact_last_name.message}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_email" className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Email du référent
+                    </Label>
+                    <Input
+                      id="contact_email"
+                      type="email"
+                      {...register('contact_email')}
+                      placeholder="Ex: jean.dupont@entreprise.com"
+                      className="h-10 sm:h-12 text-sm sm:text-base"
+                    />
+                    {errors.contact_email && (
+                      <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.contact_email.message}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="contact_phone" className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        Téléphone du référent
+                      </Label>
+                      <Input
+                        id="contact_phone"
+                        type="tel"
+                        {...register('contact_phone')}
+                        placeholder="Ex: +225 07 12 34 56 78"
+                        className="h-10 sm:h-12 text-sm sm:text-base"
+                      />
+                      {errors.contact_phone && (
+                        <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.contact_phone.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="contact_function" className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Fonction du référent
+                      </Label>
+                      <Input
+                        id="contact_function"
+                        {...register('contact_function')}
+                        placeholder="Ex: Directeur RH, Responsable Recrutement"
+                        className="h-10 sm:h-12 text-sm sm:text-base"
+                      />
+                      {errors.contact_function && (
+                        <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.contact_function.message}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Logo */}
+              {currentStep === 3 && (
                 <div className="space-y-4 sm:space-y-6">
                   <div className="space-y-3 sm:space-y-4">
                     <Label className="text-sm sm:text-base font-semibold">Logo de l'entreprise</Label>
@@ -408,8 +555,8 @@ export default function CompanyOnboarding() {
                 </div>
               )}
 
-              {/* Step 3: Récapitulatif */}
-              {currentStep === 3 && (
+              {/* Step 4: Récapitulatif */}
+              {currentStep === 4 && (
                 <div className="space-y-4 sm:space-y-6">
                   <div className="bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 rounded-[12px] border border-gray-200 space-y-3 sm:space-4">
                     <div className="pb-3 sm:pb-4 border-b border-gray-200">
@@ -424,6 +571,33 @@ export default function CompanyOnboarding() {
                       <div className="pb-3 sm:pb-4 border-b border-gray-200">
                         <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Adresse</p>
                         <p className="text-base sm:text-lg font-semibold text-gray-900 break-words">{watch('adresse')}</p>
+                      </div>
+                    )}
+                    {(watch('contact_first_name') || watch('contact_last_name') || watch('contact_email') || watch('contact_phone') || watch('contact_function')) && (
+                      <div className="pb-3 sm:pb-4 border-b border-gray-200">
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2">Contact du référent</p>
+                        <div className="space-y-2">
+                          {(watch('contact_first_name') || watch('contact_last_name')) && (
+                            <p className="text-base sm:text-lg font-semibold text-gray-900">
+                              {watch('contact_first_name')} {watch('contact_last_name')}
+                            </p>
+                          )}
+                          {watch('contact_function') && (
+                            <p className="text-sm text-gray-600">{watch('contact_function')}</p>
+                          )}
+                          {watch('contact_email') && (
+                            <p className="text-sm text-gray-600 flex items-center gap-2">
+                              <Mail className="h-3 w-3" />
+                              {watch('contact_email')}
+                            </p>
+                          )}
+                          {watch('contact_phone') && (
+                            <p className="text-sm text-gray-600 flex items-center gap-2">
+                              <Phone className="h-3 w-3" />
+                              {watch('contact_phone')}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                     {logoUrl && (

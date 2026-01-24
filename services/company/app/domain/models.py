@@ -47,6 +47,12 @@ class Company(SQLModel, table=True):
     admin_id: int = Field(index=True, description="ID du compte maître (admin) - Référence vers users dans auth-service, sans contrainte FK")
     status: CompanyStatus = Field(default=CompanyStatus.ACTIVE, description="Statut de l'entreprise")
     subscription_id: Optional[int] = Field(default=None, description="ID de l'abonnement")
+    # Champs de contact du référent
+    contact_first_name: Optional[str] = Field(default=None, max_length=100, description="Prénom du référent")
+    contact_last_name: Optional[str] = Field(default=None, max_length=100, description="Nom du référent")
+    contact_email: Optional[str] = Field(default=None, max_length=255, description="Email du référent")
+    contact_phone: Optional[str] = Field(default=None, max_length=50, description="Téléphone du référent")
+    contact_function: Optional[str] = Field(default=None, max_length=100, description="Fonction du référent")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)
     deleted_at: Optional[datetime] = Field(default=None)  # Soft delete

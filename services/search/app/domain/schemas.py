@@ -79,6 +79,8 @@ class PostSearchRequest(BaseModel):
     availability: Optional[List[str]] = Field(None, description="Disponibilités (immediate, within_1_month, etc.)")
     education_levels: Optional[List[str]] = Field(None, description="Niveaux d'étude (BAC, BTS, LICENCE, etc.)")
     salary_ranges: Optional[List[str]] = Field(None, description="Tranches salariales (0-500k, 500k-1m, etc.)")
+    min_salary: Optional[int] = Field(None, ge=0, description="Salaire minimum")
+    max_salary: Optional[int] = Field(None, ge=0, description="Salaire maximum")
     languages: Optional[Dict[str, str]] = Field(None, description="Langues avec niveaux (ex: {'Français': 'courant'})")
     min_admin_score: Optional[float] = Field(None, ge=0, le=5, description="Score admin minimum (0-5)")
     contract_types: Optional[List[str]] = Field(None, description="Types de contrat (CDI, CDD, FREELANCE, etc.)")

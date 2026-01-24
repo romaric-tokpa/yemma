@@ -5,13 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { candidateApi, authApiService, companyApi, paymentApiService, documentApi } from '@/services/api'
 import { buildPhotoUrl } from '@/utils/photoUtils'
 import { 
   Users, FileCheck, Clock, CheckCircle, XCircle, Archive, 
   AlertCircle, Loader2, Eye, User, LogOut, Menu, X,
   Shield, TrendingUp, Search, Filter, RefreshCw, Calendar,
-  Building, UserCheck, CreditCard, ChevronDown, ChevronRight
+  Building, UserCheck, CreditCard, ChevronDown, ChevronRight,
+  Mail, Phone, Briefcase, MapPin
 } from 'lucide-react'
 
 // Générer un avatar par défaut basé sur les initiales
@@ -78,6 +80,7 @@ export default function AdminDashboard() {
   const [companyRecruiters, setCompanyRecruiters] = useState([])
   const [companySubscriptions, setCompanySubscriptions] = useState({})
   const [companiesLoading, setCompaniesLoading] = useState(false)
+  const [viewingCompany, setViewingCompany] = useState(null) // Pour la fiche entreprise
 
   // Fonction pour charger les statistiques
   const loadStats = async () => {
@@ -332,6 +335,14 @@ export default function AdminDashboard() {
 
   const handleViewProfile = (profileId) => {
     navigate(`/admin/review/${profileId}`)
+  }
+
+  const handleViewCompany = (company) => {
+    setViewingCompany(company)
+  }
+
+  const handleCloseCompanyView = () => {
+    setViewingCompany(null)
   }
 
   const handleLogout = () => {
@@ -851,35 +862,79 @@ export default function AdminDashboard() {
                       <div className="space-y-2">
                         {companies.map((company) => {
                           const subscription = companySubscriptions[company.id]
+                          const hasContactInfo = company.contact_first_name || company.contact_last_name || company.contact_email || company.contact_phone || company.contact_function
                           return (
                             <Card 
                               key={company.id} 
-                              className={`hover:shadow-md transition-all duration-200 border-l-2 cursor-pointer ${
+                              className={`hover:shadow-md transition-all duration-200 border-l-2 ${
                                 selectedCompany?.id === company.id ? 'border-l-primary bg-primary/5' : 'border-l-gray-200'
                               }`}
-                              onClick={() => handleSelectCompany(company)}
                             >
                               <CardContent className="pt-3 pb-3 px-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start gap-3 flex-1 min-w-0">
                                     {company.logo_url && (
                                       <img
                                         src={company.logo_url}
                                         alt={company.name}
-                                        className="w-10 h-10 rounded-lg object-cover border border-gray-200"
+                                        className="w-10 h-10 rounded-lg object-cover border border-gray-200 flex-shrink-0"
                                       />
                                     )}
                                     <div className="flex-1 min-w-0">
-                                      <h3 className="text-sm font-semibold truncate">{company.name}</h3>
-                                      <p className="text-xs text-muted-foreground truncate">{company.legal_id}</p>
-                                      {subscription?.plan && (
-                                        <Badge variant="outline" className="mt-1 text-xs">
-                                          {subscription.plan.plan_type || 'N/A'}
-                                        </Badge>
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-sm font-semibold truncate">{company.name}</h3>
+                                        {subscription?.plan && (
+                                          <Badge variant="outline" className="text-xs flex-shrink-0">
+                                            {subscription.plan.plan_type || 'N/A'}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-muted-foreground truncate mb-2">{company.legal_id}</p>
+                                      
+                                      {/* Informations du référent */}
+                                      {hasContactInfo && (
+                                        <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+                                          <p className="text-xs font-medium text-gray-700 mb-1">Référent :</p>
+                                          {(company.contact_first_name || company.contact_last_name) && (
+                                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                                              <User className="w-3 h-3" />
+                                              {company.contact_first_name} {company.contact_last_name}
+                                            </p>
+                                          )}
+                                          {company.contact_function && (
+                                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                                              <Briefcase className="w-3 h-3" />
+                                              {company.contact_function}
+                                            </p>
+                                          )}
+                                          {company.contact_email && (
+                                            <p className="text-xs text-gray-600 flex items-center gap-1 truncate">
+                                              <Mail className="w-3 h-3 flex-shrink-0" />
+                                              <span className="truncate">{company.contact_email}</span>
+                                            </p>
+                                          )}
+                                          {company.contact_phone && (
+                                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                                              <Phone className="w-3 h-3" />
+                                              {company.contact_phone}
+                                            </p>
+                                          )}
+                                        </div>
                                       )}
                                     </div>
                                   </div>
-                                  <Eye className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleViewCompany(company)
+                                    }}
+                                    className="flex items-center gap-1.5 h-8 px-2 text-xs flex-shrink-0"
+                                  >
+                                    <Eye className="h-3.5 w-3.5" />
+                                    Voir
+                                  </Button>
                                 </div>
                               </CardContent>
                             </Card>
@@ -1074,6 +1129,201 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
+
+      {/* Dialog pour la fiche entreprise */}
+      {viewingCompany && (
+        <Dialog open={!!viewingCompany} onOpenChange={(open) => !open && handleCloseCompanyView()}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Building className="w-5 h-5" />
+                Fiche Entreprise
+              </DialogTitle>
+              <DialogDescription>
+                Informations complètes de l'entreprise
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6 mt-4">
+              {/* Informations générales */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Informations générales</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    {viewingCompany.logo_url && (
+                      <img
+                        src={viewingCompany.logo_url}
+                        alt={viewingCompany.name}
+                        className="w-20 h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 space-y-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Nom de l'entreprise</p>
+                        <p className="text-base font-semibold">{viewingCompany.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">RCCM</p>
+                        <p className="text-sm">{viewingCompany.legal_id}</p>
+                      </div>
+                      {viewingCompany.adresse && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            Adresse
+                          </p>
+                          <p className="text-sm">{viewingCompany.adresse}</p>
+                        </div>
+                      )}
+                      {companySubscriptions[viewingCompany.id]?.plan && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Abonnement</p>
+                          <Badge variant="outline" className="text-xs">
+                            {companySubscriptions[viewingCompany.id].plan.plan_type || 'N/A'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Informations du référent */}
+              {(viewingCompany.contact_first_name || viewingCompany.contact_last_name || viewingCompany.contact_email || viewingCompany.contact_phone || viewingCompany.contact_function) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Contact du référent
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {(viewingCompany.contact_first_name || viewingCompany.contact_last_name) && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Nom complet</p>
+                        <p className="text-sm font-medium">
+                          {viewingCompany.contact_first_name} {viewingCompany.contact_last_name}
+                        </p>
+                      </div>
+                    )}
+                    {viewingCompany.contact_function && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Briefcase className="w-3 h-3" />
+                          Fonction
+                        </p>
+                        <p className="text-sm">{viewingCompany.contact_function}</p>
+                      </div>
+                    )}
+                    {viewingCompany.contact_email && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          Email
+                        </p>
+                        <a 
+                          href={`mailto:${viewingCompany.contact_email}`}
+                          className="text-sm text-[#226D68] hover:underline"
+                        >
+                          {viewingCompany.contact_email}
+                        </a>
+                      </div>
+                    )}
+                    {viewingCompany.contact_phone && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          Téléphone
+                        </p>
+                        <a 
+                          href={`tel:${viewingCompany.contact_phone}`}
+                          className="text-sm text-[#226D68] hover:underline"
+                        >
+                          {viewingCompany.contact_phone}
+                        </a>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Informations supplémentaires */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Informations supplémentaires</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Statut</p>
+                    <Badge variant="outline" className="text-xs">
+                      {viewingCompany.status || 'ACTIVE'}
+                    </Badge>
+                  </div>
+                  {viewingCompany.created_at && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        Date d'inscription
+                      </p>
+                      <p className="text-sm">
+                        {new Date(viewingCompany.created_at).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  )}
+                  {companySubscriptions[viewingCompany.id] && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Abonnement</p>
+                      <div className="space-y-1">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            companySubscriptions[viewingCompany.id].plan?.plan_type === 'ENTERPRISE' 
+                              ? 'border-purple-200 bg-purple-50 text-purple-700'
+                              : companySubscriptions[viewingCompany.id].plan?.plan_type === 'PRO'
+                              ? 'border-blue-200 bg-blue-50 text-blue-700'
+                              : 'border-gray-200 bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          {companySubscriptions[viewingCompany.id].plan?.plan_type || 'FREEMIUM'}
+                        </Badge>
+                        {companySubscriptions[viewingCompany.id].status && (
+                          <Badge 
+                            variant="secondary"
+                            className={`text-xs ${
+                              companySubscriptions[viewingCompany.id].status === 'active' 
+                                ? 'bg-[#E8F4F3] text-[#1a5a55] border-[#B8DDD9]'
+                                : 'bg-gray-50 text-gray-700'
+                            }`}
+                          >
+                            {companySubscriptions[viewingCompany.id].status}
+                          </Badge>
+                        )}
+                        {companySubscriptions[viewingCompany.id].quota_limit && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Quota utilisé: {companySubscriptions[viewingCompany.id].quota_used || 0} / {companySubscriptions[viewingCompany.id].quota_limit}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+              <Button variant="outline" onClick={handleCloseCompanyView}>
+                Fermer
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
