@@ -2,40 +2,36 @@ import axios from 'axios'
 
 // Configuration des URLs des services backend
 // Les variables d'environnement utilisent le préfixe VITE_ (requis par Vite)
-// En production/Docker, utilise une URL de base vide (chemins relatifs via nginx)
-// En développement local, utilise les ports directs des services
+// En production/Docker, utilise nginx comme proxy pour toutes les API
+// Cela évite les problèmes CORS car toutes les requêtes passent par le même origin
 const getBaseUrl = (envVar, defaultPort) => {
   const envValue = import.meta.env[envVar]
-  
+
   // Si une valeur est définie et non vide, l'utiliser
   if (envValue !== undefined && envValue !== null && envValue !== '') {
     return envValue
   }
-  
-  // En Docker, tous les services passent par nginx (chemins relatifs)
-  // En développement local sans Docker, utiliser les ports directs
+
+  // En Docker, tous les services passent par nginx
+  // Utiliser des chemins relatifs pour que les requêtes passent par le même origin
+  // Cela permet à nginx de router les requêtes correctement
+  // Si le frontend est servi via nginx (port 80), les chemins relatifs fonctionnent
+  // Si le frontend est servi directement (port 3000), on doit utiliser l'URL complète avec nginx
   if (typeof window !== 'undefined') {
-    const port = window.location.port
     const hostname = window.location.hostname
-    
-    // Si on accède via nginx (port 80 ou pas de port), utiliser chemins relatifs
+    const port = window.location.port
+
+    // Si on est sur le port 80 (nginx), utiliser des chemins relatifs
     if (port === '' || port === '80') {
-      return '' // Chemins relatifs via nginx
+      return ''
     }
-    
-    // Si on accède directement au frontend (port 3000), utiliser le port direct du service
-    // car nginx pourrait ne pas être accessible sur le port 80 depuis le navigateur
-    if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '3000') {
-      // Utiliser le port direct du service pour le développement local
-      return `http://localhost:${defaultPort}`
-    }
-    
-    // Pour le développement local sans Docker, utiliser les ports directs
+
+    // Si on est sur un autre port (ex: 3000 pour le frontend direct), utiliser nginx sur port 80
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `http://localhost:${defaultPort}`
+      return 'http://localhost'
     }
   }
-  
+
   // Par défaut : utiliser chemins relatifs via nginx
   return ''
 }
@@ -62,8 +58,16 @@ const createApiClient = (baseURL) => {
   // Intercepteur pour ajouter le token JWT si disponible
   client.interceptors.request.use((config) => {
     const token = localStorage.getItem('auth_token')
+    
+    // Routes publiques qui ne nécessitent pas de token
+    const publicRoutes = ['/api/v1/auth/register', '/api/v1/auth/login', '/api/v1/auth/refresh', '/api/v1/auth/password-reset']
+    const isPublicRoute = publicRoutes.some(route => config.url?.includes(route))
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    } else if (!isPublicRoute) {
+      // Ne pas afficher le warning pour les routes publiques
+      console.warn('No auth token found in localStorage for request:', config.url)
     }
     return config
   })
@@ -74,7 +78,15 @@ const createApiClient = (baseURL) => {
     (error) => {
       // Gérer les erreurs 401 (non autorisé) - rediriger vers login
       if (error.response?.status === 401) {
+        console.warn('401 Unauthorized - Token may be invalid or expired:', error.config?.url)
+        const token = localStorage.getItem('auth_token')
+        if (token) {
+          console.log('Token exists but is invalid. Removing from localStorage.')
+        } else {
+          console.log('No token found in localStorage.')
+        }
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
         // Optionnel: rediriger vers la page de login
         // window.location.href = '/login'
@@ -195,6 +207,15 @@ export const authApiService = {
     return response.data
   },
 
+  // Confirmer la réinitialisation de mot de passe (avec token)
+  confirmPasswordReset: async (token, newPassword) => {
+    const response = await authApi.post('/api/v1/auth/password-reset/confirm', {
+      token,
+      new_password: newPassword,
+    })
+    return response.data
+  },
+
   // Changer le mot de passe
   changePassword: async (oldPassword, newPassword) => {
     const response = await authApi.post('/api/v1/auth/change-password', {
@@ -227,9 +248,47 @@ export const candidateApi = {
     return response.data
   },
 
-  // Mettre à jour le profil candidat
+  // Mettre à jour le profil candidat (utilise PATCH /me avec PartialProfileUpdateSchema)
   updateProfile: async (profileId, data) => {
-    const response = await api.put(`/api/v1/profiles/${profileId}`, data)
+    // Construire le format attendu par le backend (PartialProfileUpdateSchema)
+    const formattedData = {}
+    
+    // Si les champs accept_cgu, accept_rgpd, accept_verification sont présents, les mettre dans step0
+    // Le schéma Step0ConsentSchema exige que tous les champs booléens soient présents
+    if (data.accept_cgu !== undefined || data.accept_rgpd !== undefined || data.accept_verification !== undefined) {
+      formattedData.step0 = {
+        // Toujours envoyer les trois champs avec leurs valeurs ou false par défaut
+        accept_cgu: Boolean(data.accept_cgu ?? false),
+        accept_rgpd: Boolean(data.accept_rgpd ?? false),
+        accept_verification: Boolean(data.accept_verification ?? false),
+      }
+    }
+    
+    // Si last_step_completed est présent, l'ajouter
+    if (data.last_step_completed !== undefined && data.last_step_completed !== null) {
+      formattedData.last_step_completed = data.last_step_completed
+    }
+    
+    // Si d'autres champs de step1 sont présents, les mettre dans step1
+    const step1Fields = ['first_name', 'last_name', 'date_of_birth', 'nationality', 'phone', 
+                          'address', 'city', 'country', 'profile_title', 'professional_summary', 
+                          'sector', 'main_job', 'total_experience', 'photo_url']
+    const hasStep1Fields = step1Fields.some(field => data[field] !== undefined && data[field] !== null)
+    
+    if (hasStep1Fields) {
+      formattedData.step1 = {}
+      step1Fields.forEach(field => {
+        if (data[field] !== undefined && data[field] !== null && data[field] !== '') {
+          formattedData.step1[field] = data[field]
+        }
+      })
+      // Ne pas envoyer step1 s'il est vide après filtrage
+      if (Object.keys(formattedData.step1).length === 0) {
+        delete formattedData.step1
+      }
+    }
+    
+    const response = await api.patch('/api/v1/profiles/me', formattedData)
     return response.data
   },
 
@@ -338,10 +397,19 @@ export const candidateApi = {
     // Essayer d'utiliser l'endpoint stats si disponible
     try {
       const response = await api.get('/api/v1/profiles/stats')
-      return response.data
+      console.log('✅ Réponse de getProfileStats:', response.data)
+      if (response.data && typeof response.data === 'object') {
+        return response.data
+      }
+      console.warn('⚠️ Format de réponse inattendu pour getProfileStats:', response.data)
+      return null
     } catch (err) {
       // Si l'endpoint n'existe pas ou nécessite une auth interne, calculer côté client
-      console.warn('Endpoint /api/v1/profiles/stats non disponible, calcul côté client')
+      console.warn('⚠️ Endpoint /api/v1/profiles/stats non disponible ou erreur:', {
+        status: err?.response?.status,
+        message: err?.response?.data?.detail || err?.message,
+        url: err?.config?.url
+      })
       return null
     }
   },
@@ -416,6 +484,16 @@ export const adminApi = {
 export const documentApi = {
   // Upload un document
   uploadDocument: async (file, candidateId, documentType) => {
+    // Vérifier que file est bien une instance de File ou Blob
+    if (!file || !(file instanceof File) && !(file instanceof Blob)) {
+      // Si ce n'est pas un fichier, vérifier si c'est un ID de document déjà sauvegardé
+      if (typeof file === 'number' || (typeof file === 'object' && file?.id)) {
+        // C'est un document déjà sauvegardé, retourner l'objet tel quel
+        return typeof file === 'number' ? { id: file } : file
+      }
+      throw new Error('Input not instance of File: Le fichier doit être une instance de File ou Blob')
+    }
+
     const formData = new FormData()
     formData.append('file', file)
     formData.append('candidate_id', candidateId)
@@ -436,6 +514,20 @@ export const documentApi = {
     formData.append('company_id', companyId)
 
     const response = await documentApiClient.post('/api/v1/documents/upload/company-logo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
+
+  // Upload une photo de profil candidat (endpoint dédié)
+  uploadProfilePhoto: async (file, candidateId) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('candidate_id', candidateId)
+
+    const response = await documentApiClient.post('/api/v1/documents/upload/profile-photo', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -464,26 +556,14 @@ export const documentApi = {
   // Servir un document directement via le service (proxy)
   getDocumentServeUrl: (documentId) => {
     // Utiliser l'endpoint serve qui proxy vers MinIO
-    // Construire l'URL pour passer par nginx
-    // Si DOCUMENT_API_URL est vide ou défini, utiliser une URL relative
-    // Sinon, utiliser l'URL de base pour construire une URL absolue
+    // Construire l'URL en utilisant DOCUMENT_API_URL
     const baseUrl = DOCUMENT_API_URL || ''
-    if (baseUrl === '' || baseUrl === 'http://localhost') {
-      // URL relative pour passer par nginx (même origin que le frontend)
-      // Si le frontend est sur localhost:3000, le navigateur utilisera localhost:3000
-      // mais on veut utiliser nginx sur localhost:80, donc on doit utiliser l'URL complète
-      if (typeof window !== 'undefined') {
-        const port = window.location.port
-        // Si on est sur le port 3000, utiliser nginx sur le port 80
-        if (port === '3000') {
-          return `http://localhost/api/v1/documents/serve/${documentId}`
-        }
-      }
-      // Sinon, utiliser une URL relative
-      return `/api/v1/documents/serve/${documentId}`
+    if (baseUrl) {
+      // Si DOCUMENT_API_URL est défini, l'utiliser directement
+      return `${baseUrl}/api/v1/documents/serve/${documentId}`
     }
-    // Si DOCUMENT_API_URL est défini (non vide), l'utiliser
-    return `${baseUrl}/api/v1/documents/serve/${documentId}`
+    // Sinon, utiliser une URL relative (passera par nginx si configuré)
+    return `/api/v1/documents/serve/${documentId}`
   },
 
   // Supprimer un document
@@ -515,14 +595,30 @@ export const searchApiService = {
 
   // Recherche POST avec highlight
   postSearch: async (filters) => {
-    const response = await searchApi.post('/api/v1/search/search', {
+    const requestData = {
       query: filters.query,
+      job_title: filters.job_title,
       min_experience: filters.min_experience,
+      max_experience: filters.max_experience,
       skills: filters.skills,
       location: filters.location,
+      availability: filters.availability,
+      education_levels: filters.education_levels,
+      min_admin_score: filters.min_admin_score,
+      contract_types: filters.contract_types,
+      sector: filters.sector,
       page: filters.page || 1,
       size: filters.size || 20,
+    }
+    // Nettoyer les valeurs undefined
+    Object.keys(requestData).forEach(key => {
+      if (requestData[key] === undefined || requestData[key] === null ||
+          requestData[key] === '' ||
+          (Array.isArray(requestData[key]) && requestData[key].length === 0)) {
+        delete requestData[key]
+      }
     })
+    const response = await searchApi.post('/api/v1/search/search', requestData)
     return response.data
   },
 
@@ -601,9 +697,21 @@ export const companyApi = {
     return response.data
   },
 
+  // Lister toutes les entreprises (admin seulement)
+  listCompanies: async () => {
+    const response = await companyApiClient.get('/api/v1/companies')
+    return response.data
+  },
+
   // Récupérer l'entreprise de l'utilisateur actuel
   getMyCompany: async () => {
     const response = await companyApiClient.get('/api/v1/companies/me/company')
+    return response.data
+  },
+
+  // Récupérer une entreprise par ID
+  getCompany: async (companyId) => {
+    const response = await companyApiClient.get(`/api/v1/companies/${companyId}`)
     return response.data
   },
   
@@ -619,10 +727,13 @@ export const companyApi = {
     return response.data
   },
 
-  // Inviter un membre
-  inviteMember: async (companyId, email) => {
+  // Créer un compte recruteur (nouveau système)
+  inviteMember: async (companyId, memberData) => {
     const response = await companyApiClient.post(`/api/v1/invitations/invite`, {
-      email,
+      email: memberData.email,
+      first_name: memberData.first_name,
+      last_name: memberData.last_name,
+      password: memberData.password,
     })
     return response.data
   },

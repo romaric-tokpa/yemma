@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     
     # Document Service
     DOCUMENT_SERVICE_URL: str = "http://localhost:8003"
+    # Search Service
+    SEARCH_SERVICE_URL: str = "http://localhost:8004"
+    # Notification Service
+    NOTIFICATION_SERVICE_URL: str = "http://localhost:8005"
+    # Frontend URL
+    FRONTEND_URL: str = "http://localhost:3000"
     INTERNAL_SERVICE_TOKEN: Optional[str] = None
 
     # Redis

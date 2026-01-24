@@ -45,3 +45,17 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> Opt
     except (JWTError, ValueError, TypeError):
         return None
 
+
+def require_current_user(current_user: Optional[TokenData]) -> TokenData:
+    """
+    Vérifie que current_user n'est pas None et lève une exception si c'est le cas
+    
+    Utilisé dans les endpoints qui nécessitent une authentification utilisateur
+    """
+    if not current_user or not hasattr(current_user, 'user_id') or not current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    return current_user
+

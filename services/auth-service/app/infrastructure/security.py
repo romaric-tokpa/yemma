@@ -107,3 +107,9 @@ def require_role(required_role: str):
     
     return role_checker
 
+
+def generate_password_reset_token() -> str:
+    """Génère un token sécurisé pour la réinitialisation de mot de passe"""
+    import secrets
+    return secrets.token_urlsafe(32)
+

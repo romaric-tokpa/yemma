@@ -106,7 +106,8 @@ def index_candidate(candidate_data: Dict[str, Any]) -> Dict[str, Any]:
     # Ajouter d'autres champs optionnels si présents
     optional_fields = [
         "email", "phone", "sector", "contract_type", "main_job",
-        "salary_expectations", "availability", "created_at", "updated_at", "admin_score", "admin_report"
+        "salary_expectations", "availability", "created_at", "updated_at", "admin_score", "admin_report",
+        "photo_url"
     ]
     for field in optional_fields:
         if field in candidate_data:

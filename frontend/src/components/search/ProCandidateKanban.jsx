@@ -43,7 +43,7 @@ export function ProCandidateKanban({ results, loading, onCandidateClick }) {
         return (
           <Card
             key={candidate.candidate_id}
-            className="p-5 cursor-pointer hover:shadow-xl transition-all duration-300 rounded-[12px] shadow-sm bg-white border-l-4 border-l-transparent hover:border-l-green-emerald group"
+            className="p-5 cursor-pointer hover:shadow-xl transition-all duration-300 rounded-[12px] shadow-sm bg-white border-l-4 border-l-transparent hover:border-l-[#226D68] group"
             onClick={() => onCandidateClick(candidate.candidate_id)}
           >
             {/* Photo et header */}
@@ -52,7 +52,7 @@ export function ProCandidateKanban({ results, loading, onCandidateClick }) {
                 <img
                   src={displayPhoto}
                   alt={candidate.full_name || candidate.title || 'Candidat'}
-                  className="w-24 h-24 rounded-full object-cover border-2 border-green-emerald/20 shadow-md group-hover:border-green-emerald/40 transition-colors"
+                  className="w-24 h-24 rounded-full object-cover border-2 border-[#226D68]/20 shadow-md group-hover:border-[#226D68]/40 transition-colors"
                   onError={(e) => {
                     if (e.target.src !== defaultAvatar) {
                       e.target.src = defaultAvatar
@@ -61,7 +61,7 @@ export function ProCandidateKanban({ results, loading, onCandidateClick }) {
                 />
                 {/* Badge de score en overlay */}
                 {overallScore !== null && overallScore !== undefined && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-orange-500 text-white rounded-full px-2.5 py-1 shadow-lg flex items-center gap-1 border-2 border-white z-10">
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-[#e76f51] text-white rounded-full px-2.5 py-1 shadow-lg flex items-center gap-1 border-2 border-white z-10">
                     <Star className="h-3 w-3 fill-current" />
                     <span className="text-xs font-bold whitespace-nowrap">
                       {typeof overallScore === 'number' ? overallScore.toFixed(1) : overallScore}/5
@@ -69,7 +69,7 @@ export function ProCandidateKanban({ results, loading, onCandidateClick }) {
                   </div>
                 )}
                 {candidate.is_verified && (
-                  <div className="absolute -top-1 -right-1 bg-green-emerald rounded-full p-1 shadow-md z-10">
+                  <div className="absolute -top-1 -right-1 bg-[#226D68] rounded-full p-1 shadow-md z-10">
                     <CheckCircle2 className="h-4 w-4 text-white" />
                   </div>
                 )}
@@ -90,7 +90,7 @@ export function ProCandidateKanban({ results, loading, onCandidateClick }) {
             <div className="space-y-2 mb-4 pb-4 border-b border-border">
               {candidate.location && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 text-green-emerald flex-shrink-0" />
+                  <MapPin className="h-3.5 w-3.5 text-[#226D68] flex-shrink-0" />
                   <span className="truncate">{candidate.location}</span>
                 </div>
               )}
@@ -106,7 +106,7 @@ export function ProCandidateKanban({ results, loading, onCandidateClick }) {
               
               {candidate.availability && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5 text-green-emerald flex-shrink-0" />
+                  <Calendar className="h-3.5 w-3.5 text-[#226D68] flex-shrink-0" />
                   <span className="truncate">{candidate.availability}</span>
                 </div>
               )}

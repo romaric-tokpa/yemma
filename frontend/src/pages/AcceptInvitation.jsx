@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle, CheckCircle2, Loader2, Lock, User, Mail } from 'lucide-react'
 import { companyApi, authApiService } from '@/services/api'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 const acceptInvitationSchema = z.object({
   first_name: z.string().min(1, 'Le prénom est requis').max(100, 'Le prénom est trop long'),
@@ -99,14 +98,23 @@ export default function AcceptInvitation() {
     setLoading(true)
     setError(null)
     
+    console.log('🔵 Submitting invitation acceptance with data:', {
+      token: token.substring(0, 20) + '...',
+      first_name: data.first_name,
+      last_name: data.last_name,
+      password_length: data.password?.length
+    })
+    
     try {
       // Accepter l'invitation et créer le compte
-      await companyApi.acceptInvitation({
+      console.log('🔵 Calling companyApi.acceptInvitation...')
+      const response = await companyApi.acceptInvitation({
         token,
         first_name: data.first_name,
         last_name: data.last_name,
         password: data.password,
       })
+      console.log('🔵 Invitation accepted successfully:', response)
       
       // Récupérer l'email depuis l'invitation
       const email = invitationInfo?.email
@@ -135,11 +143,56 @@ export default function AcceptInvitation() {
         }, 3000)
       }
     } catch (err) {
-      console.error('Error accepting invitation:', err)
-      setError(
-        err.response?.data?.detail || 
-        'Erreur lors de la création du compte. Veuillez réessayer.'
-      )
+      console.error('❌ Error accepting invitation:', err)
+      console.error('❌ Error response:', err.response)
+      console.error('❌ Error response status:', err.response?.status)
+      console.error('❌ Error response data:', err.response?.data)
+      console.error('❌ Error response headers:', err.response?.headers)
+      console.error('❌ Error message:', err.message)
+      console.error('❌ Full error object:', JSON.stringify(err, null, 2))
+      
+      // Extraire le message d'erreur détaillé
+      let errorMessage = 'Erreur lors de la création du compte. Veuillez réessayer.'
+      
+      if (err.response?.data) {
+        const responseData = err.response.data
+        
+        // Essayer plusieurs formats de réponse (FastAPI utilise 'detail' ou 'message')
+        if (responseData.detail) {
+          errorMessage = typeof responseData.detail === 'string' 
+            ? responseData.detail 
+            : JSON.stringify(responseData.detail)
+        } else if (responseData.message) {
+          errorMessage = typeof responseData.message === 'string'
+            ? responseData.message
+            : JSON.stringify(responseData.message)
+        } else if (typeof responseData === 'string') {
+          errorMessage = responseData
+        } else if (responseData.error) {
+          errorMessage = typeof responseData.error === 'string'
+            ? responseData.error
+            : JSON.stringify(responseData.error)
+        } else {
+          // Si on a une réponse mais pas de message clair, afficher le statut
+          errorMessage = `Erreur ${err.response.status || 'inconnue'}: ${JSON.stringify(responseData)}`
+        }
+      } else if (err.message) {
+        errorMessage = err.message
+      } else if (err.request) {
+        errorMessage = 'Impossible de contacter le serveur. Vérifiez votre connexion.'
+      }
+      
+      // Nettoyer le message si il contient des informations techniques
+      // Par exemple, si le message contient "HTTPException(...)", extraire juste le detail
+      if (errorMessage.includes('HTTPException') && errorMessage.includes('detail=')) {
+        const detailMatch = errorMessage.match(/detail=['"]([^'"]+)['"]/)
+        if (detailMatch && detailMatch[1]) {
+          errorMessage = detailMatch[1]
+        }
+      }
+      
+      console.error('❌ Final error message:', errorMessage)
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -151,9 +204,6 @@ export default function AcceptInvitation() {
     console.log('🔵 No token, showing error message')
     return (
       <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
-        <div className="absolute top-4 right-4">
-          <ThemeToggle />
-        </div>
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">Lien invalide</CardTitle>
@@ -174,13 +224,10 @@ export default function AcceptInvitation() {
   if (loadingInvitation) {
     return (
       <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
-        <div className="absolute top-4 right-4">
-          <ThemeToggle />
-        </div>
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-emerald" />
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-[#226D68]" />
               <p className="text-muted-foreground">Vérification de l'invitation...</p>
             </div>
           </CardContent>
@@ -192,18 +239,15 @@ export default function AcceptInvitation() {
   if (success) {
     return (
       <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
-        <div className="absolute top-4 right-4">
-          <ThemeToggle />
-        </div>
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
-              <CheckCircle2 className="h-16 w-16 text-green-emerald mx-auto mb-4" />
+              <CheckCircle2 className="h-16 w-16 text-[#226D68] mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-gray-anthracite mb-2">Compte créé avec succès !</h2>
               <p className="text-muted-foreground mb-4">
                 Vous allez être redirigé vers votre espace de recherche...
               </p>
-              <Loader2 className="h-6 w-6 animate-spin mx-auto text-green-emerald" />
+              <Loader2 className="h-6 w-6 animate-spin mx-auto text-[#226D68]" />
             </div>
           </CardContent>
         </Card>
@@ -215,14 +259,10 @@ export default function AcceptInvitation() {
   
   return (
     <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-      
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="w-16 h-16 bg-green-emerald/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lock className="h-8 w-8 text-green-emerald" />
+          <div className="w-16 h-16 bg-[#226D68]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Lock className="h-8 w-8 text-[#226D68]" />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-anthracite font-heading">
             Créer votre compte
@@ -231,7 +271,7 @@ export default function AcceptInvitation() {
             Complétez le formulaire ci-dessous pour créer votre compte recruteur
           </CardDescription>
           {invitationInfo?.email && (
-            <div className="mt-4 p-3 bg-green-emerald/10 border border-green-emerald/20 rounded-lg">
+            <div className="mt-4 p-3 bg-[#226D68]/10 border border-[#226D68]/20 rounded-lg">
               <p className="text-sm text-muted-foreground mb-1">Email du compte :</p>
               <p className="text-sm font-semibold text-gray-anthracite font-mono">{invitationInfo.email}</p>
             </div>
@@ -329,7 +369,7 @@ export default function AcceptInvitation() {
             
             <Button 
               type="submit" 
-              className="w-full bg-green-emerald hover:bg-green-emerald/90 text-white" 
+              className="w-full bg-[#226D68] hover:bg-[#1a5a55] text-white" 
               disabled={loading || !invitationInfo}
             >
               {loading ? (
@@ -351,7 +391,7 @@ export default function AcceptInvitation() {
               Vous avez déjà un compte ?{' '}
               <button
                 onClick={() => navigate('/login')}
-                className="text-green-emerald hover:underline font-medium"
+                className="text-[#226D68] hover:underline font-medium"
               >
                 Se connecter
               </button>

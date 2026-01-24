@@ -58,9 +58,24 @@ class InvitationNotificationRequest(BaseModel):
     recipient_email: str = Field(..., description="Email du recruteur invité")
     recipient_name: str = Field(..., description="Nom du recruteur")
     company_name: str = Field(..., description="Nom de l'entreprise")
-    invitation_token: str = Field(..., description="Token d'invitation")
+    invitation_token: str = Field(default="", description="Token d'invitation (peut être vide si on utilise password reset)")
     invitation_url: str = Field(default="", description="URL d'acceptation de l'invitation")
     temporary_password: Optional[str] = Field(default=None, description="Mot de passe temporaire (si le compte a été créé)")
+
+
+class CandidateWelcomeRequest(BaseModel):
+    """Requête pour envoyer un email de bienvenue à un candidat après complétion de l'onboarding"""
+    candidate_email: str = Field(..., description="Email du candidat")
+    candidate_name: str = Field(..., description="Nom du candidat")
+    dashboard_url: str = Field(default="", description="URL du tableau de bord candidat")
+
+
+class CompanyWelcomeRequest(BaseModel):
+    """Requête pour envoyer un email de bienvenue à une entreprise après création du compte"""
+    recipient_email: str = Field(..., description="Email du recruteur/admin")
+    recipient_name: str = Field(..., description="Nom du recruteur/admin")
+    company_name: str = Field(..., description="Nom de l'entreprise")
+    dashboard_url: str = Field(default="", description="URL du tableau de bord entreprise")
 
 
 @router.post("/notify_validation", status_code=status.HTTP_202_ACCEPTED)
@@ -195,6 +210,7 @@ async def notify_invitation(
         
         template_data = {
             "recipient_email": request.recipient_email,
+            "recipient_name": request.recipient_name,  # Important : inclure recipient_name pour le template
             "company_name": request.company_name,
             "invitation_token": request.invitation_token,
             "invitation_url": invitation_url,
@@ -230,5 +246,117 @@ async def notify_invitation(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue invitation notification: {str(e)}"
+        )
+
+
+@router.post("/notify_candidate_welcome", status_code=status.HTTP_202_ACCEPTED)
+async def notify_candidate_welcome(
+    request: CandidateWelcomeRequest,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email de bienvenue au candidat après complétion de l'onboarding
+    
+    Appelé par le Candidate Service après soumission du profil.
+    """
+    try:
+        # Créer l'enregistrement de notification
+        notification_repo = NotificationRepository(session)
+        
+        dashboard_url = request.dashboard_url or f"{settings.FRONTEND_URL}/candidate/dashboard"
+        
+        template_data = {
+            "recipient_name": request.candidate_name,
+            "candidate_name": request.candidate_name,
+            "dashboard_url": dashboard_url
+        }
+        
+        notification = Notification(
+            notification_type="candidate_welcome",
+            recipient_email=request.candidate_email,
+            recipient_name=request.candidate_name,
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+        
+        notification = await notification_repo.create(notification)
+        
+        # Ajouter la tâche d'envoi en arrière-plan
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="candidate_welcome",
+            recipient_email=request.candidate_email,
+            recipient_name=request.candidate_name,
+            template_data=template_data,
+            notification_id=notification.id
+        )
+        
+        return {
+            "message": "Candidate welcome notification queued",
+            "notification_id": notification.id,
+            "status": "pending"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue candidate welcome notification: {str(e)}"
+        )
+
+
+@router.post("/notify_company_welcome", status_code=status.HTTP_202_ACCEPTED)
+async def notify_company_welcome(
+    request: CompanyWelcomeRequest,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email de bienvenue à une entreprise après création du compte
+    
+    Appelé par le Company Service après création d'une entreprise.
+    """
+    try:
+        # Créer l'enregistrement de notification
+        notification_repo = NotificationRepository(session)
+        
+        dashboard_url = request.dashboard_url or f"{settings.FRONTEND_URL}/company/dashboard"
+        
+        template_data = {
+            "recipient_name": request.recipient_name,
+            "company_name": request.company_name,
+            "dashboard_url": dashboard_url
+        }
+        
+        notification = Notification(
+            notification_type="company_welcome",
+            recipient_email=request.recipient_email,
+            recipient_name=request.recipient_name,
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+        
+        notification = await notification_repo.create(notification)
+        
+        # Ajouter la tâche d'envoi en arrière-plan
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="company_welcome",
+            recipient_email=request.recipient_email,
+            recipient_name=request.recipient_name,
+            template_data=template_data,
+            notification_id=notification.id
+        )
+        
+        return {
+            "message": "Company welcome notification queued",
+            "notification_id": notification.id,
+            "status": "pending"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue company welcome notification: {str(e)}"
         )
 

@@ -104,7 +104,7 @@ export function HistoryTab({ companyId }) {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                      <Badge variant="default" className="bg-[#D1E9E7] text-[#1a5a55] border-[#B8DDD9]">
                         Payée
                       </Badge>
                     </td>

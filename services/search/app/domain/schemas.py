@@ -20,6 +20,7 @@ class CandidateDocument(BaseModel):
     first_name: str
     last_name: str
     email: str
+    photo_url: Optional[str] = None
     sector: str
     main_job: str
     total_experience: int
@@ -69,6 +70,7 @@ class PostSearchRequest(BaseModel):
     """Schéma de requête POST pour la recherche avec highlight"""
     query: Optional[str] = Field(None, description="Recherche texte libre (titre, résumé, compétences)")
     min_experience: Optional[int] = Field(None, ge=0, description="Expérience minimum (années)")
+    max_experience: Optional[int] = Field(None, ge=0, description="Expérience maximum (années)")
     experience_ranges: Optional[List[ExperienceRange]] = Field(None, description="Tranches d'expérience")
     skills: Optional[List[str]] = Field(default=[], description="Liste de compétences (format: 'Python' ou 'Python:Expert')")
     skills_with_level: Optional[List[SkillFilter]] = Field(None, description="Filtre par compétences avec niveau précis")
@@ -78,6 +80,9 @@ class PostSearchRequest(BaseModel):
     education_levels: Optional[List[str]] = Field(None, description="Niveaux d'étude (BAC, BTS, LICENCE, etc.)")
     salary_ranges: Optional[List[str]] = Field(None, description="Tranches salariales (0-500k, 500k-1m, etc.)")
     languages: Optional[Dict[str, str]] = Field(None, description="Langues avec niveaux (ex: {'Français': 'courant'})")
+    min_admin_score: Optional[float] = Field(None, ge=0, le=5, description="Score admin minimum (0-5)")
+    contract_types: Optional[List[str]] = Field(None, description="Types de contrat (CDI, CDD, FREELANCE, etc.)")
+    sector: Optional[str] = Field(None, description="Secteur d'activité")
     page: int = Field(1, ge=1, description="Numéro de page")
     size: int = Field(20, ge=1, le=100, description="Taille de la page")
 
@@ -112,10 +117,17 @@ class PostSearchResult(BaseModel):
     availability: Optional[str] = None  # Disponibilité du candidat
     skills: List[Dict[str, str]] = []
     is_verified: bool
+    status: str = "VALIDATED"  # Statut du profil (VALIDATED, SUBMITTED, etc.)
     photo_url: Optional[str] = None  # Photo de profil du candidat
     admin_score: Optional[float] = None  # Score d'évaluation admin
     admin_report: Optional[Dict[str, Any]] = None  # Rapport d'évaluation admin complet
     score: Optional[float] = None
+
+
+class SearchFacet(BaseModel):
+    """Schéma pour une facette de recherche"""
+    key: str
+    count: int
 
 
 class PostSearchResponse(BaseModel):
@@ -124,6 +136,7 @@ class PostSearchResponse(BaseModel):
     page: int
     size: int
     results: List[PostSearchResult]
+    facets: Optional[Dict[str, Any]] = None  # Agrégations pour les filtres dynamiques
 
 
 class SearchResponse(BaseModel):

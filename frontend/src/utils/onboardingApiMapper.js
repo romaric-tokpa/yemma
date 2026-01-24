@@ -78,33 +78,46 @@ export function mapStep2ToBackend(step2Data) {
       
       // Convertir start_date au format datetime ISO (obligatoire)
       // Le backend attend un datetime au format ISO 8601
-      if (exp.startDate.includes('T')) {
-        // Déjà au format ISO, vérifier qu'il a le timezone
-        if (!exp.startDate.includes('Z') && !exp.startDate.match(/[+-]\d{2}:\d{2}$/)) {
-          // Ajouter le timezone UTC si absent
-          mapped.start_date = exp.startDate.endsWith('Z') ? exp.startDate : `${exp.startDate}Z`
-        } else {
-          mapped.start_date = exp.startDate
-        }
-      } else {
-        // Convertir de YYYY-MM-DD à ISO datetime avec timezone UTC
-        mapped.start_date = `${exp.startDate}T00:00:00Z`
-      }
-      
-      // Convertir end_date au format datetime ISO (optionnel)
-      if (exp.endDate && !exp.isCurrent) {
-        if (exp.endDate.includes('T')) {
+      if (exp.startDate && exp.startDate.trim() !== '') {
+        if (exp.startDate.includes('T')) {
           // Déjà au format ISO, vérifier qu'il a le timezone
-          if (!exp.endDate.includes('Z') && !exp.endDate.match(/[+-]\d{2}:\d{2}$/)) {
-            mapped.end_date = exp.endDate.endsWith('Z') ? exp.endDate : `${exp.endDate}Z`
+          if (!exp.startDate.includes('Z') && !exp.startDate.match(/[+-]\d{2}:\d{2}$/)) {
+            // Ajouter le timezone UTC si absent
+            mapped.start_date = exp.startDate.endsWith('Z') ? exp.startDate : `${exp.startDate}Z`
           } else {
-            mapped.end_date = exp.endDate
+            mapped.start_date = exp.startDate
           }
         } else {
           // Convertir de YYYY-MM-DD à ISO datetime avec timezone UTC
-          mapped.end_date = `${exp.endDate}T00:00:00Z`
+          mapped.start_date = `${exp.startDate}T00:00:00Z`
         }
       }
+      
+      // Convertir end_date au format datetime ISO (optionnel)
+      // Ne pas envoyer end_date si l'expérience est en cours ou si endDate est vide
+      const isCurrent = exp.isCurrent || false
+      const endDate = exp.endDate ? exp.endDate.trim() : ''
+      
+      if (isCurrent) {
+        // Si l'expérience est en cours, ne pas inclure end_date dans l'objet
+        // Le backend utilisera None par défaut
+        // Ne pas mettre end_date du tout dans l'objet
+      } else if (endDate !== '') {
+        // Convertir endDate seulement si l'expérience n'est pas en cours et que endDate est renseigné
+        if (endDate.includes('T')) {
+          // Déjà au format ISO, vérifier qu'il a le timezone
+          if (!endDate.includes('Z') && !endDate.match(/[+-]\d{2}:\d{2}$/)) {
+            mapped.end_date = endDate.endsWith('Z') ? endDate : `${endDate}Z`
+          } else {
+            mapped.end_date = endDate
+          }
+        } else {
+          // Convertir de YYYY-MM-DD à ISO datetime avec timezone UTC
+          mapped.end_date = `${endDate}T00:00:00Z`
+        }
+      }
+      // Si endDate est vide et isCurrent est false, ne pas inclure end_date
+      // Le backend acceptera None pour end_date (mais la validation frontend devrait empêcher cela)
       
       // Champs optionnels - ne pas envoyer null ou undefined
       if (exp.companyLogoUrl) mapped.company_logo_url = exp.companyLogoUrl

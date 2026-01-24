@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "payment-service"
     APP_ENV: str = "development"
     DEBUG: bool = True
+    PORT: int = Field(default=8006, description="Port d'écoute du serveur")
 
     # Database
     DB_HOST: str = "localhost"
@@ -32,11 +33,18 @@ class Settings(BaseSettings):
     COMPANY_SERVICE_URL: str = Field(default="http://localhost:8005", description="Company service URL")
     FRONTEND_URL: str = Field(default="http://localhost:3000", description="Frontend URL")
 
-    # CORS
-    CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
-        description="Allowed CORS origins"
+    # CORS (défini comme string pour éviter les problèmes de parsing)
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:8000,http://localhost",
+        description="Allowed CORS origins (comma-separated string)"
     )
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Retourne CORS_ORIGINS comme une liste"""
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
+        return self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else []
 
     model_config = SettingsConfigDict(
         env_file=".env",

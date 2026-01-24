@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
     AUTH_SERVICE_URL: str = "http://localhost:8001"
+    INTERNAL_SERVICE_TOKEN_SECRET: str = Field(default="", description="Secret for internal service tokens")
 
     # Invitation
     INVITATION_TOKEN_EXPIRE_DAYS: int = Field(default=7, description="Invitation token expiration in days")

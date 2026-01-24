@@ -88,16 +88,6 @@ export default function Step3({ form, onNext, onPrevious, isFirstStep }) {
         <p className="text-sm text-destructive">{errors.educations.message}</p>
       )}
 
-      <div className="flex justify-between">
-        {!isFirstStep && (
-          <Button type="button" variant="outline" onClick={onPrevious}>
-            Précédent
-          </Button>
-        )}
-        <Button type="submit" className="ml-auto">
-          Suivant
-        </Button>
-      </div>
     </form>
   )
 }

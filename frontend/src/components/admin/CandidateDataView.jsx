@@ -1,12 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
-// Générer un avatar par défaut basé sur les initiales
-const generateAvatarUrl = (firstName, lastName) => {
-  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U'
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=200&background=random&color=fff&bold=true`
-}
-
 export default function CandidateDataView({ data }) {
   if (!data) {
     return <div className="text-muted-foreground">Aucune donnée disponible</div>
@@ -14,35 +8,9 @@ export default function CandidateDataView({ data }) {
 
   // Les données viennent directement de l'API Candidate Service (format backend)
   // Format: { first_name, last_name, email, experiences: [...], educations: [...], etc. }
-  
-  // Générer l'avatar par défaut si pas de photo
-  const defaultAvatar = generateAvatarUrl(data.first_name, data.last_name)
-  const displayPhoto = data.photo_url || defaultAvatar
 
   return (
     <div className="space-y-6">
-      {/* Photo de profil */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Photo de profil</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-center">
-            <img
-              src={displayPhoto}
-              alt={`${data.first_name} ${data.last_name}`}
-              className="w-32 h-32 rounded-full object-cover border-4 border-primary/20"
-              onError={(e) => {
-                // Si l'image échoue, utiliser l'avatar par défaut
-                if (e.target.src !== defaultAvatar) {
-                  e.target.src = defaultAvatar
-                }
-              }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Profil Général */}
       <Card>
         <CardHeader>

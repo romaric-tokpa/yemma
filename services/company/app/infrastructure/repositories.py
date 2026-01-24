@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from app.domain.models import Company, TeamMember, Invitation
+from app.domain.models import Company, TeamMember, Invitation, TeamMemberStatus
 from app.core.exceptions import CompanyNotFoundError
 
 
@@ -117,6 +117,14 @@ class TeamMemberRepository:
         await self.session.commit()
         await self.session.refresh(team_member)
         return team_member
+    
+    async def delete(self, team_member: TeamMember) -> None:
+        """Supprime un membre d'équipe (soft delete)"""
+        team_member.deleted_at = datetime.utcnow()
+        team_member.status = TeamMemberStatus.INACTIVE
+        team_member.updated_at = datetime.utcnow()
+        self.session.add(team_member)
+        await self.session.commit()
 
 
 class InvitationRepository:

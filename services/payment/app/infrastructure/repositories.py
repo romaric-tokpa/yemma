@@ -31,9 +31,14 @@ class PlanRepository:
     
     async def get_all_active(self) -> List[Plan]:
         """Récupère tous les plans actifs"""
-        statement = select(Plan).where(Plan.is_active == True).order_by(Plan.price_monthly)
+        statement = select(Plan).where(Plan.is_active == True).order_by(
+            Plan.price_monthly.asc(),
+            Plan.name.asc()
+        )
         result = await self.session.execute(statement)
-        return list(result.scalars().all())
+        plans = list(result.scalars().all())
+        print(f"📋 Plans actifs récupérés depuis la DB: {[p.name for p in plans]}")
+        return plans
     
     async def create(self, plan: Plan) -> Plan:
         """Crée un nouveau plan"""

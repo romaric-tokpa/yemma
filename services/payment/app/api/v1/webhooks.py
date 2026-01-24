@@ -111,6 +111,7 @@ async def handle_checkout_completed(session_data: dict, session):
             stripe_subscription["current_period_end"]
         )
         await subscription_repo.update(existing)
+        subscription_id_to_notify = existing.id
     else:
         # Créer un nouvel abonnement
         subscription = Subscription(
@@ -137,10 +138,7 @@ async def handle_checkout_completed(session_data: dict, session):
             limit=plan.max_profile_views,
         )
         
-        # Notifier le service company
         subscription_id_to_notify = subscription.id
-    else:
-        subscription_id_to_notify = existing.id
     
     # Notifier le service company
     try:

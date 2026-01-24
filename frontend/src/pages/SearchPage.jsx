@@ -7,7 +7,7 @@ import { CandidateCard } from '../components/search/CandidateCard'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 
-export function SearchPage() {
+export default function SearchPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
@@ -89,9 +89,10 @@ export function SearchPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden border-r bg-white`}>
+    <div className="flex h-screen bg-gray-50 relative">
+      {/* Sidebar - Desktop: fixe, Mobile: drawer */}
+      {/* Desktop: Sidebar fixe */}
+      <div className={`hidden lg:block ${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden border-r bg-white`}>
         {sidebarOpen && (
           <SearchFilters
             filters={filters}
@@ -102,91 +103,122 @@ export function SearchPage() {
         )}
       </div>
 
+      {/* Mobile/Tablette: Drawer overlay */}
+      {sidebarOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="fixed inset-y-0 left-0 z-50 w-80 max-w-[90vw] sm:max-w-[85vw] bg-white shadow-xl lg:hidden transform transition-transform duration-300 ease-in-out overflow-hidden flex flex-col">
+            <SearchFilters
+              filters={filters}
+              facets={facets}
+              onFilterChange={handleFilterChange}
+              onClose={() => setSidebarOpen(false)}
+            />
+          </div>
+        </>
+      )}
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-white border-b p-4">
-          <div className="flex items-center gap-4">
-            {!sidebarOpen && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filtres
-              </Button>
-            )}
-            
-            <form onSubmit={handleSearch} className="flex-1 flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Rechercher des candidats..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button type="submit" disabled={loading}>
-                Rechercher
-              </Button>
-            </form>
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Header - Responsive */}
+        <div className="bg-white border-b p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+              {!sidebarOpen && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center gap-2 flex-shrink-0"
+                >
+                  <Filter className="h-4 w-4" />
+                  <span className="hidden sm:inline">Filtres</span>
+                </Button>
+              )}
+              
+              <form onSubmit={handleSearch} className="flex-1 flex gap-2 min-w-0">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Rechercher des candidats..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="pl-8 sm:pl-10 text-sm sm:text-base"
+                  />
+                </div>
+                <Button type="submit" disabled={loading} className="flex-shrink-0 text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Rechercher</span>
+                  <span className="sm:hidden">
+                    <Search className="h-4 w-4" />
+                  </span>
+                </Button>
+              </form>
+            </div>
           </div>
           
           {total > 0 && (
-            <div className="mt-2 text-sm text-gray-600">
+            <div className="mt-2 text-xs sm:text-sm text-gray-600">
               {total} candidat{total > 1 ? 's' : ''} trouvé{total > 1 ? 's' : ''}
             </div>
           )}
         </div>
 
-        {/* Results */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Results - Responsive */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-gray-500">Recherche en cours...</div>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#226D68] mx-auto mb-2"></div>
+                <div className="text-sm sm:text-base text-gray-500">Recherche en cours...</div>
+              </div>
             </div>
           ) : results.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <Search className="h-12 w-12 mb-4 opacity-50" />
-              <p className="text-lg">Aucun résultat trouvé</p>
-              <p className="text-sm mt-2">Essayez de modifier vos critères de recherche</p>
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+              <Search className="h-10 w-10 sm:h-12 sm:w-12 mb-4 opacity-50" />
+              <p className="text-base sm:text-lg font-semibold">Aucun résultat trouvé</p>
+              <p className="text-xs sm:text-sm mt-2 text-center">Essayez de modifier vos critères de recherche</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {results.map((candidate) => (
-                <CandidateCard
-                  key={candidate.candidate_id}
-                  candidate={candidate}
-                  onClick={() => handleCandidateClick(candidate.candidate_id)}
-                />
-              ))}
-            </div>
-          )}
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 md:gap-6">
+                {results.map((candidate) => (
+                  <CandidateCard
+                    key={candidate.candidate_id}
+                    candidate={candidate}
+                    onClick={() => handleCandidateClick(candidate.candidate_id)}
+                  />
+                ))}
+              </div>
 
-          {/* Pagination */}
-          {total > size && (
-            <div className="mt-8 flex justify-center gap-2">
-              <Button
-                variant="outline"
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
-              >
-                Précédent
-              </Button>
-              <span className="flex items-center px-4 text-sm text-gray-600">
-                Page {page} sur {Math.ceil(total / size)}
-              </span>
-              <Button
-                variant="outline"
-                disabled={page >= Math.ceil(total / size)}
-                onClick={() => setPage(page + 1)}
-              >
-                Suivant
-              </Button>
-            </div>
+              {/* Pagination - Responsive */}
+              {total > size && (
+                <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={page === 1}
+                    onClick={() => setPage(page - 1)}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                  >
+                    Précédent
+                  </Button>
+                  <span className="flex items-center px-3 sm:px-4 text-xs sm:text-sm text-gray-600">
+                    Page {page} sur {Math.ceil(total / size)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    disabled={page >= Math.ceil(total / size)}
+                    onClick={() => setPage(page + 1)}
+                    className="w-full sm:w-auto text-xs sm:text-sm"
+                  >
+                    Suivant
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

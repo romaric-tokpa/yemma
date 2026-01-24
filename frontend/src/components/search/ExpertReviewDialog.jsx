@@ -363,7 +363,7 @@ export function ExpertReviewDialog({ candidate, open, onOpenChange }) {
                               className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
                             >
                               <div className="flex items-center gap-2 mb-2">
-                                <MessageCircle className="h-4 w-4 text-green-600" />
+                                <MessageCircle className="h-4 w-4 text-[#226D68]" />
                                 <h5 className="text-xs font-semibold text-gray-700">Communication</h5>
                               </div>
                               <div className="flex items-center gap-2">
@@ -381,7 +381,7 @@ export function ExpertReviewDialog({ candidate, open, onOpenChange }) {
                               className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
                             >
                               <div className="flex items-center gap-2 mb-2">
-                                <TrendingUp className="h-4 w-4 text-orange-600" />
+                                <TrendingUp className="h-4 w-4 text-[#e76f51]" />
                                 <h5 className="text-xs font-semibold text-gray-700">Motivation</h5>
                               </div>
                               <div className="flex items-center gap-2">
@@ -400,7 +400,7 @@ export function ExpertReviewDialog({ candidate, open, onOpenChange }) {
                     {evaluation.softSkillsTags && evaluation.softSkillsTags.length > 0 && (
                       <motion.div variants={itemVariants}>
                         <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <CheckCircle2 className="h-4 w-4 text-[#226D68]" />
                           Soft Skills identifiés
                         </h4>
                         <div className="flex flex-wrap gap-2">
@@ -470,7 +470,7 @@ export function ExpertReviewDialog({ candidate, open, onOpenChange }) {
                     {evaluation.interviewNotes && (
                       <motion.div variants={itemVariants}>
                         <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                          <ClipboardList className="h-4 w-4 text-orange-600" />
+                          <ClipboardList className="h-4 w-4 text-[#e76f51]" />
                           Notes d'entretien
                         </h4>
                         <motion.div

@@ -46,6 +46,7 @@ class SkillType(str, Enum):
 class Profile(SQLModel, table=True):
     """Modèle Profile - Profil principal du candidat"""
     __tablename__ = "profiles"
+    __table_args__ = {'extend_existing': True}  # Permet la redéfinition pour les tests
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(unique=True, index=True, description="ID utilisateur (auth-service)")
@@ -105,6 +106,7 @@ class Profile(SQLModel, table=True):
 class Experience(SQLModel, table=True):
     """Modèle Experience - Expériences professionnelles"""
     __tablename__ = "experiences"
+    __table_args__ = {'extend_existing': True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: int = Field(foreign_key="profiles.id", index=True, description="ID du profil")
@@ -132,6 +134,7 @@ class Experience(SQLModel, table=True):
 class Education(SQLModel, table=True):
     """Modèle Education - Formations et diplômes"""
     __tablename__ = "educations"
+    __table_args__ = {'extend_existing': True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: int = Field(foreign_key="profiles.id", index=True, description="ID du profil")
@@ -153,6 +156,7 @@ class Education(SQLModel, table=True):
 class Certification(SQLModel, table=True):
     """Modèle Certification - Certifications et attestations"""
     __tablename__ = "certifications"
+    __table_args__ = {'extend_existing': True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: int = Field(foreign_key="profiles.id", index=True, description="ID du profil")
@@ -174,6 +178,7 @@ class Certification(SQLModel, table=True):
 class Skill(SQLModel, table=True):
     """Modèle Skill - Compétences"""
     __tablename__ = "skills"
+    __table_args__ = {'extend_existing': True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: int = Field(foreign_key="profiles.id", index=True, description="ID du profil")
@@ -193,6 +198,7 @@ class Skill(SQLModel, table=True):
 class JobPreference(SQLModel, table=True):
     """Modèle JobPreference - Préférences de recherche d'emploi"""
     __tablename__ = "job_preferences"
+    __table_args__ = {'extend_existing': True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: int = Field(foreign_key="profiles.id", unique=True, index=True, description="ID du profil")

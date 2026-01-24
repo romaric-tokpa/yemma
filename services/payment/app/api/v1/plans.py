@@ -20,7 +20,9 @@ async def get_plans(session: AsyncSession = Depends(get_session)):
     """
     repo = PlanRepository(session)
     plans = await repo.get_all_active()
-    return [PlanResponse.model_validate(plan) for plan in plans]
+    plans_list = [PlanResponse.model_validate(plan) for plan in plans]
+    print(f"📋 Plans retournés par l'API: {[p.name for p in plans_list]}")
+    return plans_list
 
 
 @router.get("/{plan_id}", response_model=PlanResponse)

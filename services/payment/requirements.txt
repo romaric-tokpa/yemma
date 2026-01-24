@@ -9,6 +9,9 @@ sqlmodel==0.0.14
 sqlalchemy[asyncio]==2.0.23
 asyncpg==0.29.0
 
+# JWT (pour l'authentification inter-services via module shared)
+python-jose[cryptography]==3.3.0
+
 # Stripe
 stripe==7.0.0
 

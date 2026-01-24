@@ -9,7 +9,7 @@ from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import get_session
-from app.infrastructure.auth import get_current_user, TokenData
+from app.infrastructure.auth import get_current_user, require_current_user, TokenData
 from app.infrastructure.internal_auth import verify_internal_token
 from app.infrastructure.repositories import (
     ProfileRepository, ExperienceRepository, EducationRepository,
@@ -44,9 +44,12 @@ logger = logging.getLogger(__name__)
 async def create_profile(
     profile_data: ProfileCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Optional[TokenData] = Depends(get_current_user)
 ):
     """Crée un nouveau profil candidat"""
+    # Vérifier que current_user existe
+    current_user = require_current_user(current_user)
+    
     # Vérifier qu'un profil n'existe pas déjà pour cet utilisateur
     existing = await ProfileRepository.get_by_user_id(session, current_user.user_id)
     if existing:
@@ -63,15 +66,15 @@ async def create_profile(
 @router.get("/me")
 async def get_my_profile(
     session: AsyncSession = Depends(get_session),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Optional[TokenData] = Depends(get_current_user)
 ):
     """Récupère le profil de l'utilisateur connecté"""
+    # Vérifier que current_user existe
+    current_user = require_current_user(current_user)
+    
     try:
-        profile = await ProfileRepository.get_by_user_id(session, current_user.user_id)
-        if not profile:
-            raise ProfileNotFoundError(str(current_user.user_id))
-        
-        profile = await ProfileRepository.get_with_relations(session, profile.id)
+        # Charger directement le profil avec toutes ses relations en une seule requête
+        profile = await ProfileRepository.get_by_user_id_with_relations(session, current_user.user_id)
         if not profile:
             raise ProfileNotFoundError(str(current_user.user_id))
         
@@ -214,18 +217,61 @@ async def partial_update_my_profile(
         SkillRepository, JobPreferenceRepository
     )
     
+    # Vérifier que current_user existe
+    current_user = require_current_user(current_user)
+    
     profile = await ProfileRepository.get_by_user_id(session, current_user.user_id)
     if not profile:
         raise ProfileNotFoundError(str(current_user.user_id))
     
-    # Vérifier le statut (on ne peut modifier que les profils DRAFT ou REJECTED)
-    if profile.status not in [ProfileStatus.DRAFT, ProfileStatus.REJECTED]:
+    # Si le profil est VALIDATED, IN_REVIEW ou SUBMITTED, on permet la modification
+    # mais on le remet en SUBMITTED pour revalidation (pas DRAFT)
+    should_resubmit = profile.status in [
+        ProfileStatus.VALIDATED, 
+        ProfileStatus.IN_REVIEW, 
+        ProfileStatus.SUBMITTED
+    ]
+    
+    # On ne peut pas modifier un profil ARCHIVED
+    if profile.status == ProfileStatus.ARCHIVED:
         raise InvalidProfileStatusError(
             profile.status.value,
-            "DRAFT or REJECTED"
+            "DRAFT, REJECTED, VALIDATED, IN_REVIEW or SUBMITTED"
         )
     
     profile_update_data = {}
+    
+    # Si le profil était validé/soumis/en review, le remettre en SUBMITTED pour revalidation
+    if should_resubmit:
+        from datetime import datetime
+        was_validated = profile.status == ProfileStatus.VALIDATED
+        profile_update_data["status"] = ProfileStatus.SUBMITTED
+        profile_update_data["submitted_at"] = datetime.utcnow()
+        # Réinitialiser les champs de validation (sera réévalué par l'admin)
+        profile_update_data["validated_at"] = None
+        profile_update_data["admin_score"] = None
+        profile_update_data["admin_report"] = None
+        profile_update_data["rejected_at"] = None
+        profile_update_data["rejection_reason"] = None
+        
+        # Si le profil était validé, le supprimer de l'index ElasticSearch
+        # car il ne doit plus être visible dans la CVthèque jusqu'à revalidation
+        if was_validated:
+            try:
+                from app.core.config import settings
+                from app.infrastructure.internal_auth import get_service_token_header
+                import httpx
+                
+                headers = get_service_token_header("candidate-service")
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.delete(
+                        f"{settings.SEARCH_SERVICE_URL}/api/v1/candidates/index/{profile.id}",
+                        headers=headers
+                    )
+                logger.info(f"Profile {profile.id} removed from search index (status changed from VALIDATED to SUBMITTED)")
+            except Exception as e:
+                # Log l'erreur mais ne bloque pas la mise à jour du profil
+                logger.warning(f"Failed to remove profile {profile.id} from search index: {str(e)}")
     
     # Étape 0 : Consentements
     if update_data.step0:
@@ -238,7 +284,9 @@ async def partial_update_my_profile(
     # Étape 1 : Profil Général / Identité
     if update_data.step1:
         step1_dict = update_data.step1.model_dump(exclude_unset=True, exclude_none=True)
-        profile_update_data.update(step1_dict)
+        # Ne mettre à jour que si le dictionnaire n'est pas vide
+        if step1_dict:
+            profile_update_data.update(step1_dict)
     
     # Étape 2 : Expériences Professionnelles
     if update_data.step2:
@@ -290,15 +338,17 @@ async def partial_update_my_profile(
         for tech_skill in update_data.step5.technical_skills:
             skill_dict = tech_skill.model_dump(exclude_unset=True)
             skill_dict["profile_id"] = profile.id
-            skill_dict["skill_type"] = "technical"
+            skill_dict["skill_type"] = "TECHNICAL"  # Utiliser la valeur de l'enum en majuscules
             await SkillRepository.create(session, skill_dict)
         
-        # Créer les compétences comportementales
+        # Créer les compétences comportementales (soft skills)
         for soft_skill_name in update_data.step5.soft_skills:
             skill_dict = {
                 "profile_id": profile.id,
-                "skill_type": "soft",
-                "name": soft_skill_name
+                "skill_type": "SOFT",  # Utiliser la valeur de l'enum en majuscules
+                "name": soft_skill_name,
+                "level": None,  # Les soft skills n'ont pas de niveau
+                "years_of_practice": None  # Les soft skills n'ont pas d'années de pratique
             }
             await SkillRepository.create(session, skill_dict)
         
@@ -306,7 +356,7 @@ async def partial_update_my_profile(
         for tool in update_data.step5.tools:
             skill_dict = tool.model_dump(exclude_unset=True)
             skill_dict["profile_id"] = profile.id
-            skill_dict["skill_type"] = "tool"
+            skill_dict["skill_type"] = "TOOL"  # Utiliser la valeur de l'enum en majuscules
             await SkillRepository.create(session, skill_dict)
     
     # Étape 6 : Documents (métadonnées uniquement, l'upload est géré via Document Service)
@@ -491,18 +541,53 @@ async def update_profile(
             )
     
     # Vérifier le statut - permettre la mise à jour du statut uniquement pour les services internes
-    # Les utilisateurs normaux ne peuvent modifier que les profils en DRAFT ou REJECTED
+    # Les utilisateurs normaux peuvent modifier les profils en DRAFT, REJECTED, ou VALIDATED/IN_REVIEW/SUBMITTED
+    # Si le profil est VALIDATED/IN_REVIEW/SUBMITTED, il sera automatiquement remis en SUBMITTED pour revalidation
     update_dict = update_data.model_dump(exclude_unset=True)
     is_status_update = "status" in update_dict
     is_internal_service = service_info is not None
     
+    # Si le profil est VALIDATED, IN_REVIEW ou SUBMITTED et que l'utilisateur modifie le profil,
+    # le remettre en SUBMITTED pour revalidation (sauf si c'est un service interne qui met à jour le statut explicitement)
     if not is_internal_service:
-        # Pour les utilisateurs normaux, vérifier que le profil est en DRAFT ou REJECTED
-        if profile.status not in [ProfileStatus.DRAFT, ProfileStatus.REJECTED]:
+        if profile.status == ProfileStatus.ARCHIVED:
             raise InvalidProfileStatusError(
                 profile.status.value,
-                "DRAFT or REJECTED"
+                "DRAFT, REJECTED, VALIDATED, IN_REVIEW or SUBMITTED"
             )
+        
+        # Si le profil est validé/soumis/en review et qu'on modifie (sans changer le statut explicitement),
+        # le remettre en SUBMITTED pour revalidation
+        if profile.status in [ProfileStatus.VALIDATED, ProfileStatus.IN_REVIEW, ProfileStatus.SUBMITTED] and not is_status_update:
+            from datetime import datetime
+            was_validated = profile.status == ProfileStatus.VALIDATED
+            update_dict["status"] = ProfileStatus.SUBMITTED.value
+            update_dict["submitted_at"] = datetime.utcnow().isoformat()
+            # Réinitialiser les champs de validation
+            update_dict["validated_at"] = None
+            update_dict["admin_score"] = None
+            update_dict["admin_report"] = None
+            update_dict["rejected_at"] = None
+            update_dict["rejection_reason"] = None
+            
+            # Si le profil était validé, le supprimer de l'index ElasticSearch
+            # car il ne doit plus être visible dans la CVthèque jusqu'à revalidation
+            if was_validated:
+                try:
+                    from app.core.config import settings
+                    from app.infrastructure.internal_auth import get_service_token_header
+                    import httpx
+                    
+                    headers = get_service_token_header("candidate-service")
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        await client.delete(
+                            f"{settings.SEARCH_SERVICE_URL}/api/v1/candidates/index/{profile_id}",
+                            headers=headers
+                        )
+                    logger.info(f"Profile {profile_id} removed from search index (status changed from VALIDATED to SUBMITTED)")
+                except Exception as e:
+                    # Log l'erreur mais ne bloque pas la mise à jour du profil
+                    logger.warning(f"Failed to remove profile {profile_id} from search index: {str(e)}")
     # Pour les services internes, permettre la mise à jour du statut même si le profil est déjà validé/rejeté
     
     updated_profile = await ProfileRepository.update(
@@ -542,6 +627,26 @@ async def submit_profile(
         )
         if not submitted_profile:
             raise ProfileNotFoundError(str(profile_id))
+        
+        # Envoyer l'email de bienvenue après soumission réussie
+        try:
+            from app.infrastructure.notification_client import send_candidate_welcome_notification
+            from app.core.config import settings
+            
+            # Construire le nom du candidat
+            candidate_name = f"{profile.first_name or ''} {profile.last_name or ''}".strip()
+            if not candidate_name:
+                candidate_name = current_user.email.split('@')[0]  # Fallback sur le nom d'utilisateur
+            
+            # Envoyer l'email de bienvenue (ne bloque pas si ça échoue)
+            await send_candidate_welcome_notification(
+                candidate_email=profile.email or current_user.email,
+                candidate_name=candidate_name,
+                dashboard_url=f"{settings.FRONTEND_URL}/candidate/dashboard"
+            )
+        except Exception as email_error:
+            # Logger l'erreur mais ne pas bloquer la soumission
+            logger.warning(f"Failed to send welcome email to candidate {profile.email}: {str(email_error)}")
         
         return ProfileResponse.model_validate(submitted_profile)
     except ValueError as e:
@@ -584,11 +689,17 @@ async def create_experience(
                 # Convertir en UTC puis retirer timezone info (timezone-naive)
                 experience_dict["start_date"] = start_dt.astimezone(timezone.utc).replace(tzinfo=None)
         
-        if "end_date" in experience_dict and experience_dict["end_date"]:
+        # Gérer end_date : si is_current est True, end_date doit être None et ne pas être inclus
+        is_current = experience_dict.get("is_current", False)
+        if is_current:
+            # Si l'expérience est en cours, supprimer end_date de l'objet (ne pas l'inclure)
+            experience_dict.pop("end_date", None)
+        elif "end_date" in experience_dict and experience_dict["end_date"]:
             end_dt = experience_dict["end_date"]
             if hasattr(end_dt, 'tzinfo') and end_dt.tzinfo is not None:
                 # Convertir en UTC puis retirer timezone info (timezone-naive)
                 experience_dict["end_date"] = end_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        # Si end_date n'est pas fourni et is_current est False, laisser None (sera validé par completion.py lors de la soumission)
         
         # Créer l'expérience
         experience = await ExperienceRepository.create(session, experience_dict)

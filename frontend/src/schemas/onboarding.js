@@ -92,11 +92,24 @@ export const step5Schema = z.object({
 })
 
 // Schéma pour l'étape 6 - Documents
+// Le CV peut être soit un File (nouveau fichier), soit undefined/null si déjà sauvegardé
+// La validation se fait dans le composant Step6 qui vérifie uploadedCVId
 export const step6Schema = z.object({
-  cv: z.instanceof(File).refine((file) => file.size <= 10 * 1024 * 1024, {
-    message: "Le CV ne doit pas dépasser 10MB",
-  }),
-  additionalDocuments: z.array(z.instanceof(File)).optional().default([]),
+  cv: z.union([
+    z.instanceof(File).refine((file) => file.size <= 10 * 1024 * 1024, {
+      message: "Le CV ne doit pas dépasser 10MB",
+    }),
+    z.undefined(),
+    z.null(),
+  ]).optional(),
+  additionalDocuments: z.union([
+    z.array(z.instanceof(File)),
+    z.undefined(),
+    z.null(),
+  ]).optional().default([]),
+  // IDs des documents déjà sauvegardés (utilisés pour la validation)
+  cv_document_id: z.number().optional(),
+  additional_document_ids: z.array(z.number()).optional(),
 })
 
 // Schéma pour l'étape 7 - Recherche d'emploi

@@ -39,7 +39,10 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
       try {
         await candidateApi.deleteExperience(profileId, exp.id)
       } catch (error) {
-        console.error('Erreur lors de la suppression de l\'expérience:', error)
+        // Ignorer l'erreur 404 si l'expérience n'existe plus
+        if (error.response?.status !== 404) {
+          console.error('Erreur lors de la suppression de l\'expérience:', error)
+        }
       }
     }
     const newExperiences = experiences.filter((_, i) => i !== index)
@@ -63,15 +66,29 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
       return
     }
 
+    // Si l'expérience est en cours, la date de fin n'est pas obligatoire
+    if (!exp.isCurrent && !exp.endDate) {
+      alert('Veuillez renseigner une date de fin ou cocher "En cours"')
+      return
+    }
+
     try {
       setSavingExperiences(prev => ({ ...prev, [index]: true }))
-      
+
       // Mapper l'expérience vers le format backend (les dates sont déjà converties dans le mapper)
       const backendExp = mapStep2ToBackend({ experiences: [exp] })[0]
-      
+
       if (exp.id) {
         // Mettre à jour l'expérience existante : supprimer et recréer
-        await candidateApi.deleteExperience(profileId, exp.id)
+        try {
+          await candidateApi.deleteExperience(profileId, exp.id)
+        } catch (deleteError) {
+          // Ignorer l'erreur 404 si l'expérience n'existe plus (déjà supprimée lors d'une sauvegarde globale)
+          if (deleteError.response?.status !== 404) {
+            throw deleteError
+          }
+          console.log('Experience déjà supprimée, création d\'une nouvelle')
+        }
         const createdExp = await candidateApi.createExperience(profileId, backendExp)
         // Mettre à jour l'expérience avec le nouvel ID
         const updated = [...experiences]
@@ -130,14 +147,15 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
 
     try {
       setUploadingLogos(prev => ({ ...prev, [index]: true }))
-      
+
+      // Utiliser le type dédié COMPANY_LOGO au lieu de OTHER
       const { documentApi } = await import('@/services/api')
-      const uploadedDoc = await documentApi.uploadDocument(file, profileId, 'OTHER')
-      const viewResponse = await documentApi.getDocumentViewUrl(uploadedDoc.id)
-      const viewUrl = viewResponse.view_url
+      const uploadedDoc = await documentApi.uploadDocument(file, profileId, 'COMPANY_LOGO')
+      // Utiliser l'URL permanente via le service au lieu de l'URL présignée temporaire
+      const serveUrl = documentApi.getDocumentServeUrl(uploadedDoc.id)
       
       const updatedExperiences = [...experiences]
-      updatedExperiences[index].companyLogoUrl = viewUrl
+      updatedExperiences[index].companyLogoUrl = serveUrl
       setValue('experiences', updatedExperiences)
     } catch (error) {
       console.error('Erreur lors de l\'upload du logo:', error)
@@ -187,8 +205,32 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
     }
   }
 
+  // Validation personnalisée pour les expériences
+  const validateExperiences = () => {
+    for (let i = 0; i < experiences.length; i++) {
+      const exp = experiences[i]
+      if (!exp.companyName || !exp.position || !exp.startDate || !exp.description) {
+        return `L'expérience ${i + 1} est incomplète. Veuillez remplir tous les champs obligatoires.`
+      }
+      // Si l'expérience n'est pas en cours, la date de fin est obligatoire
+      if (!exp.isCurrent && !exp.endDate) {
+        return `L'expérience ${i + 1} : la date de fin est obligatoire si l'expérience n'est pas en cours.`
+      }
+    }
+    return true
+  }
+
+  const handleFormSubmit = async (data) => {
+    const validation = validateExperiences()
+    if (validation !== true) {
+      alert(validation)
+      return
+    }
+    onNext(data)
+  }
+
   return (
-    <form onSubmit={handleSubmit(onNext)} className="space-y-6">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       <div className="space-y-6">
         {experiences.map((_, index) => (
           <div key={index} className="border rounded-lg p-4 space-y-4">
@@ -196,7 +238,7 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
               <div className="flex items-center gap-2">
                 <h3 className="font-medium">Expérience {index + 1}</h3>
                 {savedExperiences.has(index) && (
-                  <span className="text-xs text-green-600 flex items-center gap-1">
+                  <span className="text-xs text-[#226D68] flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" />
                     Sauvegardée
                   </span>
@@ -317,7 +359,7 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
               </div>
 
               <div className="space-y-2">
-                <Label>Date de fin</Label>
+                <Label>Date de fin{!watch(`experiences.${index}.isCurrent`) ? ' *' : ''}</Label>
                 <Input 
                   type="date" 
                   {...register(`experiences.${index}.endDate`)}
@@ -326,12 +368,24 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id={`isCurrent-${index}`}
-                    {...register(`experiences.${index}.isCurrent`)}
+                    checked={watch(`experiences.${index}.isCurrent`) || false}
+                    onCheckedChange={(checked) => {
+                      const updated = [...experiences]
+                      updated[index].isCurrent = checked || false
+                      // Si "en cours" est coché, vider la date de fin
+                      if (checked) {
+                        updated[index].endDate = ''
+                      }
+                      setValue('experiences', updated)
+                    }}
                   />
-                  <Label htmlFor={`isCurrent-${index}`} className="text-sm">
+                  <Label htmlFor={`isCurrent-${index}`} className="text-sm cursor-pointer">
                     En cours
                   </Label>
                 </div>
+                {!watch(`experiences.${index}.isCurrent`) && !watch(`experiences.${index}.endDate`) && (
+                  <p className="text-xs text-red-600">La date de fin est obligatoire si l'expérience n'est pas en cours</p>
+                )}
               </div>
 
               <div className="space-y-2 col-span-2">
@@ -416,7 +470,7 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
                       )}
                     </div>
                     {experiences[index]?.documentId && (
-                      <p className="text-xs text-green-600 flex items-center gap-1">
+                      <p className="text-xs text-[#226D68] flex items-center gap-1">
                         <FileText className="w-3 h-3" />
                         Document téléchargé avec succès
                       </p>
@@ -438,16 +492,6 @@ export default function Step2({ form, onNext, onPrevious, isFirstStep, profileId
         <p className="text-sm text-destructive">{errors.experiences.message}</p>
       )}
 
-      <div className="flex justify-between">
-        {!isFirstStep && (
-          <Button type="button" variant="outline" onClick={onPrevious}>
-            Précédent
-          </Button>
-        )}
-        <Button type="submit" className="ml-auto">
-          Suivant
-        </Button>
-      </div>
     </form>
   )
 }

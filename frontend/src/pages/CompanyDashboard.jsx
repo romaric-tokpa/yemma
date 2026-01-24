@@ -6,13 +6,12 @@ import {
   CheckCircle2, Clock, AlertCircle, Sparkles, MapPin, Mail, Phone
 } from 'lucide-react'
 import { companyApi, authApiService, paymentApiService } from '@/services/api'
-import { CompanyManagement } from './CompanyManagement'
-import { ProSearchPage } from './ProSearchPage'
+import CompanyManagement from './CompanyManagement'
+import { SearchTab } from '../components/company/SearchTab'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Loader2 } from 'lucide-react'
 
 const generateAvatarUrl = (name) => {
@@ -32,14 +31,20 @@ export default function CompanyDashboard() {
 
   useEffect(() => {
     loadData()
-    // Définir l'onglet actif selon l'URL
+  }, [])
+
+  useEffect(() => {
+    // Définir l'onglet actif selon l'URL ou les paramètres de requête
     const path = location.pathname
-    if (path.includes('/company/search')) {
+    const searchParams = new URLSearchParams(location.search)
+    const tabParam = searchParams.get('tab')
+    
+    if (tabParam === 'search') {
       setActiveTab('search')
-    } else if (path.includes('/company/settings')) {
-      setActiveTab('settings')
     } else if (path.includes('/company/management')) {
       setActiveTab('management')
+    } else if (path === '/company/dashboard' && !tabParam) {
+      setActiveTab('overview')
     }
   }, [location])
 
@@ -61,7 +66,15 @@ export default function CompanyDashboard() {
           const sub = await paymentApiService.getSubscription(companyData.id)
           setSubscription(sub)
         } catch (error) {
-          console.error('Error loading subscription:', error)
+          // Gérer les erreurs de manière non bloquante
+          if (error.response?.status === 502 || error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+            console.warn('Payment service unavailable (502 Bad Gateway). Subscription data will not be available.')
+            // Ne pas définir subscription, l'application continuera sans ces données
+            setSubscription(null)
+          } else {
+            console.error('Error loading subscription:', error)
+            setSubscription(null)
+          }
         }
       }
     } catch (error) {
@@ -87,7 +100,7 @@ export default function CompanyDashboard() {
     return (
       <div className="min-h-screen bg-gray-light flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-emerald" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-[#226D68]" />
           <p className="text-muted-foreground">Chargement...</p>
         </div>
       </div>
@@ -105,7 +118,7 @@ export default function CompanyDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate('/company/onboarding')} className="w-full bg-green-emerald hover:bg-green-emerald/90">
+            <Button onClick={() => navigate('/company/onboarding')} className="w-full bg-[#226D68] hover:bg-[#1a5a55]">
               Créer mon entreprise
             </Button>
           </CardContent>
@@ -122,375 +135,323 @@ export default function CompanyDashboard() {
 
   const displayLogo = company.logo_url || generateAvatarUrl(company.name)
   const activeMembers = teamMembers.filter(m => m.status === 'active')
+  
+  // Contracter automatiquement la sidebar sur l'onglet search
+  const shouldContractSidebar = activeTab === 'search'
+  const effectiveSidebarOpen = shouldContractSidebar ? false : sidebarOpen
 
   return (
-    <div className="min-h-screen bg-gray-light flex">
-      {/* Sidebar */}
+    <div className="h-screen bg-gray-light flex overflow-hidden max-h-screen">
+      {/* Sidebar - Compact */}
       <aside className={`
-        ${sidebarOpen ? 'w-64' : 'w-16'} 
-        bg-white border-r shadow-sm
-        fixed left-0 top-0 h-screen z-30
+        fixed lg:static inset-y-0 left-0 z-50
+        bg-white border-r border-gray-200
         transition-all duration-300 ease-in-out
+        ${effectiveSidebarOpen ? 'w-56 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16'}
         flex flex-col
       `}>
-        {/* Logo/Header Sidebar */}
-        <div className="h-16 border-b flex items-center justify-between px-4">
-          {sidebarOpen ? (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-green-emerald rounded-lg flex items-center justify-center">
-                  <Building className="w-5 h-5 text-white" />
-                </div>
-                <span className="font-bold text-lg text-gray-anthracite font-heading">Yemma</span>
+        {/* Header Sidebar - Compact */}
+        <div className="h-12 border-b border-gray-200 flex items-center justify-between px-3">
+          {effectiveSidebarOpen && (
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-[#226D68] rounded-lg flex items-center justify-center">
+                <Building className="w-4 h-4 text-white" />
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(false)}
-                className="h-8 w-8 p-0"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarOpen(true)}
-              className="h-8 w-8 p-0 mx-auto"
-            >
-              <Menu className="w-4 h-4" />
-            </Button>
+              <span className="font-bold text-sm text-gray-anthracite font-heading">Yemma</span>
+            </div>
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="lg:hidden h-8 w-8"
+          >
+            {effectiveSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </Button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        {/* Navigation - Compact */}
+        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {sidebarItems.map((item) => {
             const Icon = item.icon
             return (
-              <button
+              <Button
                 key={item.id}
+                variant={activeTab === item.id ? 'default' : 'ghost'}
+                className="w-full justify-start h-9 text-sm px-2"
                 onClick={() => {
                   setActiveTab(item.id)
                   if (item.id === 'search') {
-                    navigate('/company/search')
+                    navigate('/company/dashboard?tab=search')
                   } else if (item.id === 'management') {
                     navigate('/company/management')
                   } else {
                     navigate('/company/dashboard')
                   }
                 }}
-                className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-                  transition-colors duration-200
-                  ${activeTab === item.id 
-                    ? 'bg-green-emerald text-white shadow-sm' 
-                    : 'text-muted-foreground hover:bg-gray-light hover:text-gray-anthracite'
-                  }
-                `}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {sidebarOpen && (
-                  <span className="flex-1 text-left font-medium">{item.label}</span>
-                )}
-              </button>
+                <Icon className="w-3.5 h-3.5 mr-2" />
+                {effectiveSidebarOpen && <span>{item.label}</span>}
+              </Button>
             )
           })}
         </nav>
 
-        {/* Company info */}
-        <div className="border-t p-4">
-          {sidebarOpen ? (
-            <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-light transition-colors">
+        {/* Footer Sidebar - Compact */}
+        <div className="border-t border-gray-200 p-2 space-y-2">
+          {effectiveSidebarOpen && (
+            <div className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-50 transition-colors mb-2">
               <img
                 src={displayLogo}
                 alt={company.name}
-                className="w-10 h-10 rounded-lg object-cover border-2 border-green-emerald/20"
+                className="w-8 h-8 rounded-lg object-cover border border-gray-200"
                 onError={(e) => {
                   e.target.src = generateAvatarUrl(company.name)
                 }}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate text-gray-anthracite">{company.name}</p>
+                <p className="text-xs font-medium truncate text-gray-anthracite">{company.name}</p>
                 <p className="text-xs text-muted-foreground truncate">
                   {activeMembers.length} membre{activeMembers.length > 1 ? 's' : ''}
                 </p>
               </div>
             </div>
-          ) : (
-            <div className="flex justify-center">
-              <img
-                src={displayLogo}
-                alt={company.name}
-                className="w-10 h-10 rounded-lg object-cover border-2 border-green-emerald/20"
-                onError={(e) => {
-                  e.target.src = generateAvatarUrl(company.name)
-                }}
-              />
-            </div>
           )}
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 h-9 text-sm px-2"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-3.5 h-3.5 mr-2" />
+            {effectiveSidebarOpen && <span>Déconnexion</span>}
+          </Button>
         </div>
       </aside>
 
+      {/* Overlay pour mobile */}
+      {effectiveSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-16'} transition-all duration-300`}>
-        {/* Vue d'ensemble avec header vert émeraude */}
-        {activeTab === 'overview' ? (
-          <div className="min-h-screen bg-gray-light">
-            {/* Header avec gradient vert émeraude */}
-            <div className="bg-gradient-to-r from-green-emerald to-green-emerald/90 text-white shadow-lg">
-              <div className="max-w-7xl mx-auto px-6 py-8">
-                <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6">
-                  {/* Logo de l'entreprise */}
-                  <div className="flex-shrink-0">
-                    <img
-                      src={displayLogo}
-                      alt={company.name}
-                      className="w-24 h-24 rounded-[12px] object-cover border-4 border-white/30 shadow-xl"
-                      onError={(e) => {
-                        e.target.src = generateAvatarUrl(company.name)
-                      }}
-                    />
-                  </div>
-
-                  {/* Informations principales */}
-                  <div className="flex-1 text-white">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h1 className="text-4xl font-bold font-heading text-white">{company.name}</h1>
-                      {company.status === 'ACTIVE' && (
-                        <Badge className="bg-white/20 text-white border-white/30">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Actif
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Informations en grille */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      {company.adresse && (
-                        <div className="flex items-center gap-2 text-white/80">
-                          <MapPin className="h-5 w-5 flex-shrink-0" />
-                          <span>{company.adresse}</span>
-                        </div>
-                      )}
-                      {company.legal_id && (
-                        <div className="flex items-center gap-2 text-white/80">
-                          <FileText className="h-5 w-5 flex-shrink-0" />
-                          <span>Numéro RCCM: {company.legal_id}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions header */}
-                  <div className="flex items-center gap-3">
-                    <ThemeToggle />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate('/company/onboarding')}
-                      className="text-white hover:bg-white/10"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      <span className="hidden sm:inline">Paramètres</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleLogout}
-                      className="text-white hover:bg-white/10"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      <span className="hidden sm:inline">Déconnexion</span>
-                    </Button>
-                  </div>
-                </div>
+      <main className={`flex-1 overflow-hidden bg-gray-50 ${activeTab === 'search' ? 'flex flex-col' : ''}`}>
+        {activeTab === 'search' ? (
+          <SearchTab />
+        ) : (
+          <div className="container mx-auto p-4 max-w-7xl overflow-y-auto h-full">
+          {/* Header - Compact */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-[#226D68] to-[#1a5a55] bg-clip-text text-transparent">
+                  {activeTab === 'overview' ? 'Vue d\'ensemble' : activeTab === 'search' ? 'Recherche Candidats' : 'Gestion'}
+                </h1>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {activeTab === 'overview' 
+                    ? `Bienvenue dans votre espace ${company.name}`
+                    : activeTab === 'search'
+                      ? 'Recherchez et découvrez des candidats validés'
+                      : 'Gérez votre équipe et vos paramètres'}
+                </p>
               </div>
+              {activeTab === 'overview' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/company/onboarding')}
+                  className="h-8 px-2 text-xs"
+                >
+                  <Settings className="w-3.5 h-3.5 mr-1" />
+                  Paramètres
+                </Button>
+              )}
             </div>
 
-            {/* Contenu principal */}
-            <div className="max-w-7xl mx-auto px-6 py-8">
-              {/* Cards de statistiques */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <Card className="rounded-[12px] shadow-sm border-l-4 border-l-blue-deep hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
+            {/* Statistiques - Compact */}
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                  <CardHeader className="pb-2 pt-3 px-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2 font-medium">Membres actifs</p>
-                        <p className="text-3xl font-bold text-gray-anthracite">{activeMembers.length}</p>
-                      </div>
-                      <div className="w-14 h-14 bg-blue-deep/10 rounded-lg flex items-center justify-center">
-                        <Users className="w-7 h-7 text-blue-deep" />
-                      </div>
+                      <CardTitle className="text-xs font-medium text-blue-900">
+                        Membres actifs
+                      </CardTitle>
+                      <Users className="h-4 w-4 text-blue-600" />
                     </div>
+                  </CardHeader>
+                  <CardContent className="px-3 pb-3">
+                    <div className="text-xl font-bold text-blue-900">{activeMembers.length}</div>
+                    <p className="text-xs text-blue-700 mt-0.5">Recruteurs</p>
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[12px] shadow-sm border-l-4 border-l-green-emerald hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
+                <Card className="bg-gradient-to-br from-[#E8F4F3] to-[#D1E9E7] border-[#B8DDD9]">
+                  <CardHeader className="pb-2 pt-3 px-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2 font-medium">Statut</p>
-                        <Badge className="mt-1 bg-green-emerald text-white">
-                          {company.status === 'ACTIVE' ? 'Actif' : company.status}
-                        </Badge>
-                      </div>
-                      <div className="w-14 h-14 bg-green-emerald/10 rounded-lg flex items-center justify-center">
-                        <CheckCircle2 className="w-7 h-7 text-green-emerald" />
-                      </div>
+                      <CardTitle className="text-xs font-medium text-[#1a5a55]">
+                        Statut
+                      </CardTitle>
+                      <CheckCircle2 className="h-4 w-4 text-[#226D68]" />
                     </div>
+                  </CardHeader>
+                  <CardContent className="px-3 pb-3">
+                    <Badge className="mt-1 bg-[#226D68] text-white text-xs px-1.5 py-0 h-4">
+                      {company.status === 'ACTIVE' ? 'Actif' : company.status}
+                    </Badge>
+                    <p className="text-xs text-[#1a5a55] mt-0.5">Entreprise</p>
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[12px] shadow-sm border-l-4 border-l-purple-500 hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                  <CardHeader className="pb-2 pt-3 px-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2 font-medium">Abonnement</p>
-                        <p className="text-2xl font-bold text-gray-anthracite">
-                          {subscription?.plan?.name || 'Aucun'}
-                        </p>
-                      </div>
-                      <div className="w-14 h-14 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <CreditCard className="w-7 h-7 text-purple-600" />
-                      </div>
+                      <CardTitle className="text-xs font-medium text-purple-900">
+                        Abonnement
+                      </CardTitle>
+                      <CreditCard className="h-4 w-4 text-purple-600" />
                     </div>
+                  </CardHeader>
+                  <CardContent className="px-3 pb-3">
+                    <div className="text-sm font-bold text-purple-900 truncate">
+                      {subscription?.plan?.name || 'Aucun'}
+                    </div>
+                    <p className="text-xs text-purple-700 mt-0.5">Plan actuel</p>
                   </CardContent>
                 </Card>
 
-                <Card className="rounded-[12px] shadow-sm border-l-4 border-l-orange-500 hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
+                <Card className="bg-gradient-to-br from-[#FDF2F0] to-[#FBE5E0] border-[#F8D3CA]">
+                  <CardHeader className="pb-2 pt-3 px-3">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2 font-medium">Quota restant</p>
-                        <p className="text-3xl font-bold text-gray-anthracite">
-                          {subscription?.quota_remaining !== undefined ? subscription.quota_remaining : '∞'}
-                        </p>
-                      </div>
-                      <div className="w-14 h-14 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <TrendingUp className="w-7 h-7 text-orange-600" />
-                      </div>
+                      <CardTitle className="text-xs font-medium text-[#c04a2f]">
+                        Quota restant
+                      </CardTitle>
+                      <TrendingUp className="h-4 w-4 text-[#e76f51]" />
                     </div>
+                  </CardHeader>
+                  <CardContent className="px-3 pb-3">
+                    <div className="text-xl font-bold text-[#c04a2f]">
+                      {subscription?.quota_remaining !== undefined ? subscription.quota_remaining : '∞'}
+                    </div>
+                    <p className="text-xs text-[#c04a2f] mt-0.5">Consultations</p>
                   </CardContent>
                 </Card>
               </div>
+            )}
+          </div>
 
-              {/* Actions rapides */}
-              <Card className="mb-8 rounded-[12px] shadow-lg border-l-4 border-l-green-emerald bg-gradient-to-r from-white to-green-emerald/5">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-emerald/10 rounded-lg">
-                      <Sparkles className="h-6 w-6 text-green-emerald" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-2xl font-bold text-gray-anthracite font-heading">Actions rapides</CardTitle>
-                      <CardDescription>Accédez rapidement aux fonctionnalités principales</CardDescription>
+          {/* Contenu conditionnel selon l'onglet */}
+          {activeTab === 'overview' ? (
+            <>
+              {/* Informations de l'entreprise - Compact */}
+              <Card className="mb-3">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b py-2 px-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={displayLogo}
+                        alt={company.name}
+                        className="w-12 h-12 rounded-lg object-cover border-2 border-[#226D68]/20"
+                        onError={(e) => {
+                          e.target.src = generateAvatarUrl(company.name)
+                        }}
+                      />
+                      <div>
+                        <CardTitle className="text-sm font-semibold">{company.name}</CardTitle>
+                        <CardDescription className="text-xs mt-0.5">
+                          {company.adresse && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {company.adresse}
+                            </span>
+                          )}
+                          {company.legal_id && (
+                            <span className="flex items-center gap-1 mt-1">
+                              <FileText className="w-3 h-3" />
+                              RCCM: {company.legal_id}
+                            </span>
+                          )}
+                        </CardDescription>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              </Card>
+
+              {/* Actions rapides - Compact */}
+              <Card className="mb-3">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b py-2 px-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4" />
+                    Actions rapides
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <Button
                       variant="outline"
-                      className="h-auto py-6 flex flex-col items-center gap-3 border-2 border-blue-deep text-blue-deep hover:bg-blue-deep/10 rounded-[12px]"
+                      size="sm"
+                      className="h-auto py-3 flex flex-col items-center gap-2 border-2 text-xs"
                       onClick={() => {
                         setActiveTab('search')
-                        navigate('/company/search')
+                        navigate('/company/dashboard?tab=search')
                       }}
                     >
-                      <Search className="w-8 h-8 text-green-emerald" />
+                      <Search className="w-5 h-5 text-[#226D68]" />
                       <div className="text-center">
-                        <p className="font-semibold text-base">Rechercher des candidats</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Accédez à la CVthèque de profils validés
+                        <p className="font-semibold text-xs">Rechercher candidats</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Accéder à la CVthèque
                         </p>
                       </div>
                     </Button>
 
                     <Button
                       variant="outline"
-                      className="h-auto py-6 flex flex-col items-center gap-3 border-2 border-blue-deep text-blue-deep hover:bg-blue-deep/10 rounded-[12px]"
+                      size="sm"
+                      className="h-auto py-3 flex flex-col items-center gap-2 border-2 text-xs"
                       onClick={() => {
                         setActiveTab('management')
                         navigate('/company/management')
                       }}
                     >
-                      <UserPlus className="w-8 h-8 text-green-emerald" />
+                      <UserPlus className="w-5 h-5 text-[#226D68]" />
                       <div className="text-center">
-                        <p className="font-semibold text-base">Gérer l'équipe</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Inviter et gérer vos recruteurs
+                        <p className="font-semibold text-xs">Gérer l'équipe</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Inviter des recruteurs
                         </p>
                       </div>
                     </Button>
 
                     <Button
                       variant="outline"
-                      className="h-auto py-6 flex flex-col items-center gap-3 border-2 border-blue-deep text-blue-deep hover:bg-blue-deep/10 rounded-[12px]"
+                      size="sm"
+                      className="h-auto py-3 flex flex-col items-center gap-2 border-2 text-xs"
                       onClick={() => navigate('/company/onboarding')}
                     >
-                      <Settings className="w-8 h-8 text-green-emerald" />
+                      <Settings className="w-5 h-5 text-[#226D68]" />
                       <div className="text-center">
-                        <p className="font-semibold text-base">Paramètres</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Modifier les informations de l'entreprise
+                        <p className="font-semibold text-xs">Paramètres</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Modifier l'entreprise
                         </p>
                       </div>
                     </Button>
                   </div>
                 </CardContent>
               </Card>
+            </>
+          ) : activeTab === 'management' ? (
+            <div className="mt-0">
+              <CompanyManagement />
             </div>
+          ) : null}
           </div>
-        ) : (
-          <>
-            {/* Top Header pour les autres onglets */}
-            <header className="h-16 border-b bg-white sticky top-0 z-20 shadow-sm">
-              <div className="h-full px-6 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <h1 className="text-2xl font-bold text-gray-anthracite font-heading">Espace Entreprise</h1>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <ThemeToggle />
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate('/company/onboarding')}
-                    className="border-blue-deep text-blue-deep hover:bg-blue-deep/10"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Paramètres</span>
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="flex items-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span className="hidden sm:inline">Déconnexion</span>
-                  </Button>
-                </div>
-              </div>
-            </header>
-
-            {/* Main Content Area pour les autres onglets */}
-            <main className={activeTab === 'search' ? '' : 'p-6 max-w-7xl mx-auto'}>
-              {activeTab === 'search' && (
-                <ProSearchPage />
-              )}
-
-              {activeTab === 'management' && (
-                <CompanyManagement />
-              )}
-            </main>
-          </>
         )}
-      </div>
+      </main>
     </div>
   )
 }

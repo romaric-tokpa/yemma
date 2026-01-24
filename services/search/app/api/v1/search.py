@@ -221,16 +221,42 @@ async def post_search_candidates(request: PostSearchRequest):
             availability=source.get("availability"),
             skills=skills,
             is_verified=source.get("is_verified", False),
+            status=source.get("status", "VALIDATED"),  # Statut du profil
             photo_url=source.get("photo_url"),
             admin_score=source.get("admin_score"),  # Score admin d'évaluation
             admin_report=source.get("admin_report"),  # Rapport admin complet si disponible
             score=hit.get("_score"),
         ))
-    
+
+    # Extraire les agrégations/facettes pour les filtres dynamiques
+    aggregations = result.get("aggregations", {})
+    facets = None
+    if aggregations:
+        facets = {
+            "availability": [
+                {"key": bucket["key"], "count": bucket["doc_count"]}
+                for bucket in aggregations.get("availability_counts", {}).get("buckets", [])
+            ],
+            "contract_types": [
+                {"key": bucket["key"], "count": bucket["doc_count"]}
+                for bucket in aggregations.get("contract_type_counts", {}).get("buckets", [])
+            ],
+            "sectors": [
+                {"key": bucket["key"], "count": bucket["doc_count"]}
+                for bucket in aggregations.get("sector_counts", {}).get("buckets", [])
+            ],
+            "experience_ranges": [
+                {"key": bucket["key"], "from": bucket.get("from"), "to": bucket.get("to"), "count": bucket["doc_count"]}
+                for bucket in aggregations.get("experience_ranges", {}).get("buckets", [])
+            ],
+            "avg_admin_score": aggregations.get("avg_admin_score", {}).get("value"),
+        }
+
     return PostSearchResponse(
         total=total,
         page=request.page,
         size=request.size,
         results=results,
+        facets=facets,
     )
 

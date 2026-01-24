@@ -3,7 +3,7 @@ Schémas Pydantic spécifiques pour chaque étape de l'onboarding
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
 # ============================================
@@ -23,15 +23,15 @@ class Step0ConsentSchema(BaseModel):
 
 class Step1IdentitySchema(BaseModel):
     """Schéma pour l'étape 1 - Profil Général / Identité"""
-    # Informations d'identité
-    first_name: str = Field(description="Prénom")
-    last_name: str = Field(description="Nom")
+    # Informations d'identité (optionnels pour permettre les mises à jour partielles)
+    first_name: Optional[str] = Field(None, description="Prénom")
+    last_name: Optional[str] = Field(None, description="Nom")
     date_of_birth: Optional[datetime] = Field(None, description="Date de naissance")
     nationality: Optional[str] = Field(None, description="Nationalité")
     photo_url: Optional[str] = Field(None, description="URL de la photo")
     
     # Coordonnées
-    email: EmailStr = Field(description="Email")
+    email: Optional[EmailStr] = Field(None, description="Email")
     phone: Optional[str] = Field(None, description="Téléphone")
     address: Optional[str] = Field(None, description="Adresse")
     city: Optional[str] = Field(None, description="Ville")
@@ -42,7 +42,9 @@ class Step1IdentitySchema(BaseModel):
     professional_summary: Optional[str] = Field(None, description="Résumé professionnel (min 300 caractères)")
     sector: Optional[str] = Field(None, description="Secteur d'activité")
     main_job: Optional[str] = Field(None, description="Métier principal")
-    total_experience: Optional[int] = Field(0, description="Années d'expérience totale")
+    total_experience: Optional[int] = Field(None, description="Années d'expérience totale")
+    
+    model_config = ConfigDict(extra="forbid")
 
 
 # ============================================

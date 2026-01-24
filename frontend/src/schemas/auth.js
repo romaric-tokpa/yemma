@@ -26,7 +26,7 @@ export const registerCompanySchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
   companyName: z.string().min(2, "Le nom de l'entreprise est requis"),
-  companyLegalId: z.string().min(1, "Le numéro SIRET est requis"),
+  companyLegalId: z.string().min(1, "Le RCCM est requis"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Les mots de passe ne correspondent pas",
   path: ["confirmPassword"],

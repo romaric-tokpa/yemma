@@ -16,6 +16,26 @@ from app.domain.exceptions import (
     TokenError,
     PermissionDeniedError,
 )
+from app.core.config import settings
+
+
+def add_cors_headers(response: JSONResponse, request: Request) -> JSONResponse:
+    """Ajoute les headers CORS à une réponse"""
+    origin = request.headers.get("origin")
+    if origin:
+        # Vérifier si l'origine est dans la liste des origines autorisées
+        # ou si c'est localhost (pour le développement)
+        is_allowed = (
+            origin in settings.CORS_ORIGINS or
+            origin.startswith("http://localhost") or
+            origin.startswith("http://127.0.0.1")
+        )
+        if is_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    return response
 
 
 class APIException(Exception):
@@ -33,7 +53,7 @@ class APIException(Exception):
 
 async def api_exception_handler(request: Request, exc: APIException):
     """Handler pour les exceptions API personnalisées"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=exc.status_code,
         content={
             "error": True,
@@ -42,11 +62,12 @@ async def api_exception_handler(request: Request, exc: APIException):
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def auth_error_handler(request: Request, exc: AuthError):
     """Handler pour les erreurs d'authentification"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
         content={
             "error": True,
@@ -55,11 +76,12 @@ async def auth_error_handler(request: Request, exc: AuthError):
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsError):
     """Handler pour les identifiants invalides"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
         content={
             "error": True,
@@ -68,11 +90,12 @@ async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsE
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def user_not_found_handler(request: Request, exc: UserNotFoundError):
     """Handler pour utilisateur non trouvé"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
         content={
             "error": True,
@@ -81,11 +104,12 @@ async def user_not_found_handler(request: Request, exc: UserNotFoundError):
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def user_already_exists_handler(request: Request, exc: UserAlreadyExistsError):
     """Handler pour utilisateur déjà existant"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content={
             "error": True,
@@ -94,11 +118,12 @@ async def user_already_exists_handler(request: Request, exc: UserAlreadyExistsEr
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def token_error_handler(request: Request, exc: TokenError):
     """Handler pour les erreurs de token"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
         content={
             "error": True,
@@ -107,11 +132,12 @@ async def token_error_handler(request: Request, exc: TokenError):
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def permission_denied_handler(request: Request, exc: PermissionDeniedError):
     """Handler pour permission refusée"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
         content={
             "error": True,
@@ -120,11 +146,12 @@ async def permission_denied_handler(request: Request, exc: PermissionDeniedError
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handler pour les exceptions HTTP standard"""
-    return JSONResponse(
+    response = JSONResponse(
         status_code=exc.status_code,
         content={
             "error": True,
@@ -133,6 +160,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -145,7 +173,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "type": error["type"],
         })
     
-    return JSONResponse(
+    response = JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "error": True,
@@ -154,11 +182,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 async def general_exception_handler(request: Request, exc: Exception):
     """Handler pour les exceptions non gérées"""
-    return JSONResponse(
+    import traceback
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    response = JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": True,
@@ -167,6 +202,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             "path": str(request.url),
         }
     )
+    return add_cors_headers(response, request)
 
 
 def setup_exception_handlers(app: FastAPI):

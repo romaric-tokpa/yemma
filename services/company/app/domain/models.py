@@ -86,6 +86,8 @@ class Invitation(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     company_id: int = Field(foreign_key="companies.id", index=True, description="ID de l'entreprise")
     email: str = Field(index=True, max_length=255, description="Email invité")
+    first_name: Optional[str] = Field(default=None, max_length=100, description="Prénom de l'invité")
+    last_name: Optional[str] = Field(default=None, max_length=100, description="Nom de l'invité")
     token: str = Field(unique=True, index=True, max_length=255, description="Token d'invitation unique")
     role: TeamMemberRole = Field(default=TeamMemberRole.RECRUTEUR, description="Rôle assigné (RECRUTEUR par défaut)")
     status: InvitationStatus = Field(default=InvitationStatus.PENDING, description="Statut de l'invitation")

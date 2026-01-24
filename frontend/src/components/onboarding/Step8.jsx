@@ -65,6 +65,7 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
   // Vérifier l'existence du CV via le service Document
   const [hasCv, setHasCv] = useState(false)
   const [hasAdditionalDocs, setHasAdditionalDocs] = useState(false)
+  const [additionalDocsCount, setAdditionalDocsCount] = useState(0)
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true)
   
   // État pour la photo de profil récupérée depuis le backend
@@ -82,17 +83,24 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
         const { candidateApi, documentApi } = await import('@/services/api')
         const profile = await candidateApi.getMyProfile()
         
+        // Récupérer tous les documents en une seule fois pour éviter les appels multiples
+        let documents = []
+        try {
+          documents = await documentApi.getCandidateDocuments(profileId)
+        } catch (docError) {
+          console.error('Erreur lors de la récupération des documents:', docError)
+        }
+        
         // Récupérer la photo de profil
         if (profile.photo_url) {
           setProfilePhotoUrl(profile.photo_url)
         } else {
-          // Si pas de photo_url, essayer de trouver le document de type OTHER
+          // Si pas de photo_url, essayer de trouver le document de type PROFILE_PHOTO (ou OTHER pour rétrocompatibilité)
           try {
-            const documents = await documentApi.getCandidateDocuments(profileId)
             const photoDoc = documents
-              .filter(doc => doc.document_type === 'OTHER')
+              .filter(doc => doc.document_type === 'PROFILE_PHOTO' || doc.document_type === 'OTHER')
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-            
+
             if (photoDoc) {
               const viewResponse = await documentApi.getDocumentViewUrl(photoDoc.id)
               setProfilePhotoUrl(viewResponse.view_url)
@@ -101,24 +109,42 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
             console.error('Erreur lors de la récupération de la photo:', docError)
           }
         }
-        
-        // Vérifier les documents
-        const documents = await documentApi.getCandidateDocuments(profileId)
-        
+
+        // Vérifier les documents (utiliser les documents déjà chargés)
+
         // Vérifier si un CV existe (type CV)
         const cvDocuments = documents.filter(doc => doc.document_type === 'CV')
         setHasCv(cvDocuments.length > 0)
-        
-        // Vérifier les documents complémentaires (tout sauf CV et OTHER qui est la photo)
-        const additionalDocs = documents.filter(doc => doc.document_type !== 'CV' && doc.document_type !== 'OTHER')
+
+        // Vérifier les documents complémentaires (tout sauf CV, PROFILE_PHOTO, COMPANY_LOGO et OTHER)
+        const additionalDocs = documents.filter(doc =>
+          doc.document_type !== 'CV' &&
+          doc.document_type !== 'PROFILE_PHOTO' &&
+          doc.document_type !== 'COMPANY_LOGO' &&
+          doc.document_type !== 'OTHER'
+        )
         setHasAdditionalDocs(additionalDocs.length > 0)
+        setAdditionalDocsCount(additionalDocs.length)
       } catch (error) {
         console.error('Erreur lors de la vérification des documents:', error)
         // En cas d'erreur, vérifier aussi dans formData.step6 comme fallback
-        const cvFromFormData = step6.cv && (step6.cv instanceof File || (Array.isArray(step6.cv) && step6.cv.length > 0))
+        // Fonction helper pour vérifier si c'est un fichier
+        const isFile = (obj) => {
+          if (!obj || typeof obj !== 'object') return false
+          if (typeof obj.name === 'string' && typeof obj.size === 'number' && typeof obj.type === 'string') {
+            try {
+              return obj instanceof File || obj instanceof Blob || obj.constructor?.name === 'File'
+            } catch {
+              return true
+            }
+          }
+          return false
+        }
+        const cvFromFormData = step6.cv && (isFile(step6.cv) || (Array.isArray(step6.cv) && step6.cv.length > 0))
         setHasCv(cvFromFormData || false)
         const additionalFromFormData = step6.additionalDocuments && Array.isArray(step6.additionalDocuments) && step6.additionalDocuments.length > 0
         setHasAdditionalDocs(additionalFromFormData || false)
+        setAdditionalDocsCount(additionalFromFormData ? step6.additionalDocuments.length : 0)
       } finally {
         setIsLoadingDocuments(false)
       }
@@ -525,7 +551,7 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
             ) : (
               <div className="flex items-center gap-2">
                 {hasCv ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <CheckCircle2 className="w-4 h-4 text-[#226D68]" />
                 ) : (
                   <AlertCircle className="w-4 h-4 text-yellow-500" />
                 )}
@@ -536,9 +562,9 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
             )}
             {hasAdditionalDocs && (
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <CheckCircle2 className="w-4 h-4 text-[#226D68]" />
                 <span className="text-sm">
-                  Documents complémentaires: {step6.additionalDocuments.length} fichier(s)
+                  Documents complémentaires: {additionalDocsCount} fichier{additionalDocsCount > 1 ? 's' : ''}
                 </span>
               </div>
             )}

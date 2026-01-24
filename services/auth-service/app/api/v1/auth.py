@@ -4,6 +4,7 @@ Endpoints d'authentification
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.domain.schemas import (
     LoginRequest,
@@ -13,6 +14,8 @@ from app.domain.schemas import (
     PasswordResetRequest,
     PasswordResetConfirm,
     PasswordChange,
+    PasswordUpdateByEmail,
+    GeneratePasswordResetTokenRequest,
 )
 from app.domain.models import User, UserRoleLink, RefreshToken, UserStatus
 from app.domain.exceptions import InvalidCredentialsError, UserNotFoundError
@@ -49,7 +52,7 @@ async def register(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="User with this email already exists"
+            detail=f"Un compte avec l'email {request.email} existe déjà. Veuillez vous connecter ou utiliser un autre email."
         )
     
     # Créer l'utilisateur
@@ -227,12 +230,20 @@ async def password_reset(
     session: AsyncSession = Depends(get_session)
 ):
     """Demande de réinitialisation de mot de passe"""
+    from app.infrastructure.security import generate_password_reset_token
+    
     user_repo = UserRepository(session)
     user = await user_repo.get_by_email(request.email)
     
     if user:
         # Générer un token de réinitialisation
+        reset_token = generate_password_reset_token()
+        user.password_reset_token = reset_token
+        user.password_reset_expires = datetime.utcnow() + timedelta(hours=24)  # Token valide 24h
+        await user_repo.update(user)
+        
         # TODO: Implémenter l'envoi d'email avec le token
+        # Pour l'instant, on retourne juste le token (en production, envoyer par email uniquement)
         pass
     
     # Toujours retourner succès pour ne pas révéler si l'email existe
@@ -245,8 +256,31 @@ async def password_reset_confirm(
     session: AsyncSession = Depends(get_session)
 ):
     """Confirme la réinitialisation de mot de passe"""
-    # TODO: Implémenter la validation du token et le changement de mot de passe
-    return {"message": "Password reset confirmed"}
+    user_repo = UserRepository(session)
+    
+    # Trouver l'utilisateur par token de réinitialisation
+    statement = select(User).where(
+        User.password_reset_token == request.token,
+        User.password_reset_expires > datetime.utcnow(),
+        User.deleted_at.is_(None)
+    )
+    result = await session.execute(statement)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired password reset token"
+        )
+    
+    # Mettre à jour le mot de passe
+    user.hashed_password = hash_password(request.new_password)
+    user.password_reset_token = None  # Invalider le token après utilisation
+    user.password_reset_expires = None
+    user.updated_at = datetime.utcnow()
+    await user_repo.update(user)
+    
+    return {"message": "Password reset successfully"}
 
 
 @router.post("/change-password")
@@ -274,6 +308,75 @@ async def change_password(
     await user_repo.update(user)
 
     return {"message": "Password changed successfully"}
+
+
+@router.post("/update-password-by-email")
+async def update_password_by_email(
+    request: PasswordUpdateByEmail,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Met à jour le mot de passe d'un utilisateur par email.
+    Sécurisé par INTERNAL_SERVICE_TOKEN_SECRET pour les appels inter-services.
+    Utilisé notamment pour les invitations où l'utilisateur peut définir son mot de passe.
+    """
+    # Vérifier le token interne
+    if request.internal_token != settings.INTERNAL_SERVICE_TOKEN_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid internal service token"
+        )
+    
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_email(request.email)
+    
+    if not user:
+        raise UserNotFoundError(request.email)
+    
+    # Mettre à jour le mot de passe et les informations si fournies
+    user.hashed_password = hash_password(request.new_password)
+    if request.first_name is not None:
+        user.first_name = request.first_name
+    if request.last_name is not None:
+        user.last_name = request.last_name
+    user.updated_at = datetime.utcnow()
+    await user_repo.update(user)
+    
+    return {"message": "Password updated successfully"}
+
+
+@router.post("/generate-password-reset-token")
+async def generate_password_reset_token_endpoint(
+    request: GeneratePasswordResetTokenRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Génère un token de réinitialisation de mot de passe pour un utilisateur.
+    Sécurisé par INTERNAL_SERVICE_TOKEN_SECRET pour les appels inter-services.
+    Utilisé lors de la création de compte par invitation.
+    """
+    from app.infrastructure.security import generate_password_reset_token
+    
+    # Vérifier le token interne
+    if request.internal_token != settings.INTERNAL_SERVICE_TOKEN_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid internal service token"
+        )
+    
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_email(request.email)
+    
+    if not user:
+        raise UserNotFoundError(request.email)
+    
+    # Générer un token de réinitialisation
+    reset_token = generate_password_reset_token()
+    user.password_reset_token = reset_token
+    user.password_reset_expires = datetime.utcnow() + timedelta(hours=24)  # Token valide 24h
+    await user_repo.update(user)
+    
+    return {"reset_token": reset_token, "expires_at": user.password_reset_expires.isoformat()}
 
 
 @router.get("/validate")

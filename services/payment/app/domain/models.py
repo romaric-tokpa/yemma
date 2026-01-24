@@ -65,7 +65,7 @@ class Subscription(SQLModel, table=True):
     __tablename__ = "subscriptions"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    company_id: int = Field(foreign_key="companies.id", index=True, description="ID de l'entreprise")
+    company_id: int = Field(index=True, description="ID de l'entreprise (référence externe au service company)")
     plan_id: int = Field(foreign_key="plans.id", index=True, description="ID du plan")
     status: SubscriptionStatus = Field(default=SubscriptionStatus.ACTIVE, description="Statut de l'abonnement")
     

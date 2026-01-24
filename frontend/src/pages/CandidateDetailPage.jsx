@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, Download, FileText, User, Briefcase, MapPin, Star, CheckCircle2, 
-  Mail, Phone, Calendar, Globe, Award, GraduationCap, Target, TrendingUp, Sparkles
+  Mail, Phone, Calendar, Globe, Award, GraduationCap, Target, TrendingUp, Sparkles,
+  Eye, RefreshCw, Code, Users, Wrench, BarChart3
 } from 'lucide-react'
 import { candidateApi, paymentApiService, auditApiService, documentApi, authApiService, searchApiService } from '../services/api'
 import { Button } from '../components/ui/button'
-import { Card, CardHeader, CardContent } from '../components/ui/card'
+import { Card, CardHeader, CardContent, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { BlurredDocuments } from '../components/search/BlurredDocuments'
@@ -40,13 +41,13 @@ const calculateAverageScore = (adminReport) => {
 
 // Fonction pour obtenir la couleur du badge selon le score
 const getScoreBadgeColor = (score) => {
-  if (score >= 4.5) return 'bg-green-emerald text-white'
+  if (score >= 4.5) return 'bg-[#226D68] text-white'
   if (score >= 3.5) return 'bg-primary text-white'
   if (score >= 2.5) return 'bg-yellow-500 text-white'
-  return 'bg-orange-500 text-white'
+  return 'bg-[#e76f51] text-white'
 }
 
-export function CandidateDetailPage() {
+export default function CandidateDetailPage() {
   const { candidateId } = useParams()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -55,12 +56,43 @@ export function CandidateDetailPage() {
   const [subscription, setSubscription] = useState(null)
   const [quotaAllowed, setQuotaAllowed] = useState(false)
   const [companyId, setCompanyId] = useState(null)
+  
+  // Gérer l'affichage de la photo avec fallback - DOIT être avant les returns conditionnels
+  const [photoError, setPhotoError] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState(null)
 
   useEffect(() => {
     loadUserAndCompany()
     loadCandidate()
     loadDocuments()
   }, [candidateId])
+  
+  // Si photo_url change, réinitialiser l'erreur et construire l'URL complète si nécessaire
+  useEffect(() => {
+    if (candidate?.photo_url) {
+      let photoUrlValue = candidate.photo_url
+      
+      // Si c'est une URL relative (commence par /), construire l'URL complète
+      if (photoUrlValue && photoUrlValue.startsWith('/')) {
+        const match = photoUrlValue.match(/\/api\/v1\/documents\/serve\/(\d+)/)
+        if (match && match[1]) {
+          const documentId = parseInt(match[1])
+          photoUrlValue = documentApi.getDocumentServeUrl(documentId)
+        }
+      }
+      
+      // Vérifier que ce n'est pas déjà l'URL de l'avatar
+      if (photoUrlValue && !photoUrlValue.includes('ui-avatars.com') && photoUrlValue.trim() !== '') {
+        setPhotoUrl(photoUrlValue)
+        setPhotoError(false)
+      } else {
+        setPhotoUrl(null)
+      }
+    } else {
+      setPhotoUrl(null)
+    }
+  }, [candidate?.photo_url])
+
 
   const loadUserAndCompany = async () => {
     try {
@@ -93,6 +125,7 @@ export function CandidateDetailPage() {
       // Cet endpoint gère automatiquement les quotas et les logs d'accès
       const data = await searchApiService.getCandidateProfile(candidateIdNum)
       console.log('Candidate profile loaded:', data)
+      console.log('Admin report present:', !!data.admin_report, data.admin_report)
       setCandidate(data)
       
       // Si les relations ne sont pas incluses, les charger séparément
@@ -138,9 +171,35 @@ export function CandidateDetailPage() {
   const loadDocuments = async () => {
     try {
       const data = await documentApi.getCandidateDocuments(candidateId)
-      setDocuments(data || [])
+      // Filtrer les documents supprimés (au cas où le backend ne le ferait pas)
+      const activeDocs = (data || []).filter(doc => !doc.deleted_at)
+      
+      // Filtrer les photos de profil, logos d'entreprise et images OTHER
+      const filteredDocs = activeDocs.filter((doc) => {
+        // Exclure les photos de profil (PROFILE_PHOTO)
+        if (doc.document_type === 'PROFILE_PHOTO') {
+          return false
+        }
+        
+        // Exclure les logos d'entreprise (COMPANY_LOGO)
+        if (doc.document_type === 'COMPANY_LOGO') {
+          return false
+        }
+        
+        // Exclure les images de type OTHER (anciennes photos de profil)
+        const isImage = doc.mime_type?.startsWith('image/')
+        const isOtherType = doc.document_type === 'OTHER'
+        if (isImage && isOtherType) {
+          return false
+        }
+        
+        return true // Inclure tous les autres documents
+      })
+      
+      setDocuments(filteredDocs)
     } catch (error) {
       console.error('Error loading documents:', error)
+      setDocuments([])
     }
   }
 
@@ -229,7 +288,11 @@ export function CandidateDetailPage() {
 
   const fullName = `${candidate.first_name || ''} ${candidate.last_name || ''}`.trim() || 'Candidat'
   const defaultAvatar = generateAvatarUrl(candidate.first_name, candidate.last_name)
-  const displayPhoto = candidate.photo_url || defaultAvatar
+  
+  // Déterminer quelle photo afficher - utiliser photoUrl seulement si elle existe et n'est pas l'avatar
+  const displayPhoto = (photoUrl && !photoError && !photoUrl.includes('ui-avatars.com')) 
+    ? photoUrl 
+    : defaultAvatar
   const canDownloadDossier = subscription?.plan?.document_access === true
   const location = [candidate.city, candidate.country].filter(Boolean).join(', ') || 'Non spécifié'
   const averageScore = calculateAverageScore(candidate.admin_report)
@@ -237,44 +300,66 @@ export function CandidateDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-light">
-      {/* Header avec gradient */}
-      <div className="bg-gradient-to-r from-green-emerald to-green-emerald/90 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/company/search')} 
-            className="mb-6 text-white hover:bg-white/10"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Retour à la recherche
-          </Button>
+      {/* Header avec gradient - Responsive */}
+      <div className="bg-gradient-to-r from-[#226D68] to-[#1a5a55] text-white">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate('/company/search')} 
+              className="text-white hover:bg-white/10 w-full sm:w-auto justify-start sm:justify-center"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour à la recherche
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                loadCandidate()
+                loadDocuments()
+              }}
+              className="text-white hover:bg-white/10 w-full sm:w-auto justify-start sm:justify-center"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
+          </div>
           
-          {/* Profil Header avec photo et infos */}
-          <div className="flex flex-col md:flex-row items-start gap-8">
+          {/* Profil Header avec photo et infos - Responsive */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 md:gap-8">
             {/* Photo de profil avec badge de score */}
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative self-center sm:self-start">
               <div className="relative">
                 <img
                   src={displayPhoto}
                   alt={fullName}
-                  className="w-40 h-40 rounded-full object-cover border-4 border-white/30 shadow-xl"
+                  className="w-32 h-32 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-full object-cover border-4 border-white/30 shadow-xl"
                   onError={(e) => {
-                    if (e.target.src !== defaultAvatar) {
+                    if (!photoError && e.target.src !== defaultAvatar) {
+                      setPhotoError(true)
                       e.target.src = defaultAvatar
+                    } else if (e.target.src !== defaultAvatar) {
+                      e.target.src = defaultAvatar
+                    }
+                  }}
+                  onLoad={() => {
+                    if (photoError && photoUrl) {
+                      setPhotoError(false)
                     }
                   }}
                 />
                 {candidate.status === 'VALIDATED' && (
-                  <div className="absolute -top-2 -right-2 bg-white rounded-full p-1.5 shadow-lg z-10">
-                    <CheckCircle2 className="h-5 w-5 text-green-emerald" />
+                  <div className="absolute -top-2 -right-2 bg-white rounded-full p-1 sm:p-1.5 shadow-lg z-10">
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-[#226D68]" />
                   </div>
                 )}
                 
                 {/* Badge de score en overlay sur la photo (comme LinkedIn) */}
                 {(overallScore || averageScore) && (
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-orange-500 text-white rounded-full px-3 py-1.5 shadow-xl flex items-center gap-1.5 border-2 border-white z-10">
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    <span className="text-sm font-bold whitespace-nowrap">
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-[#e76f51] text-white rounded-full px-2 sm:px-3 py-1 sm:py-1.5 shadow-xl flex items-center gap-1 sm:gap-1.5 border-2 border-white z-10">
+                    <Star className="h-3 w-3 sm:h-3.5 sm:w-3.5 fill-current" />
+                    <span className="text-xs sm:text-sm font-bold whitespace-nowrap">
                       {(overallScore || averageScore)}/5
                     </span>
                   </div>
@@ -283,17 +368,17 @@ export function CandidateDetailPage() {
             </div>
             
             {/* Informations principales */}
-            <div className="flex-1 text-white">
-              <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <h1 className="text-4xl font-bold font-heading text-white">{fullName}</h1>
+            <div className="flex-1 text-white text-center sm:text-left w-full sm:w-auto">
+              <div className="flex items-center justify-center sm:justify-start gap-3 mb-3 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold font-heading text-white truncate">{fullName}</h1>
               </div>
               
               {candidate.profile_title && (
-                <p className="text-xl text-white/90 mb-6 font-medium">{candidate.profile_title}</p>
+                <p className="text-base sm:text-lg md:text-xl text-white/90 mb-4 sm:mb-6 font-medium">{candidate.profile_title}</p>
               )}
               
-              {/* Informations de contact en grille */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Informations de contact en grille - Responsive */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
                 {location && (
                   <div className="flex items-center gap-2 text-white/80">
                     <MapPin className="h-5 w-5 flex-shrink-0" />
@@ -332,11 +417,11 @@ export function CandidateDetailPage() {
                 )}
               </div>
 
-              {/* Actions */}
+              {/* Actions - Responsive */}
               {canDownloadDossier && (
                 <Button 
                   onClick={handleDownloadDossier}
-                  className="bg-white text-green-emerald hover:bg-white/90"
+                  className="bg-white text-[#226D68] hover:bg-white/90 w-full sm:w-auto text-sm sm:text-base"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Télécharger le dossier
@@ -347,26 +432,26 @@ export function CandidateDetailPage() {
         </div>
       </div>
 
-      {/* Contenu principal */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* Contenu principal - Responsive */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
         {/* Avis Expert en avant - Card mise en évidence */}
-        {candidate.admin_report && (
-          <Card className="mb-8 border-l-4 border-l-green-emerald shadow-lg bg-gradient-to-r from-white to-green-emerald/5">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-green-emerald/10 rounded-lg">
-                  <Sparkles className="h-6 w-6 text-green-emerald" />
+        {candidate?.admin_report && Object.keys(candidate.admin_report).length > 0 && (
+          <Card className="mb-6 sm:mb-8 border-l-4 border-l-[#226D68] shadow-lg bg-gradient-to-r from-white to-[#226D68]/5">
+            <CardHeader className="pb-3 sm:pb-4 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
+                <div className="p-2 bg-[#226D68]/10 rounded-lg flex-shrink-0">
+                  <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#226D68]" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-anthracite font-heading">Avis de l'Expert</h2>
-                  <p className="text-sm text-muted-foreground">Évaluation professionnelle du profil</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-anthracite font-heading">Avis de l'Expert</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Évaluation professionnelle du profil</p>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+            <CardContent className="pt-0 p-4 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
                 {candidate.admin_report.overall_score !== undefined && (
-                  <div className="bg-gradient-to-br from-green-emerald/10 to-green-emerald/5 rounded-lg p-4 border border-green-emerald/20">
+                  <div className="bg-gradient-to-br from-[#226D68]/10 to-[#226D68]/5 rounded-lg p-4 border border-[#226D68]/20">
                     <p className="text-sm text-muted-foreground mb-2 font-medium">Note globale</p>
                     <div className="flex items-center gap-2">
                       <div className="flex">
@@ -486,7 +571,7 @@ export function CandidateDetailPage() {
                   <p className="text-sm font-medium text-muted-foreground mb-3">Tags de compétences comportementales</p>
                   <div className="flex flex-wrap gap-2">
                     {candidate.admin_report.soft_skills_tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="bg-green-emerald/10 text-green-emerald border-green-emerald/20">
+                      <Badge key={index} variant="secondary" className="bg-[#226D68]/10 text-[#226D68] border-[#226D68]/20">
                         {tag}
                       </Badge>
                     ))}
@@ -521,30 +606,32 @@ export function CandidateDetailPage() {
           </Card>
         )}
 
-        {/* Tabs pour le reste du contenu */}
+        {/* Tabs pour le reste du contenu - Responsive */}
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="bg-white mb-6">
-            <TabsTrigger value="profile" className="data-[state=active]:bg-green-emerald data-[state=active]:text-white">
-              Profil complet
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="data-[state=active]:bg-green-emerald data-[state=active]:text-white">
-              Documents
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+            <TabsList className="bg-white mb-4 sm:mb-6 inline-flex w-full sm:w-auto min-w-max sm:min-w-0">
+              <TabsTrigger value="profile" className="data-[state=active]:bg-[#226D68] data-[state=active]:text-white text-xs sm:text-sm px-4 sm:px-6 py-2 sm:py-2.5 whitespace-nowrap">
+                Profil complet
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="data-[state=active]:bg-[#226D68] data-[state=active]:text-white text-xs sm:text-sm px-4 sm:px-6 py-2 sm:py-2.5 whitespace-nowrap">
+                Documents
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <TabsContent value="profile" className="mt-6 space-y-6">
+          <TabsContent value="profile" className="mt-4 sm:mt-6 space-y-4 sm:space-y-6">
             {/* Résumé professionnel */}
             {candidate.professional_summary && (
-              <Card className="p-6 shadow-sm">
-                <h3 className="text-xl font-semibold mb-4 text-gray-anthracite font-heading">Résumé professionnel</h3>
-                <p className="text-foreground whitespace-pre-wrap leading-relaxed">{candidate.professional_summary}</p>
+              <Card className="p-4 sm:p-6 shadow-sm">
+                <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-anthracite font-heading">Résumé professionnel</h3>
+                <p className="text-sm sm:text-base text-foreground whitespace-pre-wrap leading-relaxed">{candidate.professional_summary}</p>
               </Card>
             )}
 
             {/* Informations personnelles */}
-            <Card className="p-6 shadow-sm">
-              <h3 className="text-xl font-semibold mb-4 text-gray-anthracite font-heading">Informations personnelles</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Card className="p-4 sm:p-6 shadow-sm">
+              <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 text-gray-anthracite font-heading">Informations personnelles</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 {candidate.date_of_birth && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground flex items-center gap-2 mb-1">
@@ -586,34 +673,34 @@ export function CandidateDetailPage() {
 
             {/* Expériences professionnelles */}
             {candidate.experiences && candidate.experiences.length > 0 && (
-              <Card className="p-6 shadow-sm">
-                <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
-                  <Briefcase className="h-6 w-6 text-green-emerald" />
-                  Expériences professionnelles
+              <Card className="p-4 sm:p-6 shadow-sm">
+                <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
+                  <Briefcase className="h-5 w-5 sm:h-6 sm:w-6 text-[#226D68] flex-shrink-0" />
+                  <span className="truncate">Expériences professionnelles</span>
                 </h3>
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {candidate.experiences.map((exp) => {
                     const defaultCompanyLogo = generateCompanyLogoUrl(exp.company_name)
                     const displayCompanyLogo = exp.company_logo_url || defaultCompanyLogo
                     
                     return (
-                      <div key={exp.id} className="border-l-4 border-l-green-emerald pl-6 pb-6 last:pb-0 relative">
-                        <div className="absolute -left-2 top-0 w-4 h-4 bg-green-emerald rounded-full border-2 border-white"></div>
-                        <div className="flex items-start gap-4">
+                      <div key={exp.id} className="border-l-4 border-l-[#226D68] pl-4 sm:pl-6 pb-4 sm:pb-6 last:pb-0 relative">
+                        <div className="absolute -left-2 top-0 w-3 h-3 sm:w-4 sm:h-4 bg-[#226D68] rounded-full border-2 border-white"></div>
+                        <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                           <img
                             src={displayCompanyLogo}
                             alt={exp.company_name}
-                            className="w-16 h-16 rounded-lg object-cover border-2 border-primary/20 flex-shrink-0 shadow-sm"
+                            className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border-2 border-primary/20 flex-shrink-0 shadow-sm self-center sm:self-start"
                             onError={(e) => {
                               if (e.target.src !== defaultCompanyLogo) {
                                 e.target.src = defaultCompanyLogo
                               }
                             }}
                           />
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-lg text-gray-anthracite mb-1">{exp.position}</h4>
-                            <p className="text-muted-foreground font-medium mb-2">{exp.company_name}</p>
-                            <p className="text-sm text-muted-foreground mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-base sm:text-lg text-gray-anthracite mb-1 truncate">{exp.position}</h4>
+                            <p className="text-sm sm:text-base text-muted-foreground font-medium mb-2 truncate">{exp.company_name}</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-3">
                               {new Date(exp.start_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
                               {exp.end_date 
                                 ? ` - ${new Date(exp.end_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
@@ -645,24 +732,24 @@ export function CandidateDetailPage() {
 
             {/* Formations */}
             {candidate.educations && candidate.educations.length > 0 && (
-              <Card className="p-6 shadow-sm">
-                <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
-                  <GraduationCap className="h-6 w-6 text-blue-deep" />
-                  Formations
+              <Card className="p-4 sm:p-6 shadow-sm">
+                <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
+                  <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-blue-deep flex-shrink-0" />
+                  <span className="truncate">Formations</span>
                 </h3>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {candidate.educations.map((edu) => (
-                    <div key={edu.id} className="border-l-4 border-l-blue-deep pl-4 py-2">
-                      <h4 className="font-semibold text-gray-anthracite">{edu.diploma}</h4>
-                      <p className="text-muted-foreground">{edu.institution}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-sm text-muted-foreground">
+                    <div key={edu.id} className="border-l-4 border-l-blue-deep pl-3 sm:pl-4 py-2">
+                      <h4 className="font-semibold text-sm sm:text-base text-gray-anthracite truncate">{edu.diploma}</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">{edu.institution}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           {edu.start_year && `${edu.start_year} - `}{edu.graduation_year}
                         </p>
                         {edu.level && (
                           <>
-                            <span className="text-muted-foreground">•</span>
-                            <Badge variant="outline" className="border-blue-deep text-blue-deep">{edu.level}</Badge>
+                            <span className="text-muted-foreground hidden sm:inline">•</span>
+                            <Badge variant="outline" className="border-blue-deep text-blue-deep text-xs">{edu.level}</Badge>
                           </>
                         )}
                       </div>
@@ -674,10 +761,10 @@ export function CandidateDetailPage() {
 
             {/* Certifications */}
             {candidate.certifications && candidate.certifications.length > 0 && (
-              <Card className="p-6 shadow-sm">
-                <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
-                  <Award className="h-6 w-6 text-gold-soft" />
-                  Certifications
+              <Card className="p-4 sm:p-6 shadow-sm">
+                <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
+                  <Award className="h-5 w-5 sm:h-6 sm:w-6 text-gold-soft flex-shrink-0" />
+                  <span className="truncate">Certifications</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {candidate.certifications.map((cert) => (
@@ -689,7 +776,7 @@ export function CandidateDetailPage() {
                           href={cert.verification_url} 
                           target="_blank" 
                           rel="noopener noreferrer" 
-                          className="text-sm text-green-emerald hover:underline mt-2 inline-block font-medium"
+                          className="text-sm text-[#226D68] hover:underline mt-2 inline-block font-medium"
                         >
                           Vérifier
                         </a>
@@ -707,60 +794,152 @@ export function CandidateDetailPage() {
 
             {/* Compétences */}
             {candidate.skills && candidate.skills.length > 0 && (
-              <Card className="p-6 shadow-sm">
-                <h3 className="text-xl font-semibold mb-6 text-gray-anthracite font-heading">Compétences</h3>
-                <div className="space-y-6">
-                  {['TECHNICAL', 'SOFT', 'TOOL'].map((skillType) => {
-                    const skillsOfType = candidate.skills.filter(s => s.skill_type === skillType)
-                    if (skillsOfType.length === 0) return null
-                    
-                    return (
-                      <div key={skillType}>
-                        <label className="text-sm font-semibold text-gray-anthracite mb-3 block">
-                          {skillType === 'TECHNICAL' ? 'Compétences techniques' :
-                           skillType === 'SOFT' ? 'Compétences comportementales' :
-                           'Outils & Logiciels'}
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {skillsOfType.map((skill) => (
-                            <Badge 
-                              key={skill.id} 
-                              variant={skillType === 'TECHNICAL' ? 'secondary' : 'outline'}
-                              className={skillType === 'TECHNICAL' ? 'bg-blue-deep/10 text-blue-deep border-blue-deep/20' : ''}
-                            >
-                              {skill.name}
-                              {skill.level && ` (${skill.level})`}
-                              {skill.years_of_practice && ` - ${skill.years_of_practice} ans`}
-                            </Badge>
-                          ))}
+              <Card className="rounded-lg shadow-sm border-l-4 border-l-[#226D68]">
+                <CardHeader className="py-2.5 px-4 border-b bg-gradient-to-r from-[#226D68]/5 to-transparent">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-[#226D68]" />
+                    <CardTitle className="text-base font-semibold text-gray-900">
+                      Compétences
+                      <span className="ml-2 text-xs font-normal text-gray-600">
+                        ({candidate.skills.length})
+                      </span>
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="space-y-3">
+                    {/* Compétences Techniques */}
+                    {(() => {
+                      const technicalSkills = candidate.skills.filter(s => s.skill_type === 'TECHNICAL')
+                      if (technicalSkills.length === 0) return null
+                      return (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Code className="h-3.5 w-3.5 text-blue-600" />
+                            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                              Techniques ({technicalSkills.length})
+                            </h4>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {technicalSkills.map((skill) => (
+                              <Badge
+                                key={skill.id}
+                                variant="secondary"
+                                className="bg-blue-50 text-blue-900 border-blue-200 text-xs px-2 py-1 font-medium"
+                              >
+                                {skill.name}
+                                {skill.level && (
+                                  <span className="ml-1.5 text-blue-700 font-normal">
+                                    • {skill.level === 'BEGINNER' ? 'Débutant' :
+                                       skill.level === 'INTERMEDIATE' ? 'Int.' :
+                                       skill.level === 'ADVANCED' ? 'Avancé' : 
+                                       skill.level === 'EXPERT' ? 'Expert' : skill.level}
+                                  </span>
+                                )}
+                                {skill.years_of_practice > 0 && (
+                                  <span className="ml-1.5 text-blue-600 font-normal">
+                                    ({skill.years_of_practice}an{skill.years_of_practice > 1 ? 's' : ''})
+                                  </span>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })()}
+
+                    {/* Soft Skills */}
+                    {(() => {
+                      const softSkills = candidate.skills.filter(s => s.skill_type === 'SOFT')
+                      if (softSkills.length === 0) return null
+                      return (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Users className="h-3.5 w-3.5 text-[#226D68]" />
+                            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                              Soft Skills ({softSkills.length})
+                            </h4>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {softSkills.map((skill) => (
+                              <Badge
+                                key={skill.id}
+                                variant="outline"
+                                className="bg-[#E8F4F3] text-[#1a5a55] border-[#B8DDD9] text-xs px-2 py-1 font-medium"
+                              >
+                                <Sparkles className="h-3 w-3 inline mr-1 text-[#226D68]" />
+                                {skill.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Outils & Logiciels */}
+                    {(() => {
+                      const toolSkills = candidate.skills.filter(s => s.skill_type === 'TOOL')
+                      if (toolSkills.length === 0) return null
+                      return (
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Wrench className="h-3.5 w-3.5 text-purple-600" />
+                            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                              Outils ({toolSkills.length})
+                            </h4>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {toolSkills.map((skill) => (
+                              <Badge
+                                key={skill.id}
+                                variant="secondary"
+                                className="bg-purple-50 text-purple-900 border-purple-200 text-xs px-2 py-1 font-medium"
+                              >
+                                {skill.name}
+                                {skill.level && (
+                                  <span className="ml-1.5 text-purple-700 font-normal">
+                                    • {skill.level === 'BEGINNER' ? 'Débutant' :
+                                       skill.level === 'INTERMEDIATE' ? 'Int.' :
+                                       skill.level === 'ADVANCED' ? 'Avancé' : 
+                                       skill.level === 'EXPERT' ? 'Expert' : skill.level}
+                                  </span>
+                                )}
+                                {skill.years_of_practice > 0 && (
+                                  <span className="ml-1.5 text-purple-600 font-normal">
+                                    ({skill.years_of_practice}an{skill.years_of_practice > 1 ? 's' : ''})
+                                  </span>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </CardContent>
               </Card>
             )}
 
             {/* Préférences de recherche d'emploi */}
             {candidate.job_preferences && (
-              <Card className="p-6 shadow-sm">
-                <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
-                  <Target className="h-6 w-6 text-green-emerald" />
-                  Recherche d'emploi
+              <Card className="p-4 sm:p-6 shadow-sm">
+                <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 flex items-center gap-2 text-gray-anthracite font-heading">
+                  <Target className="h-5 w-5 sm:h-6 sm:w-6 text-[#226D68] flex-shrink-0" />
+                  <span className="truncate">Recherche d'emploi</span>
                 </h3>
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {candidate.job_preferences.desired_positions && candidate.job_preferences.desired_positions.length > 0 && (
                     <div>
-                      <label className="text-sm font-semibold text-gray-anthracite mb-3 block">Postes recherchés</label>
-                      <div className="flex flex-wrap gap-2">
+                      <label className="text-xs sm:text-sm font-semibold text-gray-anthracite mb-2 sm:mb-3 block">Postes recherchés</label>
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
                         {candidate.job_preferences.desired_positions.map((pos, index) => (
-                          <Badge key={index} className="bg-green-emerald/10 text-green-emerald border-green-emerald/20">{pos}</Badge>
+                          <Badge key={index} className="bg-[#226D68]/10 text-[#226D68] border-[#226D68]/20 text-xs">{pos}</Badge>
                         ))}
                       </div>
                     </div>
                   )}
                   
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                     {candidate.job_preferences.contract_type && (
                       <div>
                         <label className="text-sm font-medium text-muted-foreground mb-1 block">Type de contrat</label>
@@ -813,57 +992,155 @@ export function CandidateDetailPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="documents" className="mt-6">
+          <TabsContent value="documents" className="mt-4 sm:mt-6">
             {documents.length > 0 ? (
               <>
                 {subscription?.plan?.plan_type === 'FREEMIUM' ? (
                   <BlurredDocuments documents={documents} subscription={subscription} />
                 ) : (
-                  <Card className="p-6 shadow-sm">
-                    <div className="space-y-4">
-                      <h3 className="text-xl font-semibold text-gray-anthracite font-heading">Documents justificatifs</h3>
-                      <div className="space-y-2">
-                        {documents.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-all bg-white"
-                          >
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-5 w-5 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium text-gray-anthracite">{doc.document_type}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {new Date(doc.uploaded_at).toLocaleDateString('fr-FR')}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  const { url } = await documentApi.getDocumentViewUrl(doc.id)
-                                  window.open(url, '_blank')
-                                } catch (error) {
-                                  console.error('Error viewing document:', error)
-                                }
-                              }}
-                            >
-                              Voir
-                            </Button>
-                          </div>
-                        ))}
+                  <Card className="rounded-[12px] shadow-lg border-l-4 border-l-blue-deep">
+                    <CardHeader className="bg-gradient-to-r from-blue-deep/5 to-blue-deep/10 border-b py-2 px-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2 text-xs sm:text-sm font-semibold">
+                          <FileText className="h-4 w-4 text-blue-deep flex-shrink-0" />
+                          <span className="truncate">Documents justificatifs</span>
+                        </CardTitle>
                       </div>
-                    </div>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="space-y-2 sm:space-y-3">
+                        {documents.map((doc) => {
+                          const getDocumentTypeLabel = (type) => {
+                            const labels = {
+                              'CV': 'Curriculum Vitae',
+                              'ATTESTATION': 'Attestation',
+                              'CERTIFICATE': 'Certificat',
+                              'RECOMMENDATION_LETTER': 'Lettre de recommandation',
+                              'DIPLOMA': 'Diplôme',
+                              'OTHER': 'Autre'
+                            }
+                            return labels[type] || type
+                          }
+
+                          const getDocumentTypeColor = (type) => {
+                            const colors = {
+                              'CV': 'bg-blue-100 text-blue-800 border-blue-200',
+                              'ATTESTATION': 'bg-[#D1E9E7] text-[#1a5a55] border-[#B8DDD9]',
+                              'CERTIFICATE': 'bg-[#FBE5E0] text-[#c04a2f] border-[#F8D3CA]',
+                              'RECOMMENDATION_LETTER': 'bg-purple-100 text-purple-800 border-purple-200',
+                              'DIPLOMA': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+                              'OTHER': 'bg-gray-100 text-gray-800 border-gray-200'
+                            }
+                            return colors[type] || 'bg-gray-100 text-gray-800 border-gray-200'
+                          }
+
+                          const formatFileSize = (bytes) => {
+                            if (!bytes) return '0 B'
+                            if (bytes < 1024) return `${bytes} B`
+                            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+                            return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+                          }
+
+                          const handleViewDocument = async () => {
+                            try {
+                              const serveUrl = documentApi.getDocumentServeUrl(doc.id)
+                              window.open(serveUrl, '_blank')
+                            } catch (error) {
+                              console.error('Error viewing document:', error)
+                              alert('Erreur lors de l\'ouverture du document: ' + (error.response?.data?.detail || error.message))
+                            }
+                          }
+
+                          const handleDownloadDocument = async () => {
+                            try {
+                              const serveUrl = documentApi.getDocumentServeUrl(doc.id)
+                              const link = document.createElement('a')
+                              link.href = serveUrl
+                              link.download = doc.original_filename || `document_${doc.id}`
+                              link.target = '_blank'
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                            } catch (error) {
+                              console.error('Error downloading document:', error)
+                              alert('Erreur lors du téléchargement du document: ' + (error.response?.data?.detail || error.message))
+                            }
+                          }
+
+                          return (
+                            <Card key={doc.id} className="rounded-lg shadow-sm hover:shadow-md transition-all border-l-2 border-l-blue-deep/50 group">
+                              <CardContent className="pt-3 pb-3 px-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <FileText className="h-4 w-4 text-blue-deep flex-shrink-0" />
+                                      <h4 className="font-semibold text-sm text-gray-anthracite truncate">{doc.original_filename}</h4>
+                                      <Badge className={`text-xs px-1.5 py-0 h-4 ${getDocumentTypeColor(doc.document_type)}`}>
+                                        {getDocumentTypeLabel(doc.document_type)}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                      <span>{formatFileSize(doc.file_size)}</span>
+                                      <span>•</span>
+                                      <span>{doc.mime_type}</span>
+                                      {(doc.created_at || doc.uploaded_at) && (
+                                        <>
+                                          <span>•</span>
+                                          <span>{new Date(doc.created_at || doc.uploaded_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                        </>
+                                      )}
+                                      {doc.status && (
+                                        <>
+                                          <span>•</span>
+                                          <Badge 
+                                            variant={doc.status === 'uploaded' ? 'secondary' : 'outline'} 
+                                            className="text-xs px-1.5 py-0 h-4"
+                                          >
+                                            {doc.status === 'uploaded' ? 'Téléchargé' : doc.status}
+                                          </Badge>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleViewDocument}
+                                      className="h-7 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <Eye className="h-3.5 w-3.5 mr-1" />
+                                      Voir
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={handleDownloadDocument}
+                                      className="h-7 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <Download className="h-3.5 w-3.5 mr-1" />
+                                      Télécharger
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </CardContent>
                   </Card>
                 )}
               </>
             ) : (
-              <Card className="p-6 shadow-sm">
-                <div className="text-center text-muted-foreground py-8">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Aucun document disponible</p>
-                </div>
+              <Card className="rounded-[12px] shadow-lg border-l-4 border-l-blue-deep">
+                <CardContent className="p-3">
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="text-sm font-semibold mb-1">Aucun document enregistré</p>
+                    <p className="text-xs text-muted-foreground mb-3">Les documents sont ajoutés lors de l'onboarding</p>
+                  </div>
+                </CardContent>
               </Card>
             )}
           </TabsContent>

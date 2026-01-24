@@ -46,6 +46,12 @@ ENV/
 htmlcov/
 .tox/
 .hypothesis/
+coverage/
+*.cover
+.hypothesis/
+.pytest_cache/
+test-results/
+vitest.config.js.timestamp-*
 
 # Logs
 *.log

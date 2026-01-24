@@ -1,0 +1,38 @@
+# Makefile pour l'exécution des tests
+
+.PHONY: test test-backend test-frontend test-all test-coverage install-test-deps
+
+# Installer les dépendances de test
+install-test-deps:
+	pip install -r tests/requirements.txt
+	cd frontend && npm install --save-dev vitest @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom @vitest/coverage-v8
+
+# Tests backend uniquement
+# Utilise le script qui exécute les tests avec conflits d'imports séparément
+test-backend:
+	bash tests/backend/run_all_tests.sh
+
+# Tests frontend uniquement
+test-frontend:
+	cd frontend && npm run test
+
+# Tests fonctionnels
+test-functional:
+	pytest tests/functional/ -v -m functional
+
+# Tous les tests
+test-all: test-backend test-frontend test-functional
+
+# Tests avec couverture
+test-coverage:
+	pytest tests/backend/ --cov=services --cov-report=html --cov-report=term-missing
+	cd frontend && npm run test:coverage
+
+# Tests unitaires uniquement
+test-unit:
+	pytest tests/backend/ -v -m unit
+	cd frontend && npm run test
+
+# Tests d'intégration
+test-integration:
+	pytest tests/backend/ -v -m integration

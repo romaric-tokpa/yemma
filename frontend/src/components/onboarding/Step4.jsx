@@ -81,16 +81,6 @@ export default function Step4({ form, onNext, onPrevious, isFirstStep }) {
         </Button>
       </div>
 
-      <div className="flex justify-between">
-        {!isFirstStep && (
-          <Button type="button" variant="outline" onClick={onPrevious}>
-            Précédent
-          </Button>
-        )}
-        <Button type="submit" className="ml-auto">
-          Suivant
-        </Button>
-      </div>
     </form>
   )
 }

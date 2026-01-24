@@ -143,9 +143,18 @@ class S3Storage:
     
     async def delete_file(self, s3_key: str) -> bool:
         """Supprime un fichier de S3"""
+        import asyncio
+        
+        def _delete_file():
+            """Fonction synchrone pour supprimer le fichier depuis S3"""
+            try:
+                self.client.delete_object(Bucket=self.bucket_name, Key=s3_key)
+                return True
+            except ClientError as e:
+                raise DocumentError(f"Failed to delete file: {str(e)}")
+        
         try:
-            self.client.delete_object(Bucket=self.bucket_name, Key=s3_key)
-            return True
+            return await asyncio.to_thread(_delete_file)
         except ClientError as e:
             raise DocumentError(f"Failed to delete file: {str(e)}")
     

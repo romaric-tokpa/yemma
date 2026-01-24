@@ -29,6 +29,7 @@ async def index_candidate(request: IndexRequest):
             first_name=profile_data.get("step1", {}).get("firstName", ""),
             last_name=profile_data.get("step1", {}).get("lastName", ""),
             email=profile_data.get("step1", {}).get("email", ""),
+            photo_url=profile_data.get("photo_url") or profile_data.get("step1", {}).get("photoUrl"),
             sector=profile_data.get("step1", {}).get("sector", ""),
             main_job=profile_data.get("step1", {}).get("mainJob", ""),
             total_experience=profile_data.get("step1", {}).get("totalExperience", 0),

@@ -72,6 +72,30 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     import logging
     logger = logging.getLogger(__name__)
     
+    # Ignorer les requêtes OPTIONS (gérées par OptionsMiddleware et CORSMiddleware)
+    if request.method == "OPTIONS":
+        from app.core.config import settings
+        origin = request.headers.get("origin")
+        allowed_origins = settings.cors_origins_list
+        if origin and origin in allowed_origins:
+            allow_origin = origin
+        elif "*" in allowed_origins or not allowed_origins:
+            allow_origin = origin or "*"
+        else:
+            allow_origin = allowed_origins[0] if allowed_origins else "*"
+        
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={},
+            headers={
+                "Access-Control-Allow-Origin": allow_origin,
+                "Access-Control-Allow-Methods": "POST, GET, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Max-Age": "3600",
+            }
+        )
+    
     errors = []
     for error in exc.errors():
         error_detail = {

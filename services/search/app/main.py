@@ -39,7 +39,15 @@ app.include_router(stats.router, prefix="/api/v1/search/stats", tags=["Stats"])
 @app.on_event("startup")
 async def startup_event():
     """Initialisation au démarrage"""
-    await init_elasticsearch()
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        await init_elasticsearch()
+    except Exception as e:
+        logger.error(f"Failed to initialize Elasticsearch on startup: {str(e)}")
+        logger.warning("Service will start but Elasticsearch operations may fail. Will retry on first use.")
+        # Ne pas bloquer le démarrage du service, on réessayera lors de la première utilisation
 
 
 @app.get("/health", tags=["Health"])

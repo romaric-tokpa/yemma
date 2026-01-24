@@ -1,9 +1,11 @@
 """
 Endpoints de gestion des utilisateurs
 """
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
+import sys
+import os
 
 from app.domain.schemas import UserResponse, UserDetailResponse, UserUpdate
 from app.domain.exceptions import UserNotFoundError
@@ -11,6 +13,20 @@ from app.infrastructure.database import get_session
 from app.infrastructure.security import get_current_user, require_role
 from app.infrastructure.repositories import UserRepository
 from app.domain.schemas import TokenData
+from app.core.config import settings
+
+# Importer la vérification du token interne
+shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
+if shared_path not in sys.path:
+    sys.path.insert(0, shared_path)
+
+try:
+    from services.shared.internal_auth import verify_service_token
+except ImportError:
+    # Fallback si le module shared n'existe pas
+    def verify_service_token(token: str):
+        """Vérification basique du token interne"""
+        return None
 
 router = APIRouter()
 
@@ -52,6 +68,54 @@ async def get_user(
     session: AsyncSession = Depends(get_session)
 ):
     """Récupère un utilisateur par ID (admin seulement)"""
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_id(user_id)
+    
+    if not user:
+        raise UserNotFoundError(str(user_id))
+    
+    # Récupérer les rôles
+    roles = await user_repo.get_user_roles(user.id)
+    role_names = [role.name for role in roles]
+    
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        status=user.status.value,
+        is_email_verified=user.is_email_verified,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        roles=role_names,
+    )
+
+
+@router.get("/internal/{user_id}", response_model=UserResponse)
+async def get_user_internal(
+    user_id: int,
+    x_service_token: Optional[str] = Header(None, alias="X-Service-Token"),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Récupère un utilisateur par ID (endpoint interne pour les autres services)
+    
+    Authentification via X-Service-Token
+    """
+    # Vérifier le token de service
+    if not x_service_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-Service-Token header"
+        )
+    
+    payload = verify_service_token(x_service_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired service token"
+        )
+    
     user_repo = UserRepository(session)
     user = await user_repo.get_by_id(user_id)
     

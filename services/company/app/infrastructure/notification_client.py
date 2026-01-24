@@ -84,7 +84,7 @@ async def send_invitation_notification(
             "recipient_email": recipient_email,
             "recipient_name": recipient_name,
             "company_name": company_name,
-            "invitation_token": invitation_token,
+            "invitation_token": invitation_token or "",  # Peut être None, donc utiliser "" par défaut
             "invitation_url": invitation_url or f"{settings.FRONTEND_URL}/login",
         }
         # Ajouter temporary_password seulement s'il n'est pas None et non vide
@@ -119,4 +119,55 @@ async def send_invitation_notification(
         error_msg = f"Unexpected error: {str(e)}"
         logger.error(f"⚠️ Erreur inattendue lors de l'envoi de la notification: {error_msg}")
         raise InvitationError(f"Erreur lors de l'envoi de l'invitation: {str(e)}")
+
+
+async def send_company_welcome_notification(
+    recipient_email: str,
+    recipient_name: str,
+    company_name: str,
+    dashboard_url: Optional[str] = None
+) -> None:
+    """
+    Envoie un email de bienvenue à une entreprise après création du compte
+    
+    Args:
+        recipient_email: Email du recruteur/admin
+        recipient_name: Nom du recruteur/admin
+        company_name: Nom de l'entreprise
+        dashboard_url: URL du tableau de bord (optionnel)
+    
+    Raises:
+        Exception: Si l'envoi de la notification échoue (mais ne bloque pas le processus)
+    """
+    try:
+        headers = get_service_token_header("company-service")
+        
+        if not dashboard_url:
+            dashboard_url = f"{settings.FRONTEND_URL}/company/dashboard"
+        
+        payload = {
+            "recipient_email": recipient_email,
+            "recipient_name": recipient_name,
+            "company_name": company_name,
+            "dashboard_url": dashboard_url
+        }
+        
+        logger.info(f"Sending welcome notification to company {company_name} ({recipient_email})")
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{settings.NOTIFICATION_SERVICE_URL}/api/v1/triggers/notify_company_welcome",
+                json=payload,
+                headers=headers
+            )
+            
+            if response.status_code != 202:
+                logger.error(f"Notification service returned {response.status_code}: {response.text}")
+            
+            response.raise_for_status()
+            logger.info(f"Welcome notification sent successfully to {recipient_email}")
+    except Exception as e:
+        # Ne pas bloquer le processus si l'envoi d'email échoue
+        logger.error(f"⚠️ Erreur lors de l'envoi de l'email de bienvenue: {str(e)}", exc_info=True)
+        # Ne pas lever l'exception pour ne pas bloquer la création de l'entreprise
 

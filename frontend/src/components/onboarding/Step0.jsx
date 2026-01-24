@@ -78,10 +78,6 @@ export default function Step0({ form, onNext, isFirstStep }) {
           </div>
         </div>
       </div>
-
-      <div className="flex justify-end">
-        <Button type="submit">Continuer</Button>
-      </div>
     </form>
   )
 }

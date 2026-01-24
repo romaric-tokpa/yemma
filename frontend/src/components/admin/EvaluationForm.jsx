@@ -209,7 +209,7 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
                     </span>
                     {entry.status && (
                       <span className={`text-xs px-2 py-1 rounded ${
-                        entry.status === 'VALIDATED' ? 'bg-green-100 text-green-800' :
+                        entry.status === 'VALIDATED' ? 'bg-[#D1E9E7] text-[#1a5a55]' :
                         entry.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
@@ -379,7 +379,7 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
           <p className={`text-xs ${
             (summary?.length || 0) < 50 
               ? 'text-muted-foreground' 
-              : 'text-green-600'
+              : 'text-[#226D68]'
           }`}>
             {summary?.length || 0} / 50 caractères minimum
           </p>

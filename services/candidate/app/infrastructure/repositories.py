@@ -56,6 +56,25 @@ class ProfileRepository:
         return result.scalar_one_or_none()
     
     @staticmethod
+    async def get_by_user_id_with_relations(session: AsyncSession, user_id: int) -> Optional[Profile]:
+        """Récupère un profil par user_id avec toutes ses relations en une seule requête optimisée"""
+        result = await session.execute(
+            select(Profile)
+            .where(and_(
+                Profile.user_id == user_id,
+                Profile.deleted_at.is_(None)
+            ))
+            .options(
+                selectinload(Profile.experiences),
+                selectinload(Profile.educations),
+                selectinload(Profile.certifications),
+                selectinload(Profile.skills),
+                selectinload(Profile.job_preferences)
+            )
+        )
+        return result.scalar_one_or_none()
+    
+    @staticmethod
     async def get_with_relations(
         session: AsyncSession,
         profile_id: int
@@ -184,6 +203,33 @@ class ProfileRepository:
         can_submit, reason = can_submit_profile(profile, has_cv=has_cv)
         logger.info(f"Vérification soumission profil {profile_id}: can_submit={can_submit}, reason={reason}")
         if not can_submit:
+            # Logger les détails du profil pour le débogage
+            logger.warning(f"Profil {profile_id} ne peut pas être soumis. Détails du profil:", {
+                "has_cv": has_cv,
+                "accept_cgu": profile.accept_cgu,
+                "accept_rgpd": profile.accept_rgpd,
+                "accept_verification": profile.accept_verification,
+                "first_name": bool(profile.first_name),
+                "last_name": bool(profile.last_name),
+                "email": bool(profile.email),
+                "date_of_birth": bool(profile.date_of_birth),
+                "nationality": bool(profile.nationality),
+                "phone": bool(profile.phone),
+                "address": bool(profile.address),
+                "city": bool(profile.city),
+                "country": bool(profile.country),
+                "profile_title": bool(profile.profile_title),
+                "professional_summary": bool(profile.professional_summary),
+                "professional_summary_length": len(profile.professional_summary) if profile.professional_summary else 0,
+                "sector": bool(profile.sector),
+                "main_job": bool(profile.main_job),
+                "total_experience": profile.total_experience,
+                "experiences_count": len(profile.experiences) if profile.experiences else 0,
+                "educations_count": len(profile.educations) if profile.educations else 0,
+                "skills_count": len(profile.skills) if profile.skills else 0,
+                "has_job_preferences": bool(profile.job_preferences),
+                "completion_percentage": profile.completion_percentage,
+            })
             raise ValueError(reason)
         
         profile.status = ProfileStatus.SUBMITTED

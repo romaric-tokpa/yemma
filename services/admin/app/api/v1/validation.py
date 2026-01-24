@@ -164,14 +164,24 @@ async def validate_candidate(
         )
         
         # ============================================
-        # ACTIONS ASYNCHRONES : Indexation et notification
+        # ACTIONS : Indexation (synchrone pour garantir l'indexation immédiate) et notification (asynchrone)
         # ============================================
-        # Action 1 : Indexer dans ElasticSearch (avec gestion d'erreur dans Audit)
-        background_tasks.add_task(
-            index_candidate_task,
-            candidate_id=candidate_id,
-            profile_data=profile_data
-        )
+        # Action 1 : Indexer dans ElasticSearch de manière synchrone pour garantir l'indexation immédiate
+        # Cela permet au profil d'être visible dans la CVthèque immédiatement après validation
+        try:
+            await index_candidate_in_search(candidate_id, profile_data)
+            indexation_status = "completed"
+            indexation_error = None
+        except Exception as index_error:
+            # Si l'indexation synchrone échoue, la relancer en asynchrone avec logging
+            indexation_status = "failed"
+            indexation_error = str(index_error)
+            print(f"⚠️ Indexation synchrone échouée pour le candidat {candidate_id}, relance en asynchrone: {index_error}")
+            background_tasks.add_task(
+                index_candidate_task,
+                candidate_id=candidate_id,
+                profile_data=profile_data
+            )
         
         # Action 2 : Envoyer la notification au candidat
         background_tasks.add_task(
@@ -188,10 +198,11 @@ async def validate_candidate(
             "status": "VALIDATED",
             "actions": {
                 "status_update": "completed",
-                "indexation": "pending",
+                "indexation": indexation_status,
                 "notification": "pending"
             },
-            "note": "Status updated. Indexation and notification are being processed asynchronously. Check Audit Service logs for any errors."
+            "indexation_error": indexation_error,
+            "note": "Status updated. Profile indexed in CV library. Notification is being processed asynchronously."
         }
         
     except HTTPException:

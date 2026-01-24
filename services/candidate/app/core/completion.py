@@ -464,10 +464,24 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     if not profile.skills or len(profile.skills) == 0:
         return False, "Au moins une compétence technique est requise (Étape 5)"
     
-    # Vérifier que les compétences sont complètes
-    for skill in profile.skills:
+    # Filtrer uniquement les compétences techniques (TECHNICAL)
+    # Le skill_type peut être une string ou un enum, donc on compare avec la valeur string
+    technical_skills = [
+        skill for skill in profile.skills 
+        if hasattr(skill, 'skill_type') and (
+            skill.skill_type == 'TECHNICAL' or 
+            str(skill.skill_type) == 'TECHNICAL' or
+            getattr(skill.skill_type, 'value', None) == 'TECHNICAL'
+        )
+    ]
+    
+    if len(technical_skills) == 0:
+        return False, "Au moins une compétence technique est requise (Étape 5)"
+    
+    # Vérifier que les compétences techniques sont complètes
+    for skill in technical_skills:
         if not skill.name or not skill.level:
-            return False, "Toutes les compétences doivent avoir un nom et un niveau (Étape 5)"
+            return False, "Toutes les compétences techniques doivent avoir un nom et un niveau (Étape 5)"
     
     # Vérifications obligatoires - Étape 7 (Préférences)
     if not profile.job_preferences:

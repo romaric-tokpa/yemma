@@ -4,7 +4,7 @@ Endpoints de gestion des invitations
 from typing import List
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.domain.schemas import (
     InvitationCreate,
@@ -20,6 +20,7 @@ from app.infrastructure.invitation import (
     create_invitation_token,
     is_invitation_valid,
     get_invitation_link,
+    generate_invitation_token,
 )
 from app.infrastructure.notification_client import send_invitation_notification
 from app.core.config import settings
@@ -81,92 +82,412 @@ async def invite_recruiter(
                 detail="Only company admin can perform this action"
             )
     
-    # Vérifier s'il y a déjà une invitation en cours pour cet email
-    invitation_repo = InvitationRepository(session)
-    existing_invitation = await invitation_repo.get_by_email_and_company(
-        invitation_data.email,
-        company.id
-    )
+    # Vérifier si l'utilisateur est déjà membre de cette entreprise
+    from app.infrastructure.repositories import TeamMemberRepository
+    team_member_repo = TeamMemberRepository(session)
     
-    # Si une invitation valide existe déjà, annuler l'ancienne et créer une nouvelle
-    if existing_invitation and is_invitation_valid(existing_invitation):
-        # Annuler l'ancienne invitation pour permettre d'en envoyer une nouvelle
-        existing_invitation.status = InvitationStatus.CANCELLED
-        await invitation_repo.update(existing_invitation)
-    
-    # Vérifier que l'utilisateur n'est pas déjà membre de cette entreprise
-    # Vérifier via auth-service si l'utilisateur existe
-    user_exists = False
+    # Créer directement le compte dans auth-service
     user_id = None
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(
-                f"{settings.AUTH_SERVICE_URL}/api/v1/users/email/{invitation_data.email}"
+    password_reset_token = None
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            # Créer l'utilisateur dans auth-service
+            logger.info(f"Creating user account for: {invitation_data.email}")
+            register_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/register"
+            register_response = await client.post(
+                register_url,
+                json={
+                    "email": invitation_data.email,
+                    "password": invitation_data.password,
+                    "first_name": invitation_data.first_name,
+                    "last_name": invitation_data.last_name,
+                    "role": "ROLE_RECRUITER"
+                }
             )
-            if response.status_code == 200:
-                user_data = response.json()
-                user_id = user_data.get("id")
-                user_exists = True
+            
+            if register_response.status_code in [200, 201]:
+                # Utilisateur créé avec succès
+                register_data = register_response.json()
+                access_token = register_data.get("access_token")
                 
-                # Vérifier si cet utilisateur est déjà membre de l'entreprise
-                team_member_repo = TeamMemberRepository(session)
-                existing_member = await team_member_repo.get_by_user_id(user_id)
-                if existing_member and existing_member.company_id == company.id:
+                # Extraire l'ID utilisateur directement depuis le token JWT
+                # Le token contient 'sub' qui est l'ID utilisateur
+                if access_token:
+                    try:
+                        from app.infrastructure.auth import decode_token
+                        # Décoder le token pour extraire l'ID utilisateur
+                        decoded_token = decode_token(access_token)
+                        user_id = int(decoded_token.get("sub"))
+                        logger.info(f"User created successfully with ID: {user_id} (extracted from token)")
+                    except HTTPException:
+                        raise
+                    except Exception as e:
+                        logger.error(f"Failed to extract user ID from token: {str(e)}", exc_info=True)
+                        # Fallback: essayer de récupérer via l'endpoint /me
+                        try:
+                            me_url = f"{settings.AUTH_SERVICE_URL}/api/v1/users/me"
+                            me_response = await client.get(
+                                me_url,
+                                headers={"Authorization": f"Bearer {access_token}"}
+                            )
+                            if me_response.status_code == 200:
+                                user_data = me_response.json()
+                                user_id = user_data.get("id")
+                                logger.info(f"User ID retrieved via /me endpoint: {user_id}")
+                            else:
+                                error_detail = me_response.text
+                                logger.error(f"Failed to get user ID after registration: {me_response.status_code} - {error_detail}")
+                                raise HTTPException(
+                                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                    detail=f"Échec de la récupération de l'ID utilisateur: {error_detail}"
+                                )
+                        except Exception as fallback_error:
+                            logger.error(f"Fallback to /me endpoint also failed: {str(fallback_error)}")
+                            raise HTTPException(
+                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"Échec de l'extraction de l'ID utilisateur: {str(e)}"
+                            )
+                else:
                     raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail="This user is already a team member of your company"
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Token d'accès non reçu lors de la création du compte"
                     )
-    except httpx.HTTPStatusError as e:
-        # L'utilisateur n'existe pas encore (404), on va le créer
-        if e.response.status_code != 404:
+                
+                # Générer un token de réinitialisation de mot de passe
+                logger.info(f"Generating password reset token for user: {user_id}")
+                reset_token_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/generate-password-reset-token"
+                try:
+                    reset_token_response = await client.post(
+                        reset_token_url,
+                        json={
+                            "email": invitation_data.email,
+                            "internal_token": settings.INTERNAL_SERVICE_TOKEN_SECRET
+                        }
+                    )
+                    
+                    if reset_token_response.status_code == 200:
+                        reset_token_data = reset_token_response.json()
+                        password_reset_token = reset_token_data.get("reset_token")
+                        logger.info(f"Password reset token generated successfully")
+                    else:
+                        error_detail = reset_token_response.text
+                        logger.warning(f"Failed to generate password reset token: {reset_token_response.status_code} - {error_detail}")
+                        # On continue quand même, on pourra générer le token plus tard
+                except Exception as e:
+                    logger.warning(f"Error generating password reset token: {str(e)}")
+                    # On continue quand même
+                    
+            elif register_response.status_code == 409:
+                # L'utilisateur existe déjà, récupérer son ID et mettre à jour le mot de passe si nécessaire
+                logger.info(f"User already exists (409), will retrieve user ID and handle password: {invitation_data.email}")
+                
+                # D'abord, vérifier si l'utilisateur est déjà membre de cette entreprise
+                # Pour cela, on doit récupérer son user_id
+                # Essayer de se connecter pour obtenir un token et récupérer l'ID
+                login_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/login"
+                logger.info(f"Attempting to login with provided password for existing user: {invitation_data.email}")
+                login_response = await client.post(
+                    login_url,
+                    json={
+                        "email": invitation_data.email,
+                        "password": invitation_data.password
+                    }
+                )
+                logger.info(f"Login response status: {login_response.status_code}")
+                
+                if login_response.status_code == 200:
+                    # Le mot de passe correspond déjà, récupérer l'ID utilisateur
+                    login_data = login_response.json()
+                    access_token = login_data.get("access_token")
+                    if access_token:
+                        try:
+                            from app.infrastructure.auth import decode_token
+                            decoded_token = decode_token(access_token)
+                            user_id = int(decoded_token.get("sub"))
+                            logger.info(f"User ID retrieved from login token: {user_id}")
+                        except Exception as e:
+                            logger.error(f"Failed to extract user ID from login token: {str(e)}")
+                            # Fallback via /me endpoint
+                            me_url = f"{settings.AUTH_SERVICE_URL}/api/v1/users/me"
+                            me_response = await client.get(
+                                me_url,
+                                headers={"Authorization": f"Bearer {access_token}"}
+                            )
+                            if me_response.status_code == 200:
+                                user_data = me_response.json()
+                                user_id = user_data.get("id")
+                                logger.info(f"User ID retrieved via /me endpoint: {user_id}")
+                            else:
+                                error_detail = me_response.text
+                                logger.error(f"Failed to get user ID: {me_response.status_code} - {error_detail}")
+                                raise HTTPException(
+                                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                    detail=f"Échec de la récupération de l'ID utilisateur: {error_detail}"
+                                )
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Token d'accès non reçu lors de la connexion"
+                        )
+                elif login_response.status_code == 401:
+                    # Le mot de passe ne correspond pas, mettre à jour le mot de passe
+                    logger.info(f"Password doesn't match, updating password for existing user: {invitation_data.email}")
+                    try:
+                        update_password_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/update-password-by-email"
+                        update_password_response = await client.post(
+                            update_password_url,
+                            json={
+                                "email": invitation_data.email,
+                                "new_password": invitation_data.password,
+                                "internal_token": settings.INTERNAL_SERVICE_TOKEN_SECRET,
+                                "first_name": invitation_data.first_name,
+                                "last_name": invitation_data.last_name
+                            }
+                        )
+                        
+                        if update_password_response.status_code == 200:
+                            logger.info(f"Password updated successfully for existing user: {invitation_data.email}")
+                            # Maintenant, se connecter avec le nouveau mot de passe pour obtenir l'ID
+                            login_response = await client.post(
+                                login_url,
+                                json={
+                                    "email": invitation_data.email,
+                                    "password": invitation_data.password
+                                }
+                            )
+                            
+                            if login_response.status_code == 200:
+                                login_data = login_response.json()
+                                access_token = login_data.get("access_token")
+                                if access_token:
+                                    try:
+                                        from app.infrastructure.auth import decode_token
+                                        decoded_token = decode_token(access_token)
+                                        user_id = int(decoded_token.get("sub"))
+                                        logger.info(f"User ID retrieved after password update: {user_id}")
+                                    except Exception as e:
+                                        logger.error(f"Failed to extract user ID after password update: {str(e)}")
+                                        # Fallback via /me endpoint
+                                        me_url = f"{settings.AUTH_SERVICE_URL}/api/v1/users/me"
+                                        me_response = await client.get(
+                                            me_url,
+                                            headers={"Authorization": f"Bearer {access_token}"}
+                                        )
+                                        if me_response.status_code == 200:
+                                            user_data = me_response.json()
+                                            user_id = user_data.get("id")
+                                            logger.info(f"User ID retrieved via /me endpoint after password update: {user_id}")
+                                        else:
+                                            raise HTTPException(
+                                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                                detail="Échec de la récupération de l'ID utilisateur après mise à jour du mot de passe"
+                                            )
+                                else:
+                                    raise HTTPException(
+                                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                        detail="Token d'accès non reçu après mise à jour du mot de passe"
+                                    )
+                            else:
+                                error_detail = login_response.text
+                                logger.error(f"Failed to login after password update: {login_response.status_code} - {error_detail}")
+                                raise HTTPException(
+                                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                    detail=f"Impossible de se connecter après la mise à jour du mot de passe: {error_detail}"
+                                )
+                        else:
+                            error_detail = update_password_response.text
+                            logger.error(f"Failed to update password: {update_password_response.status_code} - {error_detail}")
+                            raise HTTPException(
+                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"Impossible de mettre à jour le mot de passe: {error_detail}"
+                            )
+                    except httpx.HTTPError as e:
+                        logger.error(f"Error updating password: {str(e)}")
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Erreur lors de la mise à jour du mot de passe: {str(e)}"
+                        )
+                else:
+                    error_detail = login_response.text
+                    logger.error(f"Failed to login existing user: {login_response.status_code} - {error_detail}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Impossible de se connecter avec le compte existant: {error_detail}"
+                    )
+                
+                # Générer un token de réinitialisation de mot de passe pour l'utilisateur existant
+                logger.info(f"Generating password reset token for existing user: {user_id}")
+                reset_token_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/generate-password-reset-token"
+                try:
+                    reset_token_response = await client.post(
+                        reset_token_url,
+                        json={
+                            "email": invitation_data.email,
+                            "internal_token": settings.INTERNAL_SERVICE_TOKEN_SECRET
+                        }
+                    )
+                    
+                    if reset_token_response.status_code == 200:
+                        reset_token_data = reset_token_response.json()
+                        password_reset_token = reset_token_data.get("reset_token")
+                        logger.info(f"Password reset token generated successfully for existing user")
+                    else:
+                        error_detail = reset_token_response.text
+                        logger.warning(f"Failed to generate password reset token: {reset_token_response.status_code} - {error_detail}")
+                except Exception as e:
+                    logger.warning(f"Error generating password reset token: {str(e)}")
+            else:
+                error_detail = register_response.text
+                logger.error(f"Failed to create user: {register_response.status_code} - {error_detail}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Échec de la création du compte: {error_detail}"
+                )
+                
+        except httpx.HTTPError as e:
+            error_msg = str(e) or repr(e) or "Erreur de connexion inconnue"
+            logger.error(f"Connection error when communicating with auth service: {error_msg}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Impossible de se connecter au service d'authentification: {error_msg}"
+            )
+        except HTTPException:
             raise
-        user_exists = False
-    except httpx.HTTPError:
-        # Erreur de connexion, on continue quand même
-        pass
+        except Exception as e:
+            error_msg = str(e) or repr(e) or f"Erreur de type {type(e).__name__}"
+            logger.error(f"Unexpected error when creating user: {error_msg}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erreur inattendue lors de la création du compte: {error_msg}"
+            )
     
-    # Générer le token d'invitation unique
-    token, expires_at = create_invitation_token(
-        invitation_data.email,
-        company.id
-    )
+    if not user_id:
+        logger.error(f"Failed to retrieve user_id after all attempts for email: {invitation_data.email}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Échec de la récupération de l'identifiant utilisateur. Veuillez réessayer ou contacter le support."
+        )
     
-    # Créer l'invitation avec le rôle RECRUTEUR par défaut
-    # Le compte ne sera créé que lorsque l'invité acceptera l'invitation
-    invitation = Invitation(
+    logger.info(f"User ID successfully retrieved: {user_id} for email: {invitation_data.email}")
+    
+    # Vérifier si l'utilisateur est déjà membre de cette entreprise
+    existing_member = await team_member_repo.get_by_user_id(user_id)
+    if existing_member:
+        if existing_member.company_id == company.id:
+            logger.warning(f"User {user_id} is already a team member of company {company.id}")
+            # Mettre à jour l'invitation existante si elle existe pour le suivi
+            invitation_repo = InvitationRepository(session)
+            from sqlalchemy import select
+            statement = select(Invitation).where(
+                Invitation.email == invitation_data.email,
+                Invitation.company_id == company.id
+            ).order_by(Invitation.created_at.desc()).limit(1)
+            result = await session.execute(statement)
+            existing_invitation = result.scalar_one_or_none()
+            
+            if existing_invitation:
+                # Mettre à jour l'invitation existante pour le suivi
+                existing_invitation.status = InvitationStatus.ACCEPTED
+                existing_invitation.accepted_at = datetime.utcnow()
+                existing_invitation.first_name = invitation_data.first_name
+                existing_invitation.last_name = invitation_data.last_name
+                if not existing_invitation.token or existing_invitation.token == "":
+                    existing_invitation.token = generate_invitation_token()
+                await invitation_repo.update(existing_invitation)
+            
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cet utilisateur ({invitation_data.email}) est déjà membre de votre entreprise"
+            )
+        else:
+            logger.warning(f"User {user_id} is already a team member of another company ({existing_member.company_id})")
+            # Permettre à l'utilisateur d'être membre de plusieurs entreprises
+            # ou lever une exception selon les règles métier
+            # Pour l'instant, on permet à l'utilisateur d'être membre de plusieurs entreprises
+    
+    # Créer le TeamMember immédiatement
+    logger.info(f"Creating team member for user {user_id}, company {company.id}")
+    team_member = TeamMember(
+        user_id=user_id,
         company_id=company.id,
-        email=invitation_data.email,
-        token=token,
-        role=TeamMemberRole.RECRUTEUR,  # Rôle par défaut
-        status=InvitationStatus.PENDING,
-        expires_at=expires_at,
-        invited_by=current_user.user_id,
+        role_in_company=TeamMemberRole.RECRUTEUR,
+        status=TeamMemberStatus.ACTIVE,
+        joined_at=datetime.utcnow(),
     )
+    team_member = await team_member_repo.create(team_member)
+    logger.info(f"Team member created: {team_member.id}")
     
-    invitation = await invitation_repo.create(invitation)
+    # Créer ou mettre à jour une invitation pour le suivi (statut ACCEPTED car le compte est déjà créé)
+    invitation_repo = InvitationRepository(session)
     
-    # Appeler le Service Notification pour envoyer l'email
-    # Le lien pointe vers la page d'acceptation d'invitation où l'utilisateur créera son compte
-    invitation_url = f"{settings.FRONTEND_URL}/invitation/accept?token={token}"
-    recipient_name = invitation_data.email.split("@")[0]  # Nom par défaut depuis l'email
+    # Vérifier si une invitation existe déjà pour cet email et cette entreprise
+    # Chercher toutes les invitations pour cet email et cette entreprise, pas seulement les pending
+    from sqlalchemy import select
+    statement = select(Invitation).where(
+        Invitation.email == invitation_data.email,
+        Invitation.company_id == company.id
+    ).order_by(Invitation.created_at.desc()).limit(1)
+    result = await session.execute(statement)
+    existing_invitation = result.scalar_one_or_none()
     
+    if existing_invitation:
+        # Mettre à jour l'invitation existante
+        logger.info(f"Updating existing invitation {existing_invitation.id} for email {invitation_data.email}")
+        existing_invitation.status = InvitationStatus.ACCEPTED
+        existing_invitation.accepted_at = datetime.utcnow()
+        existing_invitation.expires_at = datetime.utcnow() + timedelta(days=7)
+        existing_invitation.first_name = invitation_data.first_name
+        existing_invitation.last_name = invitation_data.last_name
+        # Générer un token unique si le token existant est vide
+        if not existing_invitation.token or existing_invitation.token == "":
+            existing_invitation.token = generate_invitation_token()
+        invitation = await invitation_repo.update(existing_invitation)
+    else:
+        # Créer une nouvelle invitation avec un token unique (même si on ne l'utilise pas pour le flux)
+        # On génère un token unique pour respecter la contrainte unique sur le champ token
+        logger.info(f"Creating new invitation for email {invitation_data.email}")
+        invitation = Invitation(
+            company_id=company.id,
+            email=invitation_data.email,
+            first_name=invitation_data.first_name,
+            last_name=invitation_data.last_name,
+            token=generate_invitation_token(),  # Token unique pour éviter la violation de contrainte
+            role=TeamMemberRole.RECRUTEUR,
+            status=InvitationStatus.ACCEPTED,  # Déjà accepté car le compte est créé
+            expires_at=datetime.utcnow() + timedelta(days=7),  # Pour l'historique
+            invited_by=current_user.user_id,
+            accepted_at=datetime.utcnow(),
+        )
+        invitation = await invitation_repo.create(invitation)
+    
+    # Envoyer l'email avec le lien de réinitialisation de mot de passe
+    if password_reset_token:
+        password_reset_url = f"{settings.FRONTEND_URL}/reset-password?token={password_reset_token}"
+    else:
+        # Fallback: générer un nouveau token si le premier a échoué
+        logger.warning("Password reset token not available, attempting to generate one")
+        # Pour l'instant, on envoie un message générique
+        password_reset_url = f"{settings.FRONTEND_URL}/reset-password"
+    
+    recipient_name = f"{invitation_data.first_name} {invitation_data.last_name}"
+    
+    # Envoyer l'email avec le lien de réinitialisation de mot de passe
     try:
+        logger.info(f"Attempting to send invitation email to {invitation_data.email}")
         await send_invitation_notification(
             recipient_email=invitation_data.email,
             recipient_name=recipient_name,
             company_name=company.name,
-            invitation_token=token,
-            invitation_url=invitation_url,
-            temporary_password=None  # Plus de mot de passe temporaire, l'utilisateur créera le sien
+            invitation_token="",  # Token vide car on utilise le password reset token
+            invitation_url=password_reset_url,  # Lien de réinitialisation
+            temporary_password=invitation_data.password  # Mot de passe temporaire à inclure dans l'email
         )
+        logger.info(f"Invitation email sent successfully to {invitation_data.email}")
     except Exception as e:
-        # Log l'erreur mais ne pas bloquer la création de l'invitation
-        # L'invitation a été créée, on peut toujours la retourner
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error sending invitation notification: {str(e)}", exc_info=True)
-        # On continue quand même car l'invitation a été créée
-        # L'utilisateur pourra voir l'invitation dans la liste même si l'email n'a pas été envoyé
+        logger.error(f"❌ Error sending invitation notification to {invitation_data.email}: {str(e)}", exc_info=True)
+        # On continue quand même car le compte et le team member ont été créés
+        # Mais on log l'erreur pour le débogage
     
     return InvitationResponse.model_validate(invitation)
 
@@ -249,16 +570,21 @@ async def accept_invitation(
                 logger.info(f"Attempting to create user: {invitation.email}")
                 register_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/register"
                 logger.info(f"Register URL: {register_url}")
+                register_payload = {
+                    "email": invitation.email,
+                    "password": accept_data.password,
+                    "first_name": accept_data.first_name,
+                    "last_name": accept_data.last_name,
+                    "role": "ROLE_RECRUITER"
+                }
+                logger.info(f"Register payload (password hidden): email={invitation.email}, first_name={accept_data.first_name}, last_name={accept_data.last_name}, role=ROLE_RECRUITER")
                 register_response = await client.post(
                     register_url,
-                    json={
-                        "email": invitation.email,
-                        "password": accept_data.password,
-                        "first_name": accept_data.first_name,
-                        "last_name": accept_data.last_name,
-                        "role": "ROLE_RECRUITER"
-                    }
+                    json=register_payload
                 )
+                logger.info(f"Register response status: {register_response.status_code}")
+                if register_response.status_code != 200 and register_response.status_code != 201:
+                    logger.warning(f"Register response body: {register_response.text}")
                 
                 if register_response.status_code in [200, 201]:
                     # Utilisateur créé avec succès
@@ -315,9 +641,10 @@ async def accept_invitation(
                         )
                 elif register_response.status_code == 409:
                     # L'utilisateur existe déjà
-                    # On essaie de se connecter avec le mot de passe fourni pour vérifier s'il correspond
-                    # Si oui, on lie le compte à l'entreprise. Si non, on retourne une erreur claire.
-                    logger.info(f"User already exists (409), verifying password: {invitation.email}")
+                    # Dans le contexte d'une invitation, si l'utilisateur existe déjà mais n'a pas encore accepté cette invitation,
+                    # on doit permettre de lier le compte à l'entreprise avec le mot de passe fourni.
+                    # On essaie d'abord de se connecter avec le mot de passe fourni pour vérifier s'il correspond
+                    logger.info(f"User already exists (409), attempting to link account with provided password: {invitation.email}")
                     login_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/login"
                     login_response = await client.post(
                         login_url,
@@ -377,12 +704,97 @@ async def accept_invitation(
                             )
                     elif login_response.status_code == 401:
                         # Mot de passe incorrect - l'utilisateur existe mais le mot de passe ne correspond pas
+                        # Dans le contexte d'une invitation valide, on peut permettre de mettre à jour le mot de passe
+                        # car l'invitation est une preuve d'autorisation
                         error_detail = login_response.text
-                        logger.error(f"Failed to login existing user: Invalid password - {error_detail}")
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Un compte existe déjà avec cet email. Pour accepter cette invitation, vous devez utiliser le mot de passe de votre compte existant. Si vous avez oublié votre mot de passe, veuillez utiliser la fonctionnalité de réinitialisation de mot de passe."
-                        )
+                        logger.warning(f"Failed to login existing user: Invalid password - {error_detail}")
+                        logger.info(f"User {invitation.email} exists but password doesn't match. Attempting to update password via invitation.")
+                        
+                        # Mettre à jour le mot de passe via l'endpoint inter-services
+                        try:
+                            update_password_url = f"{settings.AUTH_SERVICE_URL}/api/v1/auth/update-password-by-email"
+                            update_password_response = await client.post(
+                                update_password_url,
+                                json={
+                                    "email": invitation.email,
+                                    "new_password": accept_data.password,
+                                    "internal_token": settings.INTERNAL_SERVICE_TOKEN_SECRET,
+                                    "first_name": accept_data.first_name,
+                                    "last_name": accept_data.last_name
+                                }
+                            )
+                            
+                            if update_password_response.status_code == 200:
+                                logger.info(f"Password updated successfully for user {invitation.email}")
+                                # Maintenant, essayer de se connecter avec le nouveau mot de passe
+                                login_response = await client.post(
+                                    login_url,
+                                    json={
+                                        "email": invitation.email,
+                                        "password": accept_data.password
+                                    }
+                                )
+                                
+                                if login_response.status_code == 200:
+                                    login_data = login_response.json()
+                                    access_token = login_data.get("access_token")
+                                    if access_token:
+                                        # Récupérer l'ID utilisateur via l'endpoint /me
+                                        try:
+                                            me_url = f"{settings.AUTH_SERVICE_URL}/api/v1/users/me"
+                                            me_response = await client.get(
+                                                me_url,
+                                                headers={"Authorization": f"Bearer {access_token}"}
+                                            )
+                                            if me_response.status_code == 200:
+                                                user_data = me_response.json()
+                                                user_id = user_data.get("id")
+                                                if not user_id:
+                                                    raise HTTPException(
+                                                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                                        detail="User ID not found in /me response"
+                                                    )
+                                                logger.info(f"User ID retrieved from /me endpoint after password update: {user_id}")
+                                            else:
+                                                error_detail = me_response.text
+                                                logger.error(f"Failed to get user from /me after password update: {me_response.status_code} - {error_detail}")
+                                                raise HTTPException(
+                                                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                                    detail=f"Échec de la récupération de l'ID utilisateur après mise à jour du mot de passe: {error_detail}"
+                                                )
+                                        except HTTPException:
+                                            raise
+                                        except Exception as e:
+                                            logger.error(f"Error getting user from /me after password update: {str(e)}")
+                                            raise HTTPException(
+                                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                                detail=f"Failed to retrieve user ID after password update: {str(e)}"
+                                            )
+                                    else:
+                                        raise HTTPException(
+                                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                            detail="No access token in login response after password update"
+                                        )
+                                else:
+                                    error_detail = login_response.text
+                                    logger.error(f"Failed to login after password update: {login_response.status_code} - {error_detail}")
+                                    raise HTTPException(
+                                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                        detail=f"Impossible de se connecter après la mise à jour du mot de passe: {error_detail}"
+                                    )
+                            else:
+                                error_detail = update_password_response.text
+                                logger.error(f"Failed to update password: {update_password_response.status_code} - {error_detail}")
+                                raise HTTPException(
+                                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                    detail=f"Impossible de mettre à jour le mot de passe: {error_detail}"
+                                )
+                        except httpx.HTTPError as e:
+                            logger.error(f"Error updating password: {str(e)}")
+                            raise HTTPException(
+                                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail=f"Erreur lors de la mise à jour du mot de passe: {str(e)}"
+                            )
                     else:
                         error_detail = login_response.text
                         logger.error(f"Failed to login existing user: {login_response.status_code} - {error_detail}")
@@ -399,23 +811,41 @@ async def accept_invitation(
                     )
                     
             except httpx.HTTPStatusError as e:
-                error_detail = e.response.text if e.response else str(e)
-                logger.error(f"HTTP error when communicating with auth service: {e}", exc_info=True)
+                error_detail = ""
+                if e.response:
+                    try:
+                        error_detail = e.response.text
+                        if not error_detail and e.response.content:
+                            error_detail = e.response.content.decode('utf-8', errors='ignore')
+                    except:
+                        error_detail = f"HTTP {e.response.status_code}"
+                if not error_detail:
+                    error_detail = str(e) or repr(e)
+                logger.error(f"HTTP error when communicating with auth service: {e.response.status_code if e.response else 'unknown'} - {error_detail}", exc_info=True)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to create or verify user account: {error_detail}"
+                    detail=f"Échec de la création ou vérification du compte utilisateur: {error_detail}"
                 )
             except httpx.HTTPError as e:
-                logger.error(f"Connection error when communicating with auth service: {e}", exc_info=True)
+                error_msg = str(e) or repr(e) or "Erreur de connexion inconnue"
+                logger.error(f"Connection error when communicating with auth service: {error_msg}", exc_info=True)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to connect to auth service: {str(e)}"
+                    detail=f"Impossible de se connecter au service d'authentification: {error_msg}"
                 )
+            except HTTPException:
+                # Propager les HTTPException directement (elles ont déjà le bon format)
+                raise
             except Exception as e:
-                logger.error(f"Unexpected error when communicating with auth service: {e}", exc_info=True)
+                # Si c'est une HTTPException mais qu'elle n'a pas été attrapée par le bloc précédent,
+                # extraire son detail
+                if isinstance(e, HTTPException):
+                    raise
+                error_msg = str(e) or repr(e) or f"Erreur de type {type(e).__name__}"
+                logger.error(f"Unexpected error when communicating with auth service: {error_msg}", exc_info=True)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Unexpected error: {str(e)}"
+                    detail=f"Erreur inattendue lors de la communication avec le service d'authentification: {error_msg}"
                 )
         
         if not user_id:
@@ -479,10 +909,12 @@ async def accept_invitation(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in accept_invitation: {e}", exc_info=True)
+        error_msg = str(e) if str(e) else repr(e)
+        error_type = type(e).__name__
+        logger.error(f"Unexpected error in accept_invitation: {error_type}: {error_msg}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Erreur serveur ({error_type}): {error_msg if error_msg else 'Erreur inconnue'}"
         )
 
 

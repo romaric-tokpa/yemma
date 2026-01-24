@@ -105,6 +105,8 @@ class TeamMemberOrInvitationResponse(BaseModel):
     id: int
     type: str = Field(..., description="Type: 'member' ou 'invitation'")
     email: str = Field(..., description="Email du membre ou de l'invité")
+    first_name: Optional[str] = Field(None, description="Prénom du membre ou de l'invité")
+    last_name: Optional[str] = Field(None, description="Nom du membre ou de l'invité")
     role_in_company: TeamMemberRole
     status: str = Field(..., description="Status du membre ou de l'invitation")
     joined_at: Optional[datetime] = None
@@ -123,8 +125,11 @@ class TeamMemberOrInvitationResponse(BaseModel):
 # ============================================
 
 class InvitationCreate(BaseModel):
-    """Schéma pour la création d'une invitation"""
+    """Schéma pour la création d'une invitation et du compte recruteur"""
     email: EmailStr = Field(..., description="Email du membre à inviter")
+    first_name: str = Field(..., min_length=1, max_length=100, description="Prénom du recruteur")
+    last_name: str = Field(..., min_length=1, max_length=100, description="Nom du recruteur")
+    password: str = Field(..., min_length=8, description="Mot de passe temporaire pour le compte")
     # company_id sera automatiquement récupéré depuis get_current_company
 
 

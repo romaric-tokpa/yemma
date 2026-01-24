@@ -30,6 +30,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.options("/upload")
+async def options_upload():
+    """Gérer les requêtes OPTIONS pour /upload"""
+    from app.core.config import settings
+    from fastapi.responses import Response
+    
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
+
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
     file: UploadFile = File(..., description="Fichier à uploader (PDF, JPG, PNG, max 10MB)"),
@@ -93,6 +111,23 @@ async def upload_document(
         mime_type=document.mime_type,
         status=document.status.value,
         message="Document uploaded successfully"
+    )
+
+
+@router.options("/upload/company-logo")
+async def options_upload_company_logo():
+    """Gérer les requêtes OPTIONS pour /upload/company-logo"""
+    from fastapi.responses import Response
+    
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
     )
 
 
@@ -166,6 +201,126 @@ async def upload_company_logo(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors du téléchargement du logo: {str(e)}"
+        )
+
+
+@router.options("/upload/profile-photo")
+async def options_upload_profile_photo():
+    """Gérer les requêtes OPTIONS pour /upload/profile-photo"""
+    from fastapi.responses import Response
+
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
+
+@router.post("/upload/profile-photo")
+async def upload_profile_photo(
+    file: UploadFile = File(..., description="Photo de profil (JPG, PNG, max 5MB)"),
+    candidate_id: int = Form(..., description="ID du candidat"),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Upload une photo de profil candidat
+
+    - **file**: Photo à uploader (JPG, PNG, max 5MB)
+    - **candidate_id**: ID du candidat
+
+    Retourne l'URL permanente de la photo via le service /serve
+    """
+    try:
+        logger.info(f"Upload profile photo: filename={file.filename}, candidate_id={candidate_id}")
+
+        # Valider le fichier
+        mime_type, file_content = await FileValidator.validate_file_content(file)
+
+        # Vérifier la taille spécifique pour les photos (max 5MB)
+        if len(file_content) > 5 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La photo ne doit pas dépasser 5 Mo"
+            )
+
+        # Vérifier que c'est une image
+        if mime_type not in ['image/jpeg', 'image/png', 'image/webp']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le fichier doit être une image (JPG, PNG, WebP)"
+            )
+
+        # Supprimer l'ancienne photo de profil si elle existe
+        old_photo_statement = select(Document).where(
+            Document.candidate_id == candidate_id,
+            Document.document_type == DocumentType.PROFILE_PHOTO,
+            Document.deleted_at.is_(None)
+        )
+        old_photo_result = await session.execute(old_photo_statement)
+        old_photos = old_photo_result.scalars().all()
+
+        for old_photo in old_photos:
+            try:
+                await s3_storage.delete_file(old_photo.s3_key)
+                old_photo.deleted_at = datetime.utcnow()
+                logger.info(f"Deleted old profile photo: {old_photo.id}")
+            except Exception as e:
+                logger.warning(f"Could not delete old photo {old_photo.id}: {str(e)}")
+
+        # Générer un nom de fichier unique
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'jpg'
+        stored_filename = f"{uuid.uuid4()}.{file_extension}"
+        s3_key = f"candidates/{candidate_id}/profile_photo/{stored_filename}"
+
+        # Upload vers S3
+        await s3_storage.upload_file(
+            file_content=file_content,
+            s3_key=s3_key,
+            content_type=mime_type
+        )
+        logger.info(f"Successfully uploaded profile photo to S3: {s3_key}")
+
+        # Créer l'enregistrement en base de données
+        document = Document(
+            candidate_id=candidate_id,
+            document_type=DocumentType.PROFILE_PHOTO,
+            original_filename=file.filename,
+            stored_filename=stored_filename,
+            file_size=len(file_content),
+            mime_type=mime_type,
+            s3_key=s3_key,
+            status="uploaded"
+        )
+
+        session.add(document)
+        await session.commit()
+        await session.refresh(document)
+
+        # Générer l'URL permanente via le service /serve
+        serve_url = f"/api/v1/documents/serve/{document.id}"
+
+        return {
+            "id": document.id,
+            "candidate_id": candidate_id,
+            "document_type": "PROFILE_PHOTO",
+            "serve_url": serve_url,
+            "filename": stored_filename,
+            "size": len(file_content),
+            "mime_type": mime_type,
+            "message": "Photo de profil uploadée avec succès"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading profile photo: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors du téléchargement de la photo: {str(e)}"
         )
 
 
@@ -330,8 +485,60 @@ async def get_candidate_documents(
             mime_type=doc.mime_type,
             status=doc.status.value,
             created_at=doc.created_at,
-            updated_at=doc.updated_at
+            updated_at=doc.updated_at,
+            deleted_at=doc.deleted_at
         )
         for doc in documents
     ]
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_200_OK)
+async def delete_document(
+    document_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Supprime un document (soft delete)
+    
+    - **document_id**: ID du document à supprimer
+    """
+    # Récupérer le document
+    statement = select(Document).where(
+        Document.id == document_id,
+        Document.deleted_at.is_(None)
+    )
+    result = await session.execute(statement)
+    document = result.scalar_one_or_none()
+    
+    if not document:
+        raise DocumentNotFoundError(str(document_id))
+    
+    try:
+        # Supprimer le fichier de S3
+        try:
+            await s3_storage.delete_file(document.s3_key)
+            logger.info(f"Successfully deleted file from S3: {document.s3_key}")
+        except ClientError as e:
+            # Si le fichier n'existe pas déjà dans S3, on continue quand même
+            logger.warning(f"File not found in S3 (may already be deleted): {document.s3_key}, error: {str(e)}")
+        
+        # Marquer comme supprimé (soft delete)
+        document.deleted_at = datetime.utcnow()
+        document.updated_at = datetime.utcnow()
+        await session.commit()
+        await session.refresh(document)
+        
+        logger.info(f"Successfully deleted document {document_id}")
+        
+        return {
+            "message": "Document deleted successfully",
+            "document_id": document_id
+        }
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Error deleting document {document_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la suppression du document: {str(e)}"
+        )
 

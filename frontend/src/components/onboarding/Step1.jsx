@@ -36,38 +36,7 @@ export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId
     loadExistingPhoto()
   }, [profileId, setValue]) // Retirer photoUrl des dépendances pour recharger à chaque fois
 
-  // Fonction pour régénérer l'URL de la photo si elle a expiré
-  const regeneratePhotoUrl = async () => {
-    if (!profileId) return
-    
-    try {
-      const { documentApi, candidateApi } = await import('@/services/api')
-      // Récupérer tous les documents du candidat
-      const documents = await documentApi.getCandidateDocuments(profileId)
-      // Trouver le document le plus récent de type OTHER (photo de profil)
-      const photoDoc = documents
-        .filter(doc => doc.document_type === 'OTHER')
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-      
-      if (photoDoc) {
-        // Régénérer l'URL présignée
-        const viewResponse = await documentApi.getDocumentViewUrl(photoDoc.id)
-        const newUrl = viewResponse.view_url
-        
-        // Mettre à jour le profil avec la nouvelle URL
-        await candidateApi.updateProfile(profileId, { photo_url: newUrl })
-        
-        // Mettre à jour l'état local
-        setPhotoUrl(newUrl)
-        setValue('photoUrl', newUrl)
-        
-        return newUrl
-      }
-    } catch (error) {
-      console.error('Erreur lors de la régénération de l\'URL de la photo:', error)
-    }
-    return null
-  }
+  // Plus besoin de régénérer l'URL car on utilise maintenant des URLs permanentes
 
   // Gérer l'upload de la photo
   const handlePhotoUpload = async (event) => {
@@ -88,21 +57,30 @@ export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId
 
     try {
       setIsUploadingPhoto(true)
+
+      // Upload via l'endpoint dédié pour les photos de profil
+      const { documentApi, candidateApi } = await import('@/services/api')
+      const uploadResult = await documentApi.uploadProfilePhoto(file, profileId)
+
+      // L'endpoint retourne l'ID du document, on doit construire l'URL complète
+      // Si serve_url est déjà une URL complète, l'utiliser, sinon construire l'URL
+      let serveUrl = uploadResult.serve_url
       
-      // Upload vers le document service
-      const { documentApi } = await import('@/services/api')
-      const uploadedDoc = await documentApi.uploadDocument(file, profileId, 'OTHER')
-      const viewResponse = await documentApi.getDocumentViewUrl(uploadedDoc.id)
-      const viewUrl = viewResponse.view_url
-      
-      // Mettre à jour le profil avec l'URL de la photo
-      const { candidateApi } = await import('@/services/api')
-      await candidateApi.updateProfile(profileId, { photo_url: viewUrl })
-      
+      // Si c'est une URL relative, construire l'URL complète
+      if (serveUrl && serveUrl.startsWith('/')) {
+        serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
+      } else if (uploadResult.id) {
+        // Si serve_url n'est pas fourni mais qu'on a l'ID, construire l'URL
+        serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
+      }
+
+      // Mettre à jour le profil avec l'URL permanente de la photo
+      await candidateApi.updateProfile(profileId, { photo_url: serveUrl })
+
       // Mettre à jour l'état local
       setPhotoPreview(null)
-      setPhotoUrl(viewUrl)
-      setValue('photoUrl', viewUrl)
+      setPhotoUrl(serveUrl)
+      setValue('photoUrl', serveUrl)
     } catch (error) {
       console.error('Erreur lors de l\'upload de la photo:', error)
       alert('Erreur lors de l\'upload de la photo: ' + (error.response?.data?.detail || error.message))
@@ -137,19 +115,11 @@ export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId
                 src={displayPhoto}
                 alt="Photo de profil"
                 className="w-16 h-16 rounded-lg object-cover border-2 border-primary"
-                onError={async (e) => {
-                  // Si l'URL a échoué et que c'était une URL présignée, essayer de la régénérer
-                  if (photoUrl && (photoUrl.includes('X-Amz-Algorithm') || photoUrl.includes('localhost:9000') || photoUrl.includes('minio'))) {
-                    console.log('URL présignée expirée, régénération...')
-                    const newUrl = await regeneratePhotoUrl()
-                    if (newUrl) {
-                      // Réessayer avec la nouvelle URL
-                      e.target.src = newUrl
-                      return
-                    }
+                onError={(e) => {
+                  // En cas d'erreur, utiliser l'avatar par défaut
+                  if (e.target.src !== defaultAvatarUrl) {
+                    e.target.src = defaultAvatarUrl
                   }
-                  // Si la régénération a échoué ou si ce n'est pas une URL présignée, utiliser l'avatar par défaut
-                  e.target.src = defaultAvatarUrl
                 }}
               />
               {isUploadingPhoto && (
@@ -328,16 +298,6 @@ export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId
         </div>
       </div>
 
-      <div className="flex justify-between">
-        {!isFirstStep && (
-          <Button type="button" variant="outline" onClick={onPrevious}>
-            Précédent
-          </Button>
-        )}
-        <Button type="submit" className="ml-auto">
-          Suivant
-        </Button>
-      </div>
     </form>
   )
 }

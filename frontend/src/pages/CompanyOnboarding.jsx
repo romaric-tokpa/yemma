@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Building, Upload, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react'
+import React from 'react'
+import { Building, Upload, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Loader2, Save, FileText, Image as ImageIcon } from 'lucide-react'
 import { companyApi, documentApi } from '@/services/api'
 
-// Schéma de validation pour l'onboarding entreprise
 const companyOnboardingSchema = z.object({
   name: z.string().min(2, 'Le nom de l\'entreprise doit contenir au moins 2 caractères'),
   legal_id: z.string().min(9, 'Le RCCM doit contenir au moins 9 caractères'),
@@ -20,9 +20,9 @@ const companyOnboardingSchema = z.object({
 })
 
 const STEPS = [
-  { id: 1, title: 'Informations générales', description: 'Nom, RCCM et adresse' },
-  { id: 2, title: 'Logo de l\'entreprise', description: 'Téléchargez le logo de votre entreprise' },
-  { id: 3, title: 'Récapitulatif', description: 'Vérifiez vos informations avant de finaliser' },
+  { id: 1, title: 'Informations générales', description: 'Nom, RCCM et adresse', icon: Building },
+  { id: 2, title: 'Logo de l\'entreprise', description: 'Téléchargez le logo de votre entreprise', icon: ImageIcon },
+  { id: 3, title: 'Récapitulatif', description: 'Vérifiez vos informations avant de finaliser', icon: CheckCircle2 },
 ]
 
 export default function CompanyOnboarding() {
@@ -33,6 +33,7 @@ export default function CompanyOnboarding() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [lastSaved, setLastSaved] = useState(null)
 
   const form = useForm({
     resolver: zodResolver(companyOnboardingSchema),
@@ -52,11 +53,11 @@ export default function CompanyOnboarding() {
   const loadCompany = async () => {
     try {
       setLoading(true)
+      setError(null)
       const companyData = await companyApi.getMyCompany()
       setCompany(companyData)
       setLogoUrl(companyData.logo_url)
       
-      // Pré-remplir le formulaire si l'entreprise existe déjà
       if (companyData) {
         setValue('name', companyData.name || '')
         setValue('legal_id', companyData.legal_id || '')
@@ -64,11 +65,16 @@ export default function CompanyOnboarding() {
       }
     } catch (error) {
       console.error('Error loading company:', error)
+      
       if (error.response?.status === 404) {
-        // L'entreprise n'existe pas encore, c'est normal
         setCompany(null)
+        setError(null)
+      } else if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+        setError('Impossible de se connecter au serveur. Vérifiez votre connexion et que les services sont démarrés.')
+      } else if (error.response?.data?.detail) {
+        setError(`Erreur lors du chargement des données de l'entreprise: ${error.response.data.detail}`)
       } else {
-        setError('Erreur lors du chargement des données de l\'entreprise')
+        setError(`Erreur lors du chargement des données de l'entreprise: ${error.message || 'Erreur inconnue'}`)
       }
     } finally {
       setLoading(false)
@@ -93,10 +99,8 @@ export default function CompanyOnboarding() {
       setUploading(true)
       setError(null)
 
-      // Récupérer l'ID de l'entreprise ou créer l'entreprise si elle n'existe pas
       let companyId = company?.id
       
-      // Si l'entreprise n'existe pas encore, la créer avec les données du formulaire
       if (!companyId) {
         const formData = getValues()
         if (!formData.name || !formData.legal_id) {
@@ -114,6 +118,7 @@ export default function CompanyOnboarding() {
           })
           companyId = newCompany.id
           setCompany(newCompany)
+          setLastSaved(new Date())
         } catch (err) {
           console.error('Error creating company:', err)
           setError('Erreur lors de la création de l\'entreprise: ' + (err.response?.data?.detail || err.message))
@@ -125,6 +130,7 @@ export default function CompanyOnboarding() {
       
       if (uploadResponse.url) {
         setLogoUrl(uploadResponse.url)
+        setLastSaved(new Date())
       }
     } catch (error) {
       console.error('Error uploading logo:', error)
@@ -139,17 +145,15 @@ export default function CompanyOnboarding() {
       setError(null)
 
       if (currentStep === 1) {
-        // Vérifier que les champs requis sont remplis
         if (!data.name || !data.legal_id) {
           setError('Veuillez remplir tous les champs obligatoires')
           return
         }
         setCurrentStep(2)
+        setLastSaved(new Date())
       } else if (currentStep === 2) {
-        // Passer à l'étape récapitulatif
         setCurrentStep(3)
       } else if (currentStep === 3) {
-        // Finaliser l'onboarding
         await finalizeOnboarding(data)
       }
     } catch (err) {
@@ -163,7 +167,6 @@ export default function CompanyOnboarding() {
       setUploading(true)
 
       if (company?.id) {
-        // Mettre à jour l'entreprise existante
         await companyApi.updateCompany(company.id, {
           name: data.name,
           legal_id: data.legal_id,
@@ -171,7 +174,6 @@ export default function CompanyOnboarding() {
           logo_url: logoUrl || null,
         })
       } else {
-        // Créer l'entreprise si elle n'existe pas
         const user = JSON.parse(localStorage.getItem('user') || '{}')
         await companyApi.createCompany({
           name: data.name,
@@ -182,7 +184,6 @@ export default function CompanyOnboarding() {
         })
       }
 
-      // Rediriger vers le dashboard
       navigate('/company/dashboard')
     } catch (err) {
       console.error('Error finalizing onboarding:', err)
@@ -197,9 +198,9 @@ export default function CompanyOnboarding() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-light to-white flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-[#226D68]" />
           <p className="text-muted-foreground">Chargement...</p>
         </div>
       </div>
@@ -207,93 +208,131 @@ export default function CompanyOnboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/company/dashboard')}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Retour
-          </Button>
-          <h1 className="text-3xl font-bold mb-2">Configuration de votre entreprise</h1>
-          <p className="text-muted-foreground">
-            Complétez les informations de votre entreprise pour commencer à utiliser la plateforme
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-light to-white">
+      {/* Header avec gradient vert émeraude - Responsive */}
+      <div className="bg-gradient-to-r from-[#226D68] to-[#1a5a55] text-white shadow-lg">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold font-heading mb-1 sm:mb-2">Configuration de votre entreprise</h1>
+              <p className="text-xs sm:text-sm text-white/80">Complétez les informations de votre entreprise pour commencer</p>
+            </div>
+            {lastSaved && (
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-white/80 flex-shrink-0">
+                <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Dernière sauvegarde: {lastSaved.toLocaleTimeString()}</span>
+                <span className="sm:hidden">{lastSaved.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Barre de progression */}
+          <div className="mb-3 sm:mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs sm:text-sm font-medium">
+                Étape {currentStep} sur {STEPS.length}
+              </span>
+              <span className="text-xs sm:text-sm font-semibold">{Math.round(progress)}% complété</span>
+            </div>
+            <Progress value={progress} className="h-2 sm:h-3 bg-white/20" />
+          </div>
         </div>
+      </div>
 
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-2">
-            {STEPS.map((step, index) => (
-              <div key={step.id} className="flex items-center flex-1">
-                <div className={`
-                  flex items-center justify-center w-10 h-10 rounded-full border-2
-                  ${currentStep > step.id ? 'bg-primary border-primary text-primary-foreground' : 
-                    currentStep === step.id ? 'bg-primary border-primary text-primary-foreground' : 
-                    'bg-background border-muted-foreground text-muted-foreground'}
-                `}>
-                  {currentStep > step.id ? (
-                    <CheckCircle2 className="w-6 h-6" />
-                  ) : (
-                    <span className="font-semibold">{step.id}</span>
+      {/* Indicateurs d'étapes - Responsive */}
+      <div className="bg-white border-b shadow-sm sticky top-0 z-40">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+          <div className="flex justify-between items-center overflow-x-auto pb-2 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide">
+            {STEPS.map((step, index) => {
+              const isCompleted = currentStep > step.id
+              const isCurrent = currentStep === step.id
+              const Icon = step.icon
+              
+              return (
+                <div key={step.id} className="flex items-center flex-1 min-w-[80px] sm:min-w-0">
+                  <div className="flex flex-col items-center flex-1 w-full">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center border-2 mb-1 sm:mb-2 transition-all duration-200 ${
+                      isCompleted
+                        ? 'bg-[#226D68] border-[#226D68] text-white shadow-md'
+                        : isCurrent
+                        ? 'bg-[#226D68]/20 border-[#226D68] text-[#226D68] shadow-sm scale-110'
+                        : 'bg-white border-gray-300 text-gray-400'
+                    }`}>
+                      {isCompleted ? (
+                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                      ) : (
+                        <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                      )}
+                    </div>
+                    <span className={`text-[10px] sm:text-xs text-center font-medium transition-colors leading-tight ${
+                      isCurrent ? 'text-[#226D68]' : isCompleted ? 'text-gray-700' : 'text-gray-400'
+                    }`}>
+                      {step.title.split(' ')[0]}
+                    </span>
+                  </div>
+                  {index < STEPS.length - 1 && (
+                    <div className={`flex-1 h-0.5 mx-1 sm:mx-2 transition-colors hidden sm:block ${
+                      isCompleted ? 'bg-[#226D68]' : 'bg-gray-200'
+                    }`} />
                   )}
                 </div>
-                {index < STEPS.length - 1 && (
-                  <div className={`
-                    flex-1 h-0.5 mx-2
-                    ${currentStep > step.id ? 'bg-primary' : 'bg-muted'}
-                  `} />
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
-          <Progress value={progress} className="h-2" />
         </div>
+      </div>
 
-        {/* Form Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
-            <CardDescription>{STEPS[currentStep - 1].description}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onStepSubmit)} className="space-y-6">
+      {/* Contenu principal - Responsive */}
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+        <Card className="rounded-[16px] shadow-lg border-0 overflow-hidden">
+          <div className="bg-gradient-to-r from-[#226D68]/5 to-blue-deep/5 p-4 sm:p-6 border-b">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-4">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-[#226D68] to-blue-deep flex items-center justify-center text-white shadow-md flex-shrink-0">
+                {React.createElement(STEPS[currentStep - 1].icon, { className: 'w-6 h-6 sm:w-8 sm:h-8' })}
+              </div>
+              <div className="text-center sm:text-left flex-1 min-w-0">
+                <CardTitle className="text-xl sm:text-2xl font-bold text-gray-anthracite font-heading">{STEPS[currentStep - 1].title}</CardTitle>
+                <CardDescription className="text-sm sm:text-base mt-1">{STEPS[currentStep - 1].description}</CardDescription>
+              </div>
+            </div>
+          </div>
+          
+          <CardContent className="p-4 sm:p-6 md:p-8">
+            <form onSubmit={handleSubmit(onStepSubmit)} className="space-y-4 sm:space-y-6">
               {error && (
-                <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm">{error}</p>
+                <div className="bg-red-50 border border-red-200 text-red-800 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg flex items-start gap-2 animate-in slide-in-from-top-2">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs sm:text-sm flex-1">{error}</p>
                 </div>
               )}
 
               {/* Step 1: Informations générales */}
               {currentStep === 1 && (
-                <div className="space-y-4">
+                <div className="space-y-4 sm:space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nom de l'entreprise *</Label>
+                    <Label htmlFor="name" className="text-sm sm:text-base font-semibold">Nom de l'entreprise *</Label>
                     <Input
                       id="name"
                       {...register('name')}
                       placeholder="Ex: Acme Corporation"
+                      className="h-10 sm:h-12 text-sm sm:text-base"
                     />
                     {errors.name && (
-                      <p className="text-sm text-destructive">{errors.name.message}</p>
+                      <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.name.message}</p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="legal_id">Numéro RCCM *</Label>
+                    <Label htmlFor="legal_id" className="text-sm sm:text-base font-semibold">Numéro RCCM *</Label>
                     <Input
                       id="legal_id"
                       {...register('legal_id')}
                       placeholder="CI-ABJ-2024-A-12345"
                       maxLength={50}
+                      className="h-10 sm:h-12 text-sm sm:text-base"
                     />
                     {errors.legal_id && (
-                      <p className="text-sm text-destructive">{errors.legal_id.message}</p>
+                      <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.legal_id.message}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       Le RCCM (Registre du Commerce et du Crédit Mobilier) identifie votre entreprise
@@ -301,14 +340,15 @@ export default function CompanyOnboarding() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="adresse">Adresse complète</Label>
+                    <Label htmlFor="adresse" className="text-sm sm:text-base font-semibold">Adresse complète</Label>
                     <Input
                       id="adresse"
                       {...register('adresse')}
                       placeholder="123 Rue Example, 75001 Paris, France"
+                      className="h-10 sm:h-12 text-sm sm:text-base"
                     />
                     {errors.adresse && (
-                      <p className="text-sm text-destructive">{errors.adresse.message}</p>
+                      <p className="text-xs sm:text-sm text-red-600 animate-in fade-in">{errors.adresse.message}</p>
                     )}
                   </div>
                 </div>
@@ -316,49 +356,53 @@ export default function CompanyOnboarding() {
 
               {/* Step 2: Logo */}
               {currentStep === 2 && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="logo">Logo de l'entreprise</Label>
-                    <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="space-y-3 sm:space-y-4">
+                    <Label className="text-sm sm:text-base font-semibold">Logo de l'entreprise</Label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-[12px] p-6 sm:p-8 md:p-12 text-center bg-gray-50 hover:border-[#226D68] transition-colors">
                       {logoUrl ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                           <img
                             src={logoUrl}
                             alt="Logo entreprise"
-                            className="max-w-xs max-h-32 mx-auto object-contain"
+                            className="max-w-full sm:max-w-xs max-h-32 sm:max-h-40 mx-auto object-contain rounded-lg shadow-md"
                             onError={(e) => {
                               e.target.style.display = 'none'
                             }}
                           />
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             Logo actuel. Téléchargez une nouvelle image pour le remplacer.
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-4">
-                          <Building className="w-16 h-16 mx-auto text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
+                        <div className="space-y-3 sm:space-y-4">
+                          <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto bg-gradient-to-br from-[#226D68]/20 to-blue-deep/20 rounded-full flex items-center justify-center">
+                            <ImageIcon className="w-8 h-8 sm:w-12 sm:h-12 text-[#226D68]" />
+                          </div>
+                          <p className="text-xs sm:text-sm text-muted-foreground font-medium">
                             Aucun logo téléchargé
                           </p>
                         </div>
                       )}
-                      <Input
-                        id="logo"
-                        type="file"
-                        accept="image/*"
-                        disabled={uploading}
-                        onChange={(e) => handleLogoUpload(e.target.files)}
-                        className="max-w-xs mx-auto mt-4"
-                      />
-                      {uploading && (
-                        <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Téléchargement en cours...</span>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Formats acceptés: JPG, PNG. Taille maximale: 5 Mo
-                      </p>
+                      <div className="mt-4 sm:mt-6">
+                        <Input
+                          id="logo"
+                          type="file"
+                          accept="image/*"
+                          disabled={uploading}
+                          onChange={(e) => handleLogoUpload(e.target.files)}
+                          className="max-w-full sm:max-w-xs mx-auto text-xs sm:text-sm"
+                        />
+                        {uploading && (
+                          <div className="mt-3 sm:mt-4 flex items-center justify-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Téléchargement en cours...</span>
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-3 sm:mt-4">
+                          Formats acceptés: JPG, PNG. Taille maximale: 5 Mo
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -366,41 +410,41 @@ export default function CompanyOnboarding() {
 
               {/* Step 3: Récapitulatif */}
               {currentStep === 3 && (
-                <div className="space-y-4">
-                  <div className="bg-muted p-4 rounded-lg space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Nom de l'entreprise</p>
-                      <p className="text-lg font-semibold">{watch('name')}</p>
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 rounded-[12px] border border-gray-200 space-y-3 sm:space-4">
+                    <div className="pb-3 sm:pb-4 border-b border-gray-200">
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Nom de l'entreprise</p>
+                      <p className="text-base sm:text-lg font-semibold text-gray-900 truncate">{watch('name')}</p>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">RCCM</p>
-                      <p className="text-lg font-semibold">{watch('legal_id')}</p>
+                    <div className="pb-3 sm:pb-4 border-b border-gray-200">
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">RCCM</p>
+                      <p className="text-base sm:text-lg font-semibold text-gray-900 truncate">{watch('legal_id')}</p>
                     </div>
                     {watch('adresse') && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Adresse</p>
-                        <p className="text-lg font-semibold">{watch('adresse')}</p>
+                      <div className="pb-3 sm:pb-4 border-b border-gray-200">
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Adresse</p>
+                        <p className="text-base sm:text-lg font-semibold text-gray-900 break-words">{watch('adresse')}</p>
                       </div>
                     )}
                     {logoUrl && (
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">Logo</p>
+                        <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2 sm:mb-3">Logo</p>
                         <img
                           src={logoUrl}
                           alt="Logo"
-                          className="max-w-32 max-h-20 object-contain"
+                          className="max-w-full sm:max-w-40 max-h-20 sm:max-h-24 object-contain rounded-lg shadow-sm border border-gray-200"
                         />
                       </div>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs sm:text-sm text-muted-foreground text-center">
                     Vérifiez que toutes les informations sont correctes avant de finaliser.
                   </p>
                 </div>
               )}
 
-              {/* Navigation Buttons */}
-              <div className="flex justify-between pt-4">
+              {/* Navigation Buttons - Responsive */}
+              <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 pt-4 sm:pt-6 border-t">
                 <Button
                   type="button"
                   variant="outline"
@@ -411,15 +455,21 @@ export default function CompanyOnboarding() {
                       navigate('/company/dashboard')
                     }
                   }}
+                  className="border-blue-deep text-blue-deep hover:bg-blue-deep/10 w-full sm:w-auto order-2 sm:order-1"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   {currentStep === 1 ? 'Annuler' : 'Précédent'}
                 </Button>
-                <Button type="submit" disabled={uploading}>
+                <Button 
+                  type="submit" 
+                  disabled={uploading}
+                  className="bg-[#226D68] hover:bg-[#226D68]/90 text-white w-full sm:w-auto order-1 sm:order-2"
+                >
                   {uploading ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Enregistrement...
+                      <span className="hidden sm:inline">Enregistrement...</span>
+                      <span className="sm:hidden">Enregistrement...</span>
                     </>
                   ) : currentStep === STEPS.length ? (
                     <>

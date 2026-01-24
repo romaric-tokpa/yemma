@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Check, Crown, Zap } from 'lucide-react'
+import { Check, Crown, Zap, MapPin } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Card } from '../ui/card'
 import { Badge } from '../ui/badge'
@@ -32,7 +32,10 @@ export function SubscriptionTab({ companyId, onUpdate }) {
   const loadPlans = async () => {
     try {
       const data = await paymentApi.getPlans()
-      setPlans(data.filter(p => p.plan_type !== 'FREEMIUM'))
+      console.log('Plans chargés depuis l\'API:', data)
+      const filteredPlans = data.filter(p => p.plan_type !== 'FREEMIUM')
+      console.log('Plans filtrés (sans FREEMIUM):', filteredPlans)
+      setPlans(filteredPlans)
     } catch (error) {
       console.error('Error loading plans:', error)
     }
@@ -95,20 +98,32 @@ export function SubscriptionTab({ companyId, onUpdate }) {
       {isFreePlan && (
         <div>
           <h3 className="text-lg font-semibold mb-6">Passer au plan supérieur</h3>
+          {/* Trier les plans : Essentiel en premier, puis les autres */}
           <div className="grid md:grid-cols-2 gap-6">
-            {plans.map((plan) => (
+            {[...plans].sort((a, b) => {
+              if (a.name === 'Essentiel') return -1
+              if (b.name === 'Essentiel') return 1
+              return 0
+            }).map((plan) => (
               <Card 
                 key={plan.id} 
                 className={`p-6 relative transition-all hover:shadow-lg ${
-                  plan.plan_type === 'ENTERPRISE' ? 'border-2 border-yellow-400' : ''
+                  plan.plan_type === 'ENTERPRISE' ? 'border-2 border-yellow-400' : 
+                  plan.name === 'Essentiel' ? 'border-2 border-[#226D68]' : ''
                 }`}
               >
-                {plan.plan_type === 'ENTERPRISE' && (
+                {plan.name === 'Essentiel' && (
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <MapPin className="h-5 w-5 text-[#226D68]" />
+                    <Badge className="bg-[#226D68] text-white text-xs">Côte d'Ivoire</Badge>
+                  </div>
+                )}
+                {plan.plan_type === 'ENTERPRISE' && plan.name !== 'Essentiel' && (
                   <div className="absolute top-4 right-4">
                     <Crown className="h-6 w-6 text-yellow-500 fill-yellow-500" />
                   </div>
                 )}
-                {plan.plan_type === 'PRO' && (
+                {plan.plan_type === 'PRO' && plan.name !== 'Essentiel' && (
                   <div className="absolute top-4 right-4">
                     <Zap className="h-6 w-6 text-blue-500 fill-blue-500" />
                   </div>
@@ -116,49 +131,75 @@ export function SubscriptionTab({ companyId, onUpdate }) {
                 
                 <div className="mb-6">
                   <h4 className="text-2xl font-bold mb-2 text-gray-900">{plan.name}</h4>
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-4xl font-bold text-gray-900">
-                      {plan.price_monthly.toFixed(2)}€
-                    </span>
-                    <span className="text-gray-600 text-lg">/mois</span>
-                  </div>
-                  {plan.price_yearly && (
-                    <p className="text-sm text-gray-600">
-                      ou <span className="font-semibold">{plan.price_yearly.toFixed(2)}€/an</span>
-                      <span className="text-green-600 ml-2">
-                        (économisez {((plan.price_monthly * 12 - plan.price_yearly) / (plan.price_monthly * 12) * 100).toFixed(0)}%)
-                      </span>
-                    </p>
+                  {plan.name === "Essentiel" ? (
+                    // Affichage en FCFA pour le plan Essentiel (marché ivoirien)
+                    <>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-4xl font-bold text-gray-900">
+                          {Math.round(plan.price_monthly * 655).toLocaleString('fr-FR')} FCFA
+                        </span>
+                        <span className="text-gray-600 text-lg">/mois</span>
+                      </div>
+                      {plan.price_yearly && (
+                        <p className="text-sm text-gray-600">
+                          ou <span className="font-semibold">{Math.round(plan.price_yearly * 655).toLocaleString('fr-FR')} FCFA/an</span>
+                          <span className="text-[#226D68] ml-2">
+                            (économisez {((plan.price_monthly * 12 - plan.price_yearly) / (plan.price_monthly * 12) * 100).toFixed(0)}%)
+                          </span>
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        (≈ {plan.price_monthly.toFixed(2)}€/mois)
+                      </p>
+                    </>
+                  ) : (
+                    // Affichage en EUR pour les autres plans
+                    <>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-4xl font-bold text-gray-900">
+                          {plan.price_monthly.toFixed(2)}€
+                        </span>
+                        <span className="text-gray-600 text-lg">/mois</span>
+                      </div>
+                      {plan.price_yearly && (
+                        <p className="text-sm text-gray-600">
+                          ou <span className="font-semibold">{plan.price_yearly.toFixed(2)}€/an</span>
+                          <span className="text-[#226D68] ml-2">
+                            (économisez {((plan.price_monthly * 12 - plan.price_yearly) / (plan.price_monthly * 12) * 100).toFixed(0)}%)
+                          </span>
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
                 <ul className="space-y-3 mb-6">
                   {plan.unlimited_search && (
                     <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      <Check className="h-5 w-5 text-[#226D68] flex-shrink-0" />
                       <span>Recherche illimitée</span>
                     </li>
                   )}
                   {plan.max_profile_views === null ? (
                     <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      <Check className="h-5 w-5 text-[#226D68] flex-shrink-0" />
                       <span>Consultations illimitées</span>
                     </li>
                   ) : (
                     <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      <Check className="h-5 w-5 text-[#226D68] flex-shrink-0" />
                       <span>{plan.max_profile_views} consultations/mois</span>
                     </li>
                   )}
                   {plan.document_access && (
                     <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      <Check className="h-5 w-5 text-[#226D68] flex-shrink-0" />
                       <span>Accès aux documents</span>
                     </li>
                   )}
                   {plan.multi_accounts && (
                     <li className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      <Check className="h-5 w-5 text-[#226D68] flex-shrink-0" />
                       <span>Multi-comptes recruteurs</span>
                     </li>
                   )}
@@ -168,8 +209,9 @@ export function SubscriptionTab({ companyId, onUpdate }) {
                   className="w-full"
                   size="lg"
                   onClick={() => handleUpgrade(plan.id, 'monthly')}
+                  variant={plan.name === 'Essentiel' ? 'default' : 'outline'}
                 >
-                  Passer au plan supérieur
+                  {plan.name === 'Essentiel' ? 'Choisir ce plan' : 'Passer au plan supérieur'}
                 </Button>
               </Card>
             ))}

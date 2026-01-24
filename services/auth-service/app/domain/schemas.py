@@ -69,6 +69,21 @@ class PasswordChange(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 
+class PasswordUpdateByEmail(BaseModel):
+    """Schéma pour la mise à jour de mot de passe par email (inter-services)"""
+    email: EmailStr
+    new_password: str = Field(..., min_length=8)
+    internal_token: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+
+class GeneratePasswordResetTokenRequest(BaseModel):
+    """Schéma pour la génération d'un token de réinitialisation (inter-services)"""
+    email: EmailStr
+    internal_token: str
+
+
 # ============================================
 # User Schemas
 # ============================================
