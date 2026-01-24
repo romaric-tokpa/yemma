@@ -1,8 +1,12 @@
 # Notification Service
 
-Service de notification asynchrone avec envoi d'emails (SMTP, SendGrid, Mailgun).
+Service de notification asynchrone avec envoi d'emails pour la plateforme Yemma Solutions.
 
-## Fonctionnalités
+## 🎯 Vue d'ensemble
+
+Le service notification gère l'envoi d'emails asynchrones pour toute la plateforme, avec support de plusieurs providers (SMTP, SendGrid, Mailgun) et templates HTML professionnels.
+
+## ✨ Fonctionnalités
 
 - ✅ Envoi d'emails asynchrone via BackgroundTasks
 - ✅ Support de plusieurs providers : SMTP, SendGrid, Mailgun
@@ -11,10 +15,12 @@ Service de notification asynchrone avec envoi d'emails (SMTP, SendGrid, Mailgun)
   - Profil validé
   - Action requise sur votre profil
   - Nouvelle invitation recruteur
+  - Bienvenue entreprise
 - ✅ Historique des notifications en base de données
 - ✅ Gestion des erreurs et retry automatique
+- ✅ Statuts de notification (pending, sent, failed)
 
-## Architecture
+## 📁 Structure
 
 ```
 services/notification/
@@ -22,6 +28,7 @@ services/notification/
 │   ├── main.py                    # FastAPI app
 │   ├── api/v1/
 │   │   ├── notifications.py      # Endpoints notifications
+│   │   ├── triggers.py           # Endpoints triggers (emails pré-configurés)
 │   │   └── health.py              # Health check
 │   ├── core/
 │   │   ├── config.py             # Configuration
@@ -31,95 +38,91 @@ services/notification/
 │   │   └── schemas.py            # Schémas Pydantic
 │   └── infrastructure/
 │       ├── database.py           # Configuration DB
-│       ├── email_templates.py   # Templates d'emails
-│       ├── email_sender.py      # Service d'envoi
-│       └── repositories.py      # Repositories
+│       ├── email_templates_simple.py # Templates d'emails
+│       ├── email_sender.py       # Service d'envoi
+│       └── repositories.py       # Repositories
 ├── Dockerfile
 ├── requirements.txt
 └── README.md
 ```
 
-## Modèles d'emails
+## 📊 Modèle de données
 
-### 1. Profil validé
-Envoyé lorsqu'un profil candidat est validé par l'admin.
+### Notification
 
-**Données requises :**
-- `recipient_email` : Email du candidat
-- `recipient_name` : Nom du candidat (optionnel)
-- `candidate_name` : Nom du profil
-- `profile_url` : URL du profil (optionnel)
+Modèle principal représentant une notification :
 
-### 2. Action requise
-Envoyé lorsqu'une action est requise sur le profil du candidat.
+- `id` : ID unique
+- `notification_type` : Type (profile_validated, action_required, recruiter_invitation, company_welcome)
+- `recipient_email` : Email du destinataire
+- `recipient_name` : Nom du destinataire (optionnel)
+- `subject` : Sujet de l'email
+- `body_html` : Corps HTML de l'email
+- `metadata` : Métadonnées JSON (données spécifiques au type)
+- `status` : Statut (pending, sent, failed)
+- `error_message` : Message d'erreur si échec
+- `sent_at` : Date d'envoi
+- `created_at` : Date de création
+- `updated_at` : Date de mise à jour
 
-**Données requises :**
-- `recipient_email` : Email du candidat
-- `recipient_name` : Nom du candidat (optionnel)
-- `candidate_name` : Nom du profil
-- `action_message` : Message décrivant l'action requise
-- `profile_url` : URL du profil (optionnel)
-
-### 3. Invitation recruteur
-Envoyé lorsqu'un recruteur est invité à rejoindre une entreprise.
-
-**Données requises :**
-- `recipient_email` : Email du recruteur
-- `recipient_name` : Nom du recruteur (optionnel)
-- `company_name` : Nom de l'entreprise
-- `invitation_token` : Token d'invitation
-- `invitation_url` : URL d'invitation (optionnel)
-
-## Endpoints
+## 🚀 Endpoints
 
 ### Créer une notification générique
-```http
-POST /api/v1/notifications
-Content-Type: application/json
 
+#### POST /api/v1/notifications
+
+Crée et envoie une notification générique.
+
+**Body :**
+```json
 {
   "notification_type": "profile_validated",
   "recipient_email": "candidate@example.com",
   "recipient_name": "John Doe",
   "metadata": {
     "candidate_name": "Jane Smith",
-    "profile_url": "https://..."
+    "profile_url": "https://yemma.com/profile/123"
   }
 }
 ```
 
-### Envoyer une notification "Profil validé"
-```http
-POST /api/v1/notifications/profile-validated
-Content-Type: application/json
+### Triggers (emails pré-configurés)
 
+#### POST /api/v1/triggers/profile-validated
+
+Envoie une notification "Profil validé".
+
+**Body :**
+```json
 {
   "recipient_email": "candidate@example.com",
   "recipient_name": "John Doe",
-  "candidate_name": "Jane Smith",
+  "candidate_name": "John Doe",
   "profile_url": "https://yemma.com/profile/123"
 }
 ```
 
-### Envoyer une notification "Action requise"
-```http
-POST /api/v1/notifications/action-required
-Content-Type: application/json
+#### POST /api/v1/triggers/action-required
 
+Envoie une notification "Action requise".
+
+**Body :**
+```json
 {
   "recipient_email": "candidate@example.com",
   "recipient_name": "John Doe",
-  "candidate_name": "Jane Smith",
+  "candidate_name": "John Doe",
   "action_message": "Veuillez compléter votre CV",
   "profile_url": "https://yemma.com/profile/123"
 }
 ```
 
-### Envoyer une notification "Invitation recruteur"
-```http
-POST /api/v1/notifications/recruiter-invitation
-Content-Type: application/json
+#### POST /api/v1/triggers/recruiter-invitation
 
+Envoie une notification "Invitation recruteur".
+
+**Body :**
+```json
 {
   "recipient_email": "recruiter@example.com",
   "recipient_name": "Jane Recruiter",
@@ -129,22 +132,78 @@ Content-Type: application/json
 }
 ```
 
-### Récupérer une notification
-```http
-GET /api/v1/notifications/{notification_id}
+#### POST /api/v1/triggers/company-welcome
+
+Envoie une notification "Bienvenue entreprise".
+
+**Body :**
+```json
+{
+  "recipient_email": "admin@company.com",
+  "recipient_name": "Company Admin",
+  "company_name": "Acme Corp",
+  "dashboard_url": "https://yemma.com/company/dashboard"
+}
 ```
 
-## Configuration
+### Récupérer une notification
+
+#### GET /api/v1/notifications/{notification_id}
+
+Récupère les détails d'une notification.
+
+## 📧 Modèles d'emails
+
+### 1. Profil validé
+
+Envoyé lorsqu'un profil candidat est validé par l'admin.
+
+**Contenu :**
+- Félicitations pour la validation
+- Lien vers le profil
+- Informations sur la visibilité dans la CVthèque
+
+### 2. Action requise
+
+Envoyé lorsqu'une action est requise sur le profil du candidat.
+
+**Contenu :**
+- Message personnalisé de l'action requise
+- Lien vers le profil pour compléter
+- Instructions claires
+
+### 3. Invitation recruteur
+
+Envoyé lorsqu'un recruteur est invité à rejoindre une entreprise.
+
+**Contenu :**
+- Nom de l'entreprise
+- Lien d'invitation avec token
+- Instructions pour accepter l'invitation
+
+### 4. Bienvenue entreprise
+
+Envoyé lors de la création d'une entreprise.
+
+**Contenu :**
+- Message de bienvenue
+- Lien vers le dashboard
+- Prochaines étapes
+
+## ⚙️ Configuration
 
 ### Variables d'environnement
 
 #### Provider Email
+
 ```env
 EMAIL_PROVIDER=smtp  # ou sendgrid, mailgun
 ```
 
 #### SMTP
+
 ```env
+EMAIL_PROVIDER=smtp
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
@@ -154,7 +213,10 @@ SMTP_FROM_EMAIL=noreply@yemma.com
 SMTP_FROM_NAME=Yemma Solutions
 ```
 
+**Note pour Gmail** : Utiliser un "App Password" au lieu du mot de passe normal.
+
 #### SendGrid
+
 ```env
 EMAIL_PROVIDER=sendgrid
 SENDGRID_API_KEY=SG.xxxxx
@@ -163,6 +225,7 @@ SENDGRID_FROM_NAME=Yemma Solutions
 ```
 
 #### Mailgun
+
 ```env
 EMAIL_PROVIDER=mailgun
 MAILGUN_API_KEY=key-xxxxx
@@ -172,70 +235,167 @@ MAILGUN_FROM_NAME=Yemma Solutions
 ```
 
 #### Frontend
+
 ```env
 FRONTEND_URL=http://localhost:3000
 ```
 
-## Utilisation
+#### Database
 
-### Exemple : Envoyer une notification "Profil validé"
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=yemma_notification_db
+```
+
+## 🛠️ Développement
+
+### Installation locale
+
+```bash
+# Installer les dépendances
+pip install -r requirements.txt
+
+# Démarrer le service
+uvicorn app.main:app --reload --port 8007
+```
+
+### Avec Docker
+
+```bash
+# Build et démarrage
+docker-compose up notification-service
+
+# Voir les logs
+docker-compose logs -f notification-service
+```
+
+## 📝 Exemples d'utilisation
+
+### Envoyer une notification "Profil validé"
 
 ```python
 import httpx
 
 async with httpx.AsyncClient() as client:
     response = await client.post(
-        "http://localhost:8007/api/v1/notifications/profile-validated",
+        "http://localhost:8007/api/v1/triggers/profile-validated",
         json={
             "recipient_email": "candidate@example.com",
             "recipient_name": "John Doe",
-            "candidate_name": "Jane Smith",
+            "candidate_name": "John Doe",
             "profile_url": "https://yemma.com/profile/123"
         }
     )
     print(response.json())
 ```
 
-## Intégration avec les autres services
+### Envoyer une notification "Invitation recruteur"
+
+```python
+async with httpx.AsyncClient() as client:
+    response = await client.post(
+        "http://localhost:8007/api/v1/triggers/recruiter-invitation",
+        json={
+            "recipient_email": "recruiter@example.com",
+            "recipient_name": "Jane Recruiter",
+            "company_name": "Acme Corp",
+            "invitation_token": "abc123xyz",
+            "invitation_url": "https://yemma.com/invitation/accept?token=abc123xyz"
+        }
+    )
+```
+
+## 🔗 Intégration avec les autres services
 
 ### Company Service
+
 Lors de l'envoi d'une invitation recruteur :
 ```python
 # Dans company service
 await notification_client.post(
-    "/api/v1/notifications/recruiter-invitation",
+    "/api/v1/triggers/recruiter-invitation",
     json={
         "recipient_email": recruiter_email,
         "company_name": company.name,
         "invitation_token": token,
+        "invitation_url": f"{FRONTEND_URL}/invitation/accept?token={token}"
     }
 )
 ```
 
 ### Admin Service
+
 Lors de la validation d'un profil :
 ```python
 # Dans admin service
 await notification_client.post(
-    "/api/v1/notifications/profile-validated",
+    "/api/v1/triggers/profile-validated",
     json={
         "recipient_email": candidate.email,
-        "candidate_name": candidate.name,
+        "candidate_name": candidate.full_name,
+        "profile_url": f"{FRONTEND_URL}/candidates/{candidate_id}"
     }
 )
 ```
 
-## Statuts des notifications
+### Company Service (bienvenue)
 
-- `pending` : En attente d'envoi
-- `sent` : Envoyée avec succès
-- `failed` : Échec d'envoi (avec message d'erreur)
+Lors de la création d'une entreprise :
+```python
+# Dans company service
+await notification_client.post(
+    "/api/v1/triggers/company-welcome",
+    json={
+        "recipient_email": admin_email,
+        "recipient_name": admin_name,
+        "company_name": company.name,
+        "dashboard_url": f"{FRONTEND_URL}/company/dashboard"
+    }
+)
+```
 
-## Notes
+## 📊 Statuts des notifications
 
-- Les emails sont envoyés de manière asynchrone via `BackgroundTasks`
-- Les templates HTML sont inclus dans le code (facilement personnalisables)
-- Le service enregistre toutes les notifications en base pour traçabilité
-- En cas d'échec, le statut est mis à jour avec le message d'erreur
+- **pending** : En attente d'envoi
+- **sent** : Envoyée avec succès
+- **failed** : Échec d'envoi (avec message d'erreur)
 
+## 🔄 Envoi asynchrone
 
+Les emails sont envoyés de manière asynchrone via `BackgroundTasks` de FastAPI :
+
+- ✅ Non-bloquant : La réponse est retournée immédiatement
+- ✅ Performant : Pas d'attente de l'envoi
+- ✅ Résilient : Les erreurs sont loggées et le statut est mis à jour
+
+## 🧪 Tests
+
+```bash
+# Exécuter les tests
+pytest
+
+# Avec couverture
+pytest --cov=app
+```
+
+## 📚 Documentation supplémentaire
+
+- [Configuration Celery](./README_CELERY.md) (pour envoi asynchrone avancé)
+- [Configuration async](./README_ASYNC.md)
+- [Triggers disponibles](./README_TRIGGERS.md)
+
+## 🚀 Prochaines étapes
+
+- [ ] Implémenter le retry automatique pour les échecs
+- [ ] Ajouter le support de templates personnalisables
+- [ ] Implémenter l'envoi de SMS (Twilio)
+- [ ] Ajouter les notifications push (web push)
+- [ ] Implémenter les préférences de notification par utilisateur
+- [ ] Ajouter les statistiques d'envoi (taux d'ouverture, etc.)
+
+---
+
+**Service développé pour Yemma Solutions**
