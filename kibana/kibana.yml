@@ -1,0 +1,16 @@
+# Configuration Kibana pour Yemma (corrige les warnings au démarrage)
+server.name: kibana
+server.host: "0.0.0.0"
+
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+xpack.security.enabled: false
+telemetry.optIn: false
+
+# Clés de chiffrement (min 32 caractères) - évite les warnings et invalidation des sessions au redémarrage
+xpack.encryptedSavedObjects.encryptionKey: "minimal-32-character-encryption-key-for-dev"
+xpack.security.encryptionKey: "minimal-32-char-security-encryption-key"
+xpack.reporting.encryptionKey: "minimal-32-char-reporting-encryption-key"
+
+# Corrections des warnings de reporting
+xpack.reporting.kibanaServer.hostname: localhost
+xpack.reporting.roles.enabled: false
