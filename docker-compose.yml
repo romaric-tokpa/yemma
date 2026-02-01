@@ -142,10 +142,17 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: yemma-kibana
-    volumes:
-      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    # Pas de volume ./kibana/kibana.yml : Hostinger résout mal les chemins relatifs (mount error)
+    # Configuration via variables d'environnement uniquement
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=kibana
+      - SERVER_HOST=0.0.0.0
+      - TELEMETRY_OPTIN=false
+      - XPACK_SECURITY_ENABLED=false
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=minimal-32-character-encryption-key-for-dev
+      - XPACK_SECURITY_ENCRYPTIONKEY=minimal-32-char-security-encryption-key
+      - XPACK_REPORTING_ENCRYPTIONKEY=minimal-32-char-reporting-encryption-key
     networks:
       - yemma-network
     ports:
