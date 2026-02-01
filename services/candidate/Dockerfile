@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     APP_ENV=${APP_ENV} \
-    PYTHONPATH=/app
+    PYTHONPATH=/app:/shared
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,12 +18,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY candidate/requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
+# Copy shared module
+COPY shared /shared
+
 # Copy application code
-COPY . .
+COPY candidate/ /app/
 
 EXPOSE 8000
 

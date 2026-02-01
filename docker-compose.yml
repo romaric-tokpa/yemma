@@ -219,15 +219,15 @@ services:
 
   candidate:
     build:
-      context: ./services/candidate
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: candidate/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-candidate
     environment:
       APP_NAME: candidate-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/shared
       DEBUG: ${DEBUG:-false}
       DB_HOST: postgres
       DB_PORT: 5432
@@ -367,15 +367,15 @@ services:
 
   admin:
     build:
-      context: ./services/admin
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: admin/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-admin
     environment:
       APP_NAME: admin-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/shared
       DEBUG: ${DEBUG:-false}
       CANDIDATE_SERVICE_URL: http://candidate:8000
       SEARCH_SERVICE_URL: http://search:8000
@@ -398,15 +398,15 @@ services:
 
   company:
     build:
-      context: ./services/company
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: company/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-company
     environment:
       APP_NAME: company-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/shared
       DEBUG: ${DEBUG:-false}
       DB_HOST: postgres
       DB_PORT: 5432
