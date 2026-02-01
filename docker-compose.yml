@@ -1,5 +1,10 @@
 # Docker Compose for Production (Hostinger deployment)
-# Usage: docker-compose -f docker-compose.prod.yml up -d
+# Usage: docker-compose up -d
+#
+# En cas d'erreur "container name already in use" sur Hostinger :
+#   1. SSH sur le VPS
+#   2. Exécuter : ./scripts/cleanup-hostinger.sh
+#   3. Relancer le déploiement
 
 services:
   # ============================================
