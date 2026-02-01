@@ -774,6 +774,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: development
     container_name: yemma-frontend
     environment:
       # Variables d'environnement pour Vite (préfixe VITE_)

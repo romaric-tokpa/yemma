@@ -594,20 +594,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - APP_ENV=production
+      target: production
     container_name: yemma-frontend
-    environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
-      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-}
-      VITE_CANDIDATE_API_URL: ${VITE_CANDIDATE_API_URL:-}
-      VITE_DOCUMENT_API_URL: ${VITE_DOCUMENT_API_URL:-}
-      VITE_SEARCH_API_URL: ${VITE_SEARCH_API_URL:-}
-      VITE_COMPANY_API_URL: ${VITE_COMPANY_API_URL:-}
-      VITE_PAYMENT_API_URL: ${VITE_PAYMENT_API_URL:-}
-      VITE_NOTIFICATION_API_URL: ${VITE_NOTIFICATION_API_URL:-}
-      VITE_AUDIT_API_URL: ${VITE_AUDIT_API_URL:-}
-      VITE_ADMIN_API_URL: ${VITE_ADMIN_API_URL:-}
     networks:
       - yemma-network
     ports:
@@ -615,6 +603,11 @@ services:
     depends_on:
       - auth
       - candidate
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     restart: unless-stopped
 
 # ============================================

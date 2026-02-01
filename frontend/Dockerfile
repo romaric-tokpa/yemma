@@ -1,37 +1,76 @@
-FROM node:18-alpine
+# =============================================================================
+# MULTI-STAGE DOCKERFILE pour le frontend Yemma
+# - Stage 1 (builder): Build de production avec optimisations mémoire
+# - Stage 2 (production): Image légère nginx pour servir les fichiers statiques
+# - Stage 3 (development): Image Node pour le dev server
+# =============================================================================
 
 ARG APP_ENV=development
 
+# =============================================================================
+# STAGE 1: Builder (utilisé uniquement pour le build de production)
+# =============================================================================
+FROM node:18-alpine AS builder
+
 WORKDIR /app
 
-ENV APP_ENV=${APP_ENV}
-
-# Copy package files
+# Copier uniquement les fichiers de dépendances d'abord (cache Docker)
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm install
+# Installer les dépendances (inclut devDependencies pour le build)
+RUN npm ci --legacy-peer-deps
 
-# Copy application code
+# Copier le code source
 COPY . .
 
-# Build for production if APP_ENV is production
-# NODE_OPTIONS: évite "JavaScript heap out of memory" sur VPS Hostinger (RAM limitée)
-RUN if [ "$APP_ENV" = "production" ]; then \
-      NODE_OPTIONS="--max-old-space-size=2048" npm run build; \
-    fi
+# Build de production avec optimisations mémoire pour VPS limités
+# --max-old-space-size=1536: limite la heap pour éviter OOM sur Hostinger
+# NODE_ENV=production: optimisations de build
+ENV NODE_ENV=production
+RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build
 
-# Entrypoint hors de /app (sinon écrasé par le mount docker-compose)
+# =============================================================================
+# STAGE 2: Production (image légère nginx)
+# =============================================================================
+FROM nginx:alpine AS production
+
+# Copier la configuration nginx personnalisée
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copier les fichiers buildés depuis le stage builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Exposer le port 3000 (pour cohérence avec docker-compose)
+EXPOSE 3000
+
+# Nginx écoute sur le port 3000
+CMD ["nginx", "-g", "daemon off;"]
+
+# =============================================================================
+# STAGE 3: Development (avec hot reload)
+# =============================================================================
+FROM node:18-alpine AS development
+
+WORKDIR /app
+
+ENV APP_ENV=development
+
+# Copier les fichiers de dépendances
+COPY package.json package-lock.json* ./
+
+# Installer les dépendances
+RUN npm install
+
+# Copier le code source
+COPY . .
+
+# Entrypoint pour le développement (gère le cas des volumes vides)
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 3000
 
-# In production, serve the built files; in development, run dev server
-CMD if [ "$APP_ENV" = "production" ]; then \
-        npm run preview -- --host 0.0.0.0 --port 3000; \
-    else \
-        npm run dev -- --host 0.0.0.0; \
-    fi
+# Dev server avec hot reload
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
