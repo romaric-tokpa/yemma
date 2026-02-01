@@ -1,15 +1,22 @@
 FROM node:18-alpine
 
+ARG APP_ENV=development
+
 WORKDIR /app
+
+ENV APP_ENV=${APP_ENV}
 
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies (utilisées si le volume node_modules est vide)
+# Install dependencies
 RUN npm install
 
 # Copy application code
 COPY . .
+
+# Build for production if APP_ENV is production
+RUN if [ "$APP_ENV" = "production" ]; then npm run build; fi
 
 # Entrypoint hors de /app (sinon écrasé par le mount docker-compose)
 COPY entrypoint.sh /entrypoint.sh
@@ -18,5 +25,10 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# In production, serve the built files; in development, run dev server
+CMD if [ "$APP_ENV" = "production" ]; then \
+        npm run preview -- --host 0.0.0.0 --port 3000; \
+    else \
+        npm run dev -- --host 0.0.0.0; \
+    fi
 

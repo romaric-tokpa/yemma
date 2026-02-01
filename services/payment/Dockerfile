@@ -1,10 +1,15 @@
 FROM python:3.11-slim
 
+ARG APP_ENV=development
+ARG PORT=8000
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    APP_ENV=${APP_ENV} \
+    PORT=${PORT}
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -21,13 +26,14 @@ RUN pip install --upgrade pip && \
 # Copy application code
 COPY . .
 
-ARG PORT=8006
-ENV PORT=${PORT}
-
 EXPOSE ${PORT}
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --reload"]
+CMD if [ "$APP_ENV" = "production" ]; then \
+        uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 2; \
+    else \
+        uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --reload; \
+    fi
 

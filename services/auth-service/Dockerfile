@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Build argument for environment
+ARG APP_ENV=development
+
 # Set working directory
 WORKDIR /app
 
@@ -7,7 +10,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    APP_ENV=${APP_ENV}
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -33,10 +37,14 @@ RUN mkdir -p alembic/versions
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+# Health check with longer start period for production
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Run the application - production mode without reload, with multiple workers
+CMD if [ "$APP_ENV" = "production" ]; then \
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2; \
+    else \
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload; \
+    fi
 
