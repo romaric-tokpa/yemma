@@ -17,17 +17,17 @@ WORKDIR /app
 # Copier uniquement les fichiers de dépendances d'abord (cache Docker)
 COPY package.json package-lock.json* ./
 
-# Installer les dépendances (inclut devDependencies pour le build)
-RUN npm ci --legacy-peer-deps
+# Installer les dépendances
+# npm install est plus tolérant que npm ci sur les environnements contraints
+RUN npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
 # Copier le code source
 COPY . .
 
 # Build de production avec optimisations mémoire pour VPS limités
-# --max-old-space-size=1536: limite la heap pour éviter OOM sur Hostinger
-# NODE_ENV=production: optimisations de build
+# --max-old-space-size=1024: limite la heap pour éviter OOM sur Hostinger (RAM limitée)
 ENV NODE_ENV=production
-RUN NODE_OPTIONS="--max-old-space-size=1536" npm run build
+RUN NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # =============================================================================
 # STAGE 2: Production (image légère nginx)
