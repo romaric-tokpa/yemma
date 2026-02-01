@@ -3,7 +3,7 @@ node_modules/
 package-lock.json
 
 # Build
-dist/
+# dist/ - COMMITÉ pour déploiement Hostinger (pas de build sur le serveur)
 build/
 
 # Environment
