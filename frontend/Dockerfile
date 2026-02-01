@@ -16,7 +16,10 @@ RUN npm install
 COPY . .
 
 # Build for production if APP_ENV is production
-RUN if [ "$APP_ENV" = "production" ]; then npm run build; fi
+# NODE_OPTIONS: évite "JavaScript heap out of memory" sur VPS Hostinger (RAM limitée)
+RUN if [ "$APP_ENV" = "production" ]; then \
+      NODE_OPTIONS="--max-old-space-size=2048" npm run build; \
+    fi
 
 # Entrypoint hors de /app (sinon écrasé par le mount docker-compose)
 COPY entrypoint.sh /entrypoint.sh
