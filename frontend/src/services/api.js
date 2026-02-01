@@ -2,37 +2,30 @@ import axios from 'axios'
 
 // Configuration des URLs des services backend
 // Les variables d'environnement utilisent le préfixe VITE_ (requis par Vite)
-// En production/Docker, utilise nginx comme proxy pour toutes les API
-// Cela évite les problèmes CORS car toutes les requêtes passent par le même origin
+// - Via nginx (port 80) : chemins relatifs '' → /api/* routé par nginx
+// - Via Vite/frontend direct (port 3000) : URLs directes localhost:8001, 8002… (CORS autorisé)
 const getBaseUrl = (envVar, defaultPort) => {
   const envValue = import.meta.env[envVar]
 
-  // Si une valeur est définie et non vide, l'utiliser
   if (envValue !== undefined && envValue !== null && envValue !== '') {
     return envValue
   }
 
-  // En Docker, tous les services passent par nginx
-  // Utiliser des chemins relatifs pour que les requêtes passent par le même origin
-  // Cela permet à nginx de router les requêtes correctement
-  // Si le frontend est servi via nginx (port 80), les chemins relatifs fonctionnent
-  // Si le frontend est servi directement (port 3000), on doit utiliser l'URL complète avec nginx
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname
     const port = window.location.port
 
-    // Si on est sur le port 80 (nginx), utiliser des chemins relatifs
+    // Port 80 ou vide (nginx) → chemins relatifs, même origin
     if (port === '' || port === '80') {
       return ''
     }
 
-    // Si on est sur un autre port (ex: 3000 pour le frontend direct), utiliser nginx sur port 80
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost'
-    }
+    // Frontend sur :3000 (Vite) : nginx souvent absent → appels directs aux services
+    // Auth 8001, Candidate 8002, Document 8003, etc. (docker-compose expose ces ports)
+    const protocol = window.location.protocol || 'http:'
+    return `${protocol}//${hostname}:${defaultPort}`
   }
 
-  // Par défaut : utiliser chemins relatifs via nginx
   return ''
 }
 
@@ -404,12 +397,13 @@ export const candidateApi = {
       console.warn('⚠️ Format de réponse inattendu pour getProfileStats:', response.data)
       return null
     } catch (err) {
-      // Si l'endpoint n'existe pas ou nécessite une auth interne, calculer côté client
-      console.warn('⚠️ Endpoint /api/v1/profiles/stats non disponible ou erreur:', {
-        status: err?.response?.status,
-        message: err?.response?.data?.detail || err?.message,
-        url: err?.config?.url
-      })
+      const status = err?.response?.status
+      const url = err?.config?.url
+      if (status === 422 || status === 404) {
+        console.warn('⚠️ Endpoint /api/v1/profiles/stats non disponible (', status, '), fallback côté client')
+      } else {
+        console.warn('⚠️ Endpoint /api/v1/profiles/stats erreur:', status, url, err?.message)
+      }
       return null
     }
   },

@@ -90,12 +90,27 @@ class Settings(BaseSettings):
             return [ext.strip() for ext in self.ALLOWED_EXTENSIONS.split(',') if ext.strip()]
         return self.ALLOWED_EXTENSIONS if isinstance(self.ALLOWED_EXTENSIONS, list) else []
     
+    @staticmethod
+    def _clean_origin(o: str) -> str:
+        o = o.strip().strip('"').strip("'").strip()
+        return o
+
     @property
     def cors_origins_list(self) -> List[str]:
-        """Retourne CORS_ORIGINS comme une liste"""
+        """Retourne CORS_ORIGINS comme une liste (guillemets retirés pour éviter CORS invalide)."""
         if isinstance(self.CORS_ORIGINS, str):
-            return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
-        return self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else []
+            return [self._clean_origin(o) for o in self.CORS_ORIGINS.split(',') if o.strip()]
+        if isinstance(self.CORS_ORIGINS, list):
+            return [self._clean_origin(str(x)) for x in self.CORS_ORIGINS]
+        return []
+
+    @staticmethod
+    def sanitize_cors_header_value(value: str) -> str:
+        """Valeur sûre pour Access-Control-Allow-Origin (sans guillemets)."""
+        if not value or value == "*":
+            return value or "*"
+        v = value.strip().strip('"').strip("'").strip()
+        return v or "*"
 
 
 settings = Settings()

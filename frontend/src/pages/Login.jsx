@@ -113,10 +113,11 @@ export default function Login() {
       // Extraire le message d'erreur détaillé
       let errorMessage = 'Email ou mot de passe incorrect. Veuillez réessayer.'
       
-      if (err.response?.data) {
+      if (!err.response && (err.request || err.code === 'ERR_NETWORK' || err.message === 'Network Error')) {
+        errorMessage = 'Impossible de contacter le serveur. Vérifiez que les services backend sont démarrés (docker-compose up auth candidate …).'
+      } else if (err.response?.data) {
         const responseData = err.response.data
         
-        // Essayer plusieurs formats de réponse (FastAPI utilise 'detail' ou 'message')
         if (responseData.detail) {
           errorMessage = typeof responseData.detail === 'string' 
             ? responseData.detail 
@@ -132,7 +133,6 @@ export default function Login() {
             ? responseData.error
             : JSON.stringify(responseData.error)
         } else {
-          // Si on a une réponse mais pas de message clair, afficher le statut
           errorMessage = `Erreur ${err.response.status || 'inconnue'}: ${JSON.stringify(responseData)}`
         }
       } else if (err.message) {

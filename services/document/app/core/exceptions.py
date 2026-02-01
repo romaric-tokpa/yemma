@@ -78,11 +78,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         origin = request.headers.get("origin")
         allowed_origins = settings.cors_origins_list
         if origin and origin in allowed_origins:
-            allow_origin = origin
+            allow_origin = settings.sanitize_cors_header_value(origin)
         elif "*" in allowed_origins or not allowed_origins:
-            allow_origin = origin or "*"
+            allow_origin = settings.sanitize_cors_header_value(origin or "*")
         else:
-            allow_origin = allowed_origins[0] if allowed_origins else "*"
+            allow_origin = settings.sanitize_cors_header_value(allowed_origins[0] if allowed_origins else "*")
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,

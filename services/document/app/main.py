@@ -43,14 +43,13 @@ class OptionsMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.method == "OPTIONS":
             origin = request.headers.get("origin")
-            # Vérifier si l'origine est autorisée
             allowed_origins = settings.cors_origins_list
             if origin and origin in allowed_origins:
-                allow_origin = origin
+                allow_origin = settings.sanitize_cors_header_value(origin)
             elif "*" in allowed_origins or not allowed_origins:
-                allow_origin = origin or "*"
+                allow_origin = settings.sanitize_cors_header_value(origin or "*")
             else:
-                allow_origin = allowed_origins[0] if allowed_origins else "*"
+                allow_origin = settings.sanitize_cors_header_value(allowed_origins[0] if allowed_origins else "*")
             
             logger.info(f"OPTIONS request intercepted for origin: {origin}, allowing: {allow_origin}")
             return Response(

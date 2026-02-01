@@ -4,7 +4,13 @@ import {
   ArrowRight, CheckCircle2, Users, Briefcase, Search, Shield, 
   TrendingUp, Star, ChevronRight, Menu, X, Zap, Target, Award,
   BarChart3, Globe, Lock, Clock, DollarSign, CheckCircle,
-  ArrowDown, Play, Timer, TrendingDown, Percent, Rocket, Heart, Eye
+  ArrowDown, Play, Timer, TrendingDown, Percent, Rocket, Heart, Eye,
+  Cpu, Landmark, HeartPulse, ShoppingCart, Factory, GraduationCap, Building2,
+  Truck, UtensilsCrossed, Lightbulb, Megaphone, Scale, Home, Sprout, Leaf,
+  Radio, Gem, Car, Plane, Pill, ShieldCheck, MapPin, Trophy, Palette, Music,
+  Ruler, Wrench, FlaskConical, Microscope, UserPlus, ShoppingBag, Smartphone,
+  BookOpen, CalendarDays, Sparkles, Apple, Shirt, Box, Gamepad2, Film, BookMarked,
+  Cloud, Server, Code2, ShieldAlert, Wallet, Layout, Layers, Mail, Share2
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
@@ -278,10 +284,9 @@ export default function LandingPage() {
             </p>
           </div>
           
-          {/* Fonction pour générer une couleur unique basée sur le nom du secteur */}
+          {/* Mapping secteur → icône (lucide-react) + couleur par nom */}
           {(() => {
             const getSectorColor = (sectorName) => {
-              // Palette de couleurs vibrantes et professionnelles
               const colors = [
                 '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
                 '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1',
@@ -290,15 +295,118 @@ export default function LandingPage() {
                 '#BE185D', '#0369A1', '#B45309', '#7E22CE', '#0D9488',
                 '#C2410C', '#1E40AF', '#047857', '#B91C1C', '#6D28D9',
               ]
-              
-              // Hash simple basé sur le nom pour obtenir une couleur cohérente
               let hash = 0
               for (let i = 0; i < sectorName.length; i++) {
                 hash = sectorName.charCodeAt(i) + ((hash << 5) - hash)
               }
               return colors[Math.abs(hash) % colors.length]
             }
-            
+
+            const SECTOR_ICONS = {
+              'Technologie & Informatique': Cpu,
+              'Finance & Banque': Landmark,
+              'Santé & Médical': HeartPulse,
+              'Commerce & Distribution': ShoppingCart,
+              'Industrie & Production': Factory,
+              'Éducation & Formation': GraduationCap,
+              'Construction & BTP': Building2,
+              'Transport & Logistique': Truck,
+              'Hôtellerie & Restauration': UtensilsCrossed,
+              'Consulting & Conseil': Lightbulb,
+              'Marketing & Communication': Megaphone,
+              'Juridique & Droit': Scale,
+              'Immobilier': Home,
+              'Agriculture & Agroalimentaire': Sprout,
+              'Énergie & Environnement': Leaf,
+              'Média & Audiovisuel': Radio,
+              'Luxe & Mode': Gem,
+              'Automobile': Car,
+              'Aéronautique': Plane,
+              'Pharmaceutique': Pill,
+              'Assurance': ShieldCheck,
+              'Tourisme': MapPin,
+              'Sport & Loisirs': Trophy,
+              'Culture & Art': Palette,
+              'Design & Architecture': Ruler,
+              'Ingénierie': Wrench,
+              'Recherche & Développement': FlaskConical,
+              'Public & Associatif': Users,
+              'Startup & Innovation': Rocket,
+              'E-commerce': ShoppingBag,
+              'Télécom': Smartphone,
+              'Édition & Presse': BookOpen,
+              'Événementiel': CalendarDays,
+              'RH & Recrutement': UserPlus,
+              'Formation & Coaching': GraduationCap,
+              'Beauté & Bien-être': Sparkles,
+              'Alimentaire': Apple,
+              'Textile': Shirt,
+              'Chimie': FlaskConical,
+              'Métallurgie': Wrench,
+              'Électronique': Cpu,
+              'Plastique': Box,
+              'Bois & Mobilier': Box,
+              'Joaillerie & Horlogerie': Gem,
+              'Divertissement': Gamepad2,
+              'Jeux & Gaming': Gamepad2,
+              'Musique': Music,
+              'Cinéma': Film,
+              'Théâtre': Music,
+              'Littérature': BookMarked,
+              'Biotechnologie': Microscope,
+              'Médical & Paramédical': HeartPulse,
+              'Vétérinaire': HeartPulse,
+              'Cosmétique & Parfumerie': Sparkles,
+              'Divertissement Digital': Gamepad2,
+              'Streaming': Radio,
+              'Social Media': Share2,
+              'Content Creation': Layers,
+              'Publishing': BookOpen,
+              'News & Média': Radio,
+              'Advertising': Megaphone,
+              'Digital Marketing': Megaphone,
+              'SEO & SEM': Search,
+              'Branding': Gem,
+              'Graphic Design': Palette,
+              'Web Design': Layout,
+              'UI/UX Design': Layout,
+              'Product Design': Box,
+              'Fashion Design': Shirt,
+              'Interior Design': Home,
+              'Urban Planning': MapPin,
+              'Landscape Architecture': Sprout,
+              'Civil Engineering': Building2,
+              'Mechanical Engineering': Wrench,
+              'Electrical Engineering': Zap,
+              'Chemical Engineering': FlaskConical,
+              'Aerospace Engineering': Plane,
+              'Biomedical Engineering': HeartPulse,
+              'Environmental Engineering': Leaf,
+              'Software Engineering': Code2,
+              'Data Engineering': Server,
+              'ML Engineering': Cpu,
+              'DevOps': Cloud,
+              'Cloud Computing': Cloud,
+              'Cybersecurity': ShieldAlert,
+              'Network Security': Shield,
+              'Information Security': Lock,
+              'Compliance': Scale,
+              'Risk Management': ShieldAlert,
+              'Audit': BookOpen,
+              'Tax & Accounting': Landmark,
+              'Financial Planning': Wallet,
+              'Investment Banking': Landmark,
+              'Private Equity': Landmark,
+              'Venture Capital': Rocket,
+              'Asset Management': Landmark,
+              'Wealth Management': Gem,
+              'Life Insurance': ShieldCheck,
+              'Health Insurance': HeartPulse,
+              'Property Insurance': Home,
+            }
+
+            const getSectorIcon = (sectorName) => SECTOR_ICONS[sectorName] ?? Briefcase
+
             const sectorsRow1 = [
               'Technologie & Informatique',
               'Finance & Banque',
@@ -407,10 +515,11 @@ export default function LandingPage() {
             
             const SectorBadge = ({ sector, idx, prefix = '' }) => {
               const sectorColor = getSectorColor(sector)
+              const Icon = getSectorIcon(sector)
               return (
                 <div
                   key={`${prefix}-${idx}`}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-300 cursor-pointer"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-300 cursor-pointer"
                   style={{
                     backgroundColor: '#f3f4f6',
                     color: '#6b7280',
@@ -431,7 +540,8 @@ export default function LandingPage() {
                     e.currentTarget.style.boxShadow = 'none'
                   }}
                 >
-                  {sector}
+                  <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+                  <span>{sector}</span>
                 </div>
               )
             }

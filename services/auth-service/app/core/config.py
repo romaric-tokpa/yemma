@@ -40,8 +40,15 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000", "http://localhost"],
-        description="Allowed CORS origins"
+        default=[
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://localhost",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+            "http://127.0.0.1",
+        ],
+        description="Allowed CORS origins",
     )
 
     # RabbitMQ

@@ -217,7 +217,7 @@ services:
       OAUTH2_SECRET_KEY: ${OAUTH2_SECRET_KEY:-your-oauth2-secret-key-change-in-production}
       
       # CORS (format JSON pour les listes Pydantic)
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8000","http://127.0.0.1"]}
       
       # Redis
       REDIS_HOST: redis
@@ -275,7 +275,7 @@ services:
       DOCUMENT_SERVICE_URL: http://document:8000
       
       # CORS (format JSON pour les listes Pydantic)
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8000","http://127.0.0.1"]}
       
       # Redis
       REDIS_HOST: redis
@@ -346,8 +346,8 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
       
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-"http://localhost:3000,http://localhost:8000,http://localhost"}
+      # CORS (string séparée par virgules ; pas de JSON)
+      CORS_ORIGINS: ${CORS_ORIGINS:-"http://localhost:3000,http://localhost:8000,http://localhost,http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1"}
     volumes:
       - ./services/document:/app
       - /app/__pycache__

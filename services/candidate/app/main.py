@@ -33,9 +33,9 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Routes
-app.include_router(profiles.router, prefix="/api/v1")
+# Routes : stats AVANT profiles pour que /api/v1/profiles/stats matche avant /profiles/{profile_id}
 app.include_router(stats.router, prefix="/api/v1", tags=["Stats"])
+app.include_router(profiles.router, prefix="/api/v1")
 
 
 # Gestionnaire d'erreurs global pour garantir que les headers CORS sont toujours envoyés
