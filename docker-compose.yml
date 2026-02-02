@@ -184,7 +184,7 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       OAUTH2_SECRET_KEY: ${OAUTH2_SECRET_KEY:-your-oauth2-secret-key-change-in-production}
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8000","http://127.0.0.1"]}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["https://yemma-solutions.com","https://www.yemma-solutions.com","http://localhost:3000","http://localhost:8000"]}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
@@ -227,7 +227,7 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
       DOCUMENT_SERVICE_URL: http://document:8000
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8000","http://127.0.0.1"]}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["https://yemma-solutions.com","https://www.yemma-solutions.com","http://localhost:3000","http://localhost:8000"]}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
@@ -281,7 +281,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
-      CORS_ORIGINS: ${CORS_ORIGINS:-"http://localhost:3000,http://localhost:8000,http://localhost,http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1"}
+      CORS_ORIGINS: ${CORS_ORIGINS:-"https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000,http://localhost:8000"}
     networks:
       - yemma-network
     depends_on:
@@ -329,7 +329,7 @@ services:
       COMPANY_SERVICE_URL: http://company:8000
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["https://yemma-solutions.com","https://www.yemma-solutions.com","http://localhost:3000","http://localhost:8000"]}
     networks:
       - yemma-network
     depends_on:
@@ -362,7 +362,7 @@ services:
       CANDIDATE_SERVICE_URL: http://candidate:8000
       SEARCH_SERVICE_URL: http://search:8000
       NOTIFICATION_SERVICE_URL: http://notification:8000
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000,http://localhost:8000}
     networks:
       - yemma-network
     depends_on:
@@ -402,8 +402,8 @@ services:
       SEARCH_SERVICE_URL: http://search:8000
       SUBSCRIPTION_SERVICE_URL: http://subscription:8000
       NOTIFICATION_SERVICE_URL: http://notification:8000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000,http://localhost}
+      FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000}
     networks:
       - yemma-network
     depends_on:
@@ -442,8 +442,8 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_your_webhook_secret}
       STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
       COMPANY_SERVICE_URL: http://company:8000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000}
     networks:
       - yemma-network
     depends_on:
@@ -495,8 +495,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000,http://localhost:8000}
     networks:
       - yemma-network
     depends_on:
@@ -544,7 +544,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
       TASK_QUEUE: celery
     networks:
       - yemma-network
@@ -574,7 +574,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: ${DB_NAME:-yemma_db}
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000,http://localhost:8000}
     networks:
       - yemma-network
     depends_on:

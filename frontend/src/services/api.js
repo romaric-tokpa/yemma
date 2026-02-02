@@ -2,8 +2,8 @@ import axios from 'axios'
 
 // Configuration des URLs des services backend
 // Les variables d'environnement utilisent le préfixe VITE_ (requis par Vite)
-// - Via nginx (port 80) : chemins relatifs '' → /api/* routé par nginx
-// - Via Vite/frontend direct (port 3000) : URLs directes localhost:8001, 8002… (CORS autorisé)
+// Production : chemins relatifs '' → /api/* routé par nginx/Traefik
+// Développement local (port 3000 + localhost) : URLs directes
 const getBaseUrl = (envVar, defaultPort) => {
   const envValue = import.meta.env[envVar]
 
@@ -15,15 +15,24 @@ const getBaseUrl = (envVar, defaultPort) => {
     const hostname = window.location.hostname
     const port = window.location.port
 
-    // Port 80 ou vide (nginx) → chemins relatifs, même origin
-    if (port === '' || port === '80') {
+    // Production : domaine yemma-solutions.com ou port 80/443/vide → chemins relatifs
+    if (
+      hostname.includes('yemma-solutions.com') ||
+      port === '' ||
+      port === '80' ||
+      port === '443'
+    ) {
       return ''
     }
 
-    // Frontend sur :3000 (Vite) : nginx souvent absent → appels directs aux services
-    // Auth 8001, Candidate 8002, Document 8003, etc. (docker-compose expose ces ports)
-    const protocol = window.location.protocol || 'http:'
-    return `${protocol}//${hostname}:${defaultPort}`
+    // Développement local uniquement (localhost:3000 avec Vite)
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      const protocol = window.location.protocol || 'http:'
+      return `${protocol}//${hostname}:${defaultPort}`
+    }
+
+    // Par défaut : chemins relatifs (production via reverse proxy)
+    return ''
   }
 
   return ''
