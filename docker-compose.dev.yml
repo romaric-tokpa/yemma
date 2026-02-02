@@ -774,27 +774,20 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: production  # <-- Indispensable pour la performance et sécurité
+      target: production
     container_name: yemma-frontend
     environment:
-      # On pointe vers le domaine SSL pour l'API
       - VITE_API_BASE_URL=https://yemma-solutions.com
-    # --- ON SUPPRIME LES VOLUMES (Pas de sync en prod) ---
-    # --- ON SUPPRIME LES PORTS (Traefik gère le 443) ---
+    # On enlève les ports ici pour que seul Traefik soit la porte d'entrée
     networks:
       - yemma-network
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=yemma-network"
-      # Route HTTPS
-      - "traefik.http.routers.frontend.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
-      # Port interne sur lequel ton app écoute (3000)
-      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
-    depends_on:
-      - auth
-      - candidate
+      - "traefik.http.routers.yemma-frontend.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
+      - "traefik.http.routers.yemma-frontend.entrypoints=websecure"
+      - "traefik.http.routers.yemma-frontend.tls.certresolver=myresolver"
+      - "traefik.http.services.yemma-frontend.loadbalancer.server.port=3000"
     restart: unless-stopped
 
 # ============================================
