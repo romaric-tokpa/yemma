@@ -20,8 +20,8 @@ services:
         condition: service_started
     labels:
       - "traefik.enable=true"
-      # Remplace 'traefik_network' par le nom exact du réseau de ton conteneur traefik
-      - "traefik.docker.network=yemma-network" 
+      - "traefik.docker.network=yemma-network"
+      # Utilise bien les ` autour du domaine
       - "traefik.http.routers.yemma.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
       - "traefik.http.routers.yemma.entrypoints=websecure"
       - "traefik.http.routers.yemma.tls.certresolver=myresolver"
