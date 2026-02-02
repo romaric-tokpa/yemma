@@ -27,13 +27,13 @@ services:
       - "traefik.http.routers.yemma.tls.certresolver=myresolver"
       # Le port interne de ton conteneur Nginx (80)
       - "traefik.http.services.yemma.loadbalancer.server.port=80"
-    healthcheck:
+    #healthcheck:
       # Si /health n'existe pas dans ton nginx.conf, ce test échouera. 
       # Tu peux tester avec "http://localhost/" si besoin.
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      #test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+     # interval: 30s
+     # timeout: 10s
+     # retries: 3
     restart: unless-stopped
 
   # ============================================
