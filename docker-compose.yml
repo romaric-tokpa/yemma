@@ -1,40 +1,10 @@
-version: '3.8'
-
 # Docker Compose for Production (Hostinger deployment)
 # Usage: docker-compose up -d
+#
+# Le réseau yemma-network est partagé avec Traefik (external: true).
+# Traefik route le trafic vers nginx via les labels.
 
 services:
-
-  # ============================================
-  # REVERSE PROXY (TRAEFIK) - SSL & ROUTING
-  # ============================================
-  traefik:
-    image: traefik:v2.11
-    container_name: yemma-traefik
-    restart: unless-stopped
-    command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      # Points d'entrée (HTTP et HTTPS)
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      # Redirection automatique HTTP -> HTTPS
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      # Configuration Let's Encrypt (SSL)
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      # ⚠️ REMPLACEZ PAR VOTRE EMAIL ICI
-      - "--certificatesresolvers.myresolver.acme.email=r.tokpa@yemma-solutions.com"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
-    ports:
-      # C'est Traefik qui prend les ports publics maintenant
-      - "80:80"
-      - "443:443"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "traefik_certs:/letsencrypt"
-    networks:
-      - yemma-network
 
   # ============================================
   # API GATEWAY - NGINX
@@ -45,16 +15,15 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
     container_name: yemma-nginx
-    # Pas de 'ports' ici, on ne veut pas exposer Nginx directement sur le VPS
     networks:
       - yemma-network
     labels:
       - "traefik.enable=true"
-      # Route pour le domaine principal et www
-      - "traefik.http.routers.yemma.rule=Host(`yemma-solutions.com`, `www.yemma-solutions.com`)"
-      - "traefik.http.routers.yemma.entrypoints=websecure"
-      - "traefik.http.routers.yemma.tls.certresolver=myresolver"
-      # Indique à Traefik que Nginx écoute sur le port 80 à l'intérieur du conteneur
+      - "traefik.docker.network=yemma-network"
+      - "traefik.http.routers.yemma.rule=Host(`yemma-solutions.com`,`www.yemma-solutions.com`)"
+      - "traefik.http.routers.yemma.entrypoints=web,websecure"
+      - "traefik.http.routers.yemma.tls=true"
+      - "traefik.http.routers.yemma.tls.certresolver=letsEncrypt"
       - "traefik.http.services.yemma.loadbalancer.server.port=80"
     depends_on:
       auth:
@@ -668,7 +637,7 @@ services:
 networks:
   yemma-network:
     name: yemma-network
-    driver: bridge
+    external: true
 
 # ============================================
 # VOLUMES
@@ -683,5 +652,3 @@ volumes:
     name: yemma-minio-data
   elasticsearch_data:
     name: yemma-elasticsearch-data
-  traefik_certs:
-    name: yemma-traefik-certs
