@@ -91,9 +91,7 @@ services:
       - minio_data:/data
     networks:
       - yemma-network
-    ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    # Pas de ports exposés : accès interne uniquement via le réseau Docker
     restart: unless-stopped
 
   elasticsearch:
@@ -121,9 +119,7 @@ services:
       - elasticsearch_data:/usr/share/elasticsearch/data
     networks:
       - yemma-network
-    ports:
-      - "${ELASTICSEARCH_PORT:-9200}:9200"
-      - "${ELASTICSEARCH_TRANSPORT_PORT:-9300}:9300"
+    # Pas de ports exposés : accès interne uniquement via le réseau Docker
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
@@ -150,8 +146,7 @@ services:
       - XPACK_REPORTING_ENCRYPTIONKEY=minimal-32-char-reporting-encryption-key
     networks:
       - yemma-network
-    ports:
-      - "${KIBANA_PORT:-5601}:5601"
+    # Pas de port exposé : accès interne uniquement (via nginx si nécessaire)
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -196,8 +191,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
     networks:
       - yemma-network
-    ports:
-      - "${AUTH_PORT:-8001}:8000"
+    # Pas de port exposé : accès via nginx uniquement
     depends_on:
       postgres:
         condition: service_healthy
@@ -240,8 +234,6 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
     networks:
       - yemma-network
-    ports:
-      - "${CANDIDATE_PORT:-8002}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -292,8 +284,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-"http://localhost:3000,http://localhost:8000,http://localhost,http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1"}
     networks:
       - yemma-network
-    ports:
-      - "${DOCUMENT_PORT:-8003}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -342,8 +332,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
     networks:
       - yemma-network
-    ports:
-      - "${SEARCH_PORT:-8004}:8000"
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -377,8 +365,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
     networks:
       - yemma-network
-    ports:
-      - "${ADMIN_PORT:-8009}:8000"
     depends_on:
       candidate:
         condition: service_healthy
@@ -420,8 +406,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000,http://localhost}
     networks:
       - yemma-network
-    ports:
-      - "${COMPANY_PORT:-8005}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -515,8 +499,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
     networks:
       - yemma-network
-    ports:
-      - "${NOTIFICATION_PORT:-8007}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -618,8 +600,6 @@ services:
     container_name: yemma-frontend
     networks:
       - yemma-network
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - auth
       - candidate
