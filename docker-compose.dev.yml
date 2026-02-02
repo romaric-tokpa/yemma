@@ -774,31 +774,24 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: development
+      target: production  # <-- Indispensable pour la performance et sécurité
     container_name: yemma-frontend
     environment:
-      # Variables d'environnement pour Vite (préfixe VITE_)
-      # Utilise des chemins relatifs vides pour passer par nginx (chemins dans api.js)
-      # Si besoin d'utiliser nginx directement, définir: VITE_API_BASE_URL=http://nginx
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
-      VITE_AUTH_API_URL: ${VITE_AUTH_API_URL:-}
-      VITE_CANDIDATE_API_URL: ${VITE_CANDIDATE_API_URL:-}
-      VITE_DOCUMENT_API_URL: ${VITE_DOCUMENT_API_URL:-}
-      VITE_SEARCH_API_URL: ${VITE_SEARCH_API_URL:-}
-      VITE_COMPANY_API_URL: ${VITE_COMPANY_API_URL:-}
-      VITE_PAYMENT_API_URL: ${VITE_PAYMENT_API_URL:-}
-      VITE_NOTIFICATION_API_URL: ${VITE_NOTIFICATION_API_URL:-}
-      VITE_AUDIT_API_URL: ${VITE_AUDIT_API_URL:-}
-      VITE_ADMIN_API_URL: ${VITE_ADMIN_API_URL:-}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      # On pointe vers le domaine SSL pour l'API
+      - VITE_API_BASE_URL=https://yemma-solutions.com
+    # --- ON SUPPRIME LES VOLUMES (Pas de sync en prod) ---
+    # --- ON SUPPRIME LES PORTS (Traefik gère le 443) ---
     networks:
       - yemma-network
-    # Port exposé pour le développement (accès direct)
-    # En production, utiliser uniquement via Nginx Gateway
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=yemma-network"
+      # Route HTTPS
+      - "traefik.http.routers.frontend.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      # Port interne sur lequel ton app écoute (3000)
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
     depends_on:
       - auth
       - candidate
