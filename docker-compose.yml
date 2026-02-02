@@ -20,18 +20,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=yemma-network"
-      # Router HTTPS (principal)
-      - "traefik.http.routers.yemma.rule=Host(`yemma-solutions.com`,`www.yemma-solutions.com`)"
+      # Route unique pour le domaine
+      - "traefik.http.routers.yemma.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
       - "traefik.http.routers.yemma.entrypoints=websecure"
-      - "traefik.http.routers.yemma.tls=true"
       - "traefik.http.routers.yemma.tls.certresolver=myresolver"
       - "traefik.http.services.yemma.loadbalancer.server.port=80"
-      # Router HTTP → HTTPS redirect
-      - "traefik.http.routers.yemma-http.rule=Host(`yemma-solutions.com`,`www.yemma-solutions.com`)"
-      - "traefik.http.routers.yemma-http.entrypoints=web"
-      - "traefik.http.middlewares.yemma-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.yemma-redirect.redirectscheme.permanent=true"
-      - "traefik.http.routers.yemma-http.middlewares=yemma-redirect"
     depends_on:
       auth:
         condition: service_healthy
