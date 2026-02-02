@@ -20,11 +20,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=yemma-network"
-      # Route unique pour le domaine
-      - "traefik.http.routers.yemma.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
-      - "traefik.http.routers.yemma.entrypoints=websecure"
-      - "traefik.http.routers.yemma.tls.certresolver=myresolver"
-      - "traefik.http.services.yemma.loadbalancer.server.port=80"
+      - "traefik.http.routers.yemma-frontend.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
+      - "traefik.http.routers.yemma-frontend.entrypoints=websecure"
+      - "traefik.http.routers.yemma-frontend.tls.certresolver=myresolver"
+      # --- CHANGE LE PORT ICI : 3000 -> 80 ---
+      - "traefik.http.services.yemma-frontend.loadbalancer.server.port=80"
     depends_on:
       auth:
         condition: service_healthy
