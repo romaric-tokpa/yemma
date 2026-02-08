@@ -1,0 +1,11 @@
+# Robots.txt pour Yemma Solutions
+# https://yemma-solutions.com
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://yemma-solutions.com/sitemap.xml
+
+# Interdire l'accès aux pages d'API
+Disallow: /api/
