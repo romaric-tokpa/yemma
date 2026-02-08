@@ -38,6 +38,13 @@
     <priority>0.7</priority>
   </url>
 
+  <!-- Page Comment ça marche -->
+  <url>
+    <loc>https://yemma-solutions.com/how-it-works</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
   <!-- Page de démonstration -->
   <url>
     <loc>https://yemma-solutions.com/demo/cvtheque</loc>

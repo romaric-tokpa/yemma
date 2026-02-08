@@ -12,6 +12,7 @@ export default function Footer() {
       { label: 'Accéder à la CVthèque', href: '/register/company' },
     ],
     entreprise: [
+      { label: 'Comment ça marche', href: '/how-it-works' },
       { label: 'Blog', href: '/blog' },
       { label: 'Carrières', href: '/careers' },
     ],
