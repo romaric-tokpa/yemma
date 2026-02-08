@@ -4,7 +4,7 @@ Endpoints API pour la gestion des profils candidats
 from typing import List, Optional
 from datetime import datetime
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status as http_status
 from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # Profile Endpoints
 # ============================================
 
-@router.post("", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProfileResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_profile(
     profile_data: ProfileCreate,
     session: AsyncSession = Depends(get_session),
@@ -130,7 +130,7 @@ async def get_my_profile(
     except Exception as e:
         logger.error(f"Error in get_my_profile for user {current_user.user_id}: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
 
@@ -151,13 +151,13 @@ async def list_profiles(
     # Vérifier que l'utilisateur est admin
     if not current_user or not current_user.roles:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Authentication required"
         )
     
     if "ROLE_ADMIN" not in current_user.roles and "ROLE_SUPER_ADMIN" not in current_user.roles:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Only administrators can list profiles"
         )
     
@@ -174,7 +174,7 @@ async def list_profiles(
             query = query.where(Profile.status == status_enum)
         except ValueError:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=http_status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid status: {status}. Valid values: DRAFT, SUBMITTED, IN_REVIEW, VALIDATED, REJECTED, ARCHIVED"
             )
     
@@ -430,7 +430,7 @@ async def get_profile(
             logger.info(f"No service_info, checking user permissions for profile_id={profile_id}")
             if not current_user:
                 raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    status_code=http_status.HTTP_401_UNAUTHORIZED,
                     detail="Authentication required"
                 )
             # Vérifier que l'utilisateur est le propriétaire du profil ou un administrateur
@@ -440,7 +440,7 @@ async def get_profile(
             is_admin = "ROLE_ADMIN" in user_roles or "ROLE_SUPER_ADMIN" in user_roles
             if not is_owner and not is_admin:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                    status_code=http_status.HTTP_403_FORBIDDEN,
                     detail="Not authorized to access this profile"
                 )
         
@@ -502,7 +502,7 @@ async def get_profile(
     except Exception as e:
         logger.error(f"Error in get_profile for profile_id {profile_id}: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
 
@@ -531,12 +531,12 @@ async def update_profile(
         # Vérifier que current_user existe et a un user_id
         if not current_user or not hasattr(current_user, 'user_id'):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=http_status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication required"
             )
         if profile.user_id != current_user.user_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=http_status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to update this profile"
             )
     
@@ -616,7 +616,7 @@ async def submit_profile(
     # Vérifier les permissions
     if profile.user_id != current_user.user_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Not authorized to submit this profile"
         )
     
@@ -657,7 +657,7 @@ async def submit_profile(
 # Experience Endpoints
 # ============================================
 
-@router.post("/{profile_id}/experiences", response_model=ExperienceResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{profile_id}/experiences", response_model=ExperienceResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_experience(
     profile_id: int,
     experience_data: ExperienceCreate,
@@ -672,7 +672,7 @@ async def create_experience(
         
         if profile.user_id != current_user.user_id:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=http_status.HTTP_403_FORBIDDEN,
                 detail="Not authorized"
             )
         
@@ -716,7 +716,7 @@ async def create_experience(
         logger = logging.getLogger(__name__)
         logger.error(f"Error creating experience: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creating experience: {str(e)}"
         )
 
@@ -734,7 +734,7 @@ async def get_experiences(
     
     if profile.user_id != current_user.user_id and "ROLE_ADMIN" not in current_user.roles:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Not authorized"
         )
     
@@ -742,7 +742,7 @@ async def get_experiences(
     return [ExperienceResponse.model_validate(exp) for exp in experiences]
 
 
-@router.delete("/{profile_id}/experiences/{experience_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{profile_id}/experiences/{experience_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_experience(
     profile_id: int,
     experience_id: int,
@@ -756,14 +756,14 @@ async def delete_experience(
     
     if profile.user_id != current_user.user_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Not authorized"
         )
     
     experience = await ExperienceRepository.get_by_id(session, experience_id)
     if not experience or experience.profile_id != profile_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Experience not found"
         )
     
@@ -777,7 +777,7 @@ async def delete_experience(
 # Education Endpoints
 # ============================================
 
-@router.post("/{profile_id}/educations", response_model=EducationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{profile_id}/educations", response_model=EducationResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_education(
     profile_id: int,
     education_data: EducationCreate,
@@ -790,7 +790,7 @@ async def create_education(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     education_dict = education_data.model_dump()
     education_dict["profile_id"] = profile_id
@@ -814,13 +814,13 @@ async def get_educations(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id and "ROLE_ADMIN" not in current_user.roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     educations = await EducationRepository.get_by_profile_id(session, profile_id)
     return [EducationResponse.model_validate(edu) for edu in educations]
 
 
-@router.delete("/{profile_id}/educations/{education_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{profile_id}/educations/{education_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_education(
     profile_id: int,
     education_id: int,
@@ -833,7 +833,7 @@ async def delete_education(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     await EducationRepository.delete(session, education_id)
     
@@ -845,7 +845,7 @@ async def delete_education(
 # Certification Endpoints
 # ============================================
 
-@router.post("/{profile_id}/certifications", response_model=CertificationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{profile_id}/certifications", response_model=CertificationResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_certification(
     profile_id: int,
     certification_data: CertificationCreate,
@@ -858,7 +858,7 @@ async def create_certification(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     certification_dict = certification_data.model_dump()
     certification_dict["profile_id"] = profile_id
@@ -882,13 +882,13 @@ async def get_certifications(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id and "ROLE_ADMIN" not in current_user.roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     certifications = await CertificationRepository.get_by_profile_id(session, profile_id)
     return [CertificationResponse.model_validate(cert) for cert in certifications]
 
 
-@router.delete("/{profile_id}/certifications/{certification_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{profile_id}/certifications/{certification_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_certification(
     profile_id: int,
     certification_id: int,
@@ -901,7 +901,7 @@ async def delete_certification(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     await CertificationRepository.delete(session, certification_id)
     
@@ -913,7 +913,7 @@ async def delete_certification(
 # Skill Endpoints
 # ============================================
 
-@router.post("/{profile_id}/skills", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{profile_id}/skills", response_model=SkillResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_skill(
     profile_id: int,
     skill_data: SkillCreate,
@@ -926,7 +926,7 @@ async def create_skill(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     skill_dict = skill_data.model_dump()
     skill_dict["profile_id"] = profile_id
@@ -950,13 +950,13 @@ async def get_skills(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id and "ROLE_ADMIN" not in current_user.roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     skills = await SkillRepository.get_by_profile_id(session, profile_id)
     return [SkillResponse.model_validate(skill) for skill in skills]
 
 
-@router.delete("/{profile_id}/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{profile_id}/skills/{skill_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_skill(
     profile_id: int,
     skill_id: int,
@@ -969,7 +969,7 @@ async def delete_skill(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     await SkillRepository.delete(session, skill_id)
     
@@ -994,7 +994,7 @@ async def update_job_preferences(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     preference_dict = preference_data.model_dump()
     preference = await JobPreferenceRepository.create_or_update(
@@ -1025,7 +1025,7 @@ async def get_job_preferences(
         raise ProfileNotFoundError(str(profile_id))
     
     if profile.user_id != current_user.user_id and "ROLE_ADMIN" not in current_user.roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not authorized")
     
     result = await session.execute(
         select(JobPreference).where(JobPreference.profile_id == profile_id)
@@ -1034,7 +1034,7 @@ async def get_job_preferences(
     
     if not preference:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Job preferences not found"
         )
     
