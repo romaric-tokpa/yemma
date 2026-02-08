@@ -195,6 +195,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      NOTIFICATION_SERVICE_URL: http://notification:8000
+      FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
     networks:
       - yemma-network
     # Pas de port exposé : accès via nginx uniquement

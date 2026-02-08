@@ -70,10 +70,32 @@ class CandidateWelcomeRequest(BaseModel):
     dashboard_url: str = Field(default="", description="URL du tableau de bord candidat")
 
 
+class CandidateRegistrationRequest(BaseModel):
+    """Requête pour envoyer un email au candidat après création de son compte (avant onboarding)"""
+    candidate_email: str = Field(..., description="Email du candidat")
+    candidate_name: str = Field(..., description="Nom du candidat (prénom + nom ou email)")
+    onboarding_url: str = Field(default="", description="URL de la page d'onboarding")
+
+
 class CompanyWelcomeRequest(BaseModel):
     """Requête pour envoyer un email de bienvenue à une entreprise après création du compte"""
     recipient_email: str = Field(..., description="Email du recruteur/admin")
     recipient_name: str = Field(..., description="Nom du recruteur/admin")
+    company_name: str = Field(..., description="Nom de l'entreprise")
+    dashboard_url: str = Field(default="", description="URL du tableau de bord entreprise")
+
+
+class CompanyRegistrationRequest(BaseModel):
+    """Requête pour envoyer un email au recruteur après inscription (compte créé, avant création entreprise)"""
+    recipient_email: str = Field(..., description="Email du recruteur")
+    recipient_name: str = Field(..., description="Nom du recruteur (prénom + nom ou email)")
+    onboarding_url: str = Field(default="", description="URL de la page onboarding entreprise")
+
+
+class CompanyOnboardingCompletedRequest(BaseModel):
+    """Requête pour envoyer un email au recruteur après complétion de l'onboarding entreprise"""
+    recipient_email: str = Field(..., description="Email du recruteur")
+    recipient_name: str = Field(..., description="Nom du recruteur")
     company_name: str = Field(..., description="Nom de l'entreprise")
     dashboard_url: str = Field(default="", description="URL du tableau de bord entreprise")
 
@@ -305,6 +327,115 @@ async def notify_candidate_welcome(
         )
 
 
+@router.post("/notify_candidate_registration", status_code=status.HTTP_202_ACCEPTED)
+async def notify_candidate_registration(
+    request: CandidateRegistrationRequest,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email au candidat après création de son compte (inscription),
+    pour l'informer que son compte est créé et qu'il doit suivre le processus d'onboarding.
+
+    Appelé par le Auth Service après inscription d'un candidat (register avec rôle ROLE_CANDIDAT).
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("notify_candidate_registration: reçu pour %s (%s)", request.candidate_email, request.candidate_name)
+    try:
+        notification_repo = NotificationRepository(session)
+        onboarding_url = request.onboarding_url or f"{settings.FRONTEND_URL}/onboarding"
+
+        template_data = {
+            "recipient_name": request.candidate_name,
+            "candidate_name": request.candidate_name,
+            "onboarding_url": onboarding_url,
+        }
+
+        notification = Notification(
+            notification_type="candidate_account_created",
+            recipient_email=request.candidate_email,
+            recipient_name=request.candidate_name,
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+
+        notification = await notification_repo.create(notification)
+        logger.info("notify_candidate_registration: notification créée id=%s, enqueue envoi email", notification.id)
+
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="candidate_account_created",
+            recipient_email=request.candidate_email,
+            recipient_name=request.candidate_name,
+            template_data=template_data,
+            notification_id=notification.id,
+        )
+
+        return {
+            "message": "Candidate registration notification queued",
+            "notification_id": notification.id,
+            "status": "pending",
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue candidate registration notification: {str(e)}",
+        )
+
+
+@router.post("/notify_company_registration", status_code=status.HTTP_202_ACCEPTED)
+async def notify_company_registration(
+    request: CompanyRegistrationRequest,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email au recruteur après inscription (compte créé).
+    Pour l'informer que son compte est créé et qu'il peut compléter l'onboarding entreprise.
+    Appelé par le Auth Service après register avec rôle ROLE_COMPANY_ADMIN.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        notification_repo = NotificationRepository(session)
+        onboarding_url = request.onboarding_url or f"{settings.FRONTEND_URL}/company/onboarding"
+        template_data = {
+            "recipient_name": request.recipient_name,
+            "onboarding_url": onboarding_url,
+        }
+        notification = Notification(
+            notification_type="company_account_created",
+            recipient_email=request.recipient_email,
+            recipient_name=request.recipient_name,
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+        notification = await notification_repo.create(notification)
+        logger.info("notify_company_registration: reçu pour %s (%s)", request.recipient_email, request.recipient_name)
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="company_account_created",
+            recipient_email=request.recipient_email,
+            recipient_name=request.recipient_name,
+            template_data=template_data,
+            notification_id=notification.id,
+        )
+        logger.info("notify_company_registration: notification créée id=%s, enqueue envoi email", notification.id)
+        return {
+            "message": "Company registration notification queued",
+            "notification_id": notification.id,
+            "status": "pending",
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue company registration notification: {str(e)}",
+        )
+
+
 @router.post("/notify_company_welcome", status_code=status.HTTP_202_ACCEPTED)
 async def notify_company_welcome(
     request: CompanyWelcomeRequest,
@@ -358,5 +489,55 @@ async def notify_company_welcome(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue company welcome notification: {str(e)}"
+        )
+
+
+@router.post("/notify_company_onboarding_completed", status_code=status.HTTP_202_ACCEPTED)
+async def notify_company_onboarding_completed(
+    request: CompanyOnboardingCompletedRequest,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email au recruteur après complétion de l'onboarding entreprise.
+    Appelé par le Company Service après mise à jour (finalisation) de l'entreprise.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        notification_repo = NotificationRepository(session)
+        dashboard_url = request.dashboard_url or f"{settings.FRONTEND_URL}/company/dashboard"
+        template_data = {
+            "recipient_name": request.recipient_name,
+            "company_name": request.company_name,
+            "dashboard_url": dashboard_url,
+        }
+        notification = Notification(
+            notification_type="company_onboarding_completed",
+            recipient_email=request.recipient_email,
+            recipient_name=request.recipient_name,
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+        notification = await notification_repo.create(notification)
+        logger.info("notify_company_onboarding_completed: reçu pour %s (%s)", request.recipient_email, request.company_name)
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="company_onboarding_completed",
+            recipient_email=request.recipient_email,
+            recipient_name=request.recipient_name,
+            template_data=template_data,
+            notification_id=notification.id,
+        )
+        return {
+            "message": "Company onboarding completed notification queued",
+            "notification_id": notification.id,
+            "status": "pending",
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue company onboarding completed notification: {str(e)}",
         )
 

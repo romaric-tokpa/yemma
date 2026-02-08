@@ -7,70 +7,75 @@ from app.core.config import settings
 
 def get_base_template(title: str, content: str, button_text: str = None, button_url: str = None, header_color: str = "#0B3C5D") -> str:
     """
-    Template de base pour tous les emails
-    
-    Args:
-        title: Titre de l'email
-        content: Contenu HTML principal
-        button_text: Texte du bouton CTA (optionnel)
-        button_url: URL du bouton CTA (optionnel)
+    Template de base pour tous les emails. Compact, pro et responsive.
     """
     button_html = ""
     if button_text and button_url:
         button_html = f"""
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 30px auto;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 24px 0 0 0;">
             <tr>
-                <td style="border-radius: 8px; background-color: #1ABC9C;">
-                    <a href="{button_url}" style="display: inline-block; padding: 14px 28px; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                        {button_text}
-                    </a>
+                <td align="center" style="padding: 0;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin: 0 auto; max-width: 280px;">
+                        <tr>
+                            <td align="center" style="border-radius: 8px; background-color: {header_color};">
+                                <a href="{button_url}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; font-family: 'Inter', 'Roboto', sans-serif;">
+                                    {button_text}
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
                 </td>
             </tr>
         </table>
         """
-    
     return f"""
     <!DOCTYPE html>
     <html lang="fr">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <title>{title}</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+        <style type="text/css">
+            body, table, td, p, a {{ -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }}
+            table {{ border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }}
+            img {{ border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }}
+            @media only screen and (max-width: 620px) {{
+                .wrapper {{ width: 100% !important; max-width: 100% !important; }}
+                .content {{ padding: 24px 20px !important; }}
+                .header-cell {{ padding: 24px 20px !important; }}
+                .header-title {{ font-size: 22px !important; line-height: 1.3 !important; }}
+                .footer-cell {{ padding: 20px 16px !important; }}
+                .footer-text {{ font-size: 11px !important; }}
+                .outer-padding {{ padding: 16px 12px !important; }}
+            }}
+        </style>
     </head>
-    <body style="margin: 0; padding: 0; font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background-color: #F4F6F8;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F4F6F8; padding: 40px 20px;">
+    <body style="margin: 0; padding: 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f2f5;">
             <tr>
-                <td align="center">
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                        <!-- Header -->
+                <td align="center" class="outer-padding" style="padding: 24px 16px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" class="wrapper" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
                         <tr>
-                            <td style="background: linear-gradient(135deg, {header_color} 0%, {header_color} 100%); padding: 40px 30px; text-align: center;">
-                                <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600; font-family: 'Poppins', sans-serif;">
+                            <td class="header-cell" style="background-color: {header_color}; padding: 28px 24px; text-align: center;">
+                                <h1 class="header-title" style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600; line-height: 1.3;">
                                     {title}
                                 </h1>
                             </td>
                         </tr>
-                        
-                        <!-- Content -->
                         <tr>
-                            <td style="padding: 40px 30px;">
+                            <td class="content" style="padding: 28px 24px;">
                                 {content}
                                 {button_html}
                             </td>
                         </tr>
-                        
-                        <!-- Footer -->
                         <tr>
-                            <td style="padding: 30px; background-color: #F4F6F8; text-align: center; border-top: 1px solid #e5e5e5;">
-                                <p style="margin: 0; color: #2C2C2C; font-size: 12px; line-height: 1.6; font-family: 'Inter', 'Roboto', sans-serif;">
-                                    Cet email a été envoyé automatiquement par <strong style="color: #226D68;">Yemma Solutions</strong>.<br>
-                                    Merci de ne pas y répondre.
+                            <td class="footer-cell" style="padding: 20px 24px; background-color: #f8f9fa; text-align: center; border-top: 1px solid #e9ecef;">
+                                <p class="footer-text" style="margin: 0; color: #495057; font-size: 12px; line-height: 1.5;">
+                                    Envoyé par <strong style="color: #226D68;">Yemma Solutions</strong> · Merci de ne pas répondre
                                 </p>
-                                <p style="margin: 15px 0 0 0; color: #666666; font-size: 11px; font-family: 'Inter', 'Roboto', sans-serif;">
-                                    © {settings.APP_NAME or 'Yemma Solutions'} - Tous droits réservés
+                                <p style="margin: 8px 0 0 0; color: #868e96; font-size: 11px;">
+                                    © {settings.APP_NAME or 'Yemma Solutions'}
                                 </p>
                             </td>
                         </tr>
@@ -85,53 +90,78 @@ def get_base_template(title: str, content: str, button_text: str = None, button_
 
 def get_profile_validated_template(data: Dict[str, Any]) -> tuple[str, str, str]:
     """
-    Template simple et professionnel pour 'Profil validé'
+    Email envoyé au candidat quand l'administrateur a validé son profil et terminé l'évaluation.
+    Message : profil validé, vous êtes maintenant visible aux yeux des recruteurs. Lien dashboard.
+    Compact, pro, responsive.
     """
     recipient_name = data.get("recipient_name", "Cher candidat")
     candidate_name = data.get("candidate_name", recipient_name)
     profile_url = data.get("profile_url", f"{settings.FRONTEND_URL}/candidate/profile")
-    
-    subject = "🎉 Votre profil a été validé !"
-    
+    dashboard_url = data.get("dashboard_url", f"{settings.FRONTEND_URL}/candidate/dashboard")
+    primary_color = "#226D68"
+    secondary_color = "#e76f51"
+
+    subject = "Votre profil a été validé – Vous êtes visible aux recruteurs"
+
     content = f"""
-    <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-        Bonjour <strong>{recipient_name}</strong>,
-    </p>
-    
-    <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-        Excellente nouvelle ! Votre profil candidat <strong>{candidate_name}</strong> a été validé par notre équipe d'experts.
-    </p>
-    
-    <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
-        Votre profil est maintenant <strong>visible par les recruteurs</strong> et vous pouvez commencer à recevoir des opportunités professionnelles adaptées à votre profil.
-    </p>
-    
-    <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px; line-height: 1.6;">
-        Nous vous souhaitons beaucoup de succès dans votre recherche d'emploi !
-    </p>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    <strong style="color: {primary_color};">Excellente nouvelle !</strong> L'administrateur a validé votre profil et terminé l'évaluation. Votre profil candidat est maintenant <strong>visible aux yeux des recruteurs</strong>.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                Vous pouvez commencer à recevoir des opportunités professionnelles adaptées à votre profil. Accédez à votre tableau de bord pour suivre vos candidatures et offres.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 12px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    Nous vous souhaitons beaucoup de succès dans votre recherche d'emploi. L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
     """
-    
+
     html = get_base_template(
-        title="Profil Validé",
+        title="Profil validé – Visible aux recruteurs",
         content=content,
-        button_text="Voir mon profil",
-        button_url=profile_url
+        button_text="Accéder à mon tableau de bord",
+        button_url=dashboard_url,
+        header_color=primary_color,
     )
-    
+
     text = f"""
     Bonjour {recipient_name},
-    
-    Excellente nouvelle ! Votre profil candidat {candidate_name} a été validé par notre équipe d'experts.
-    
-    Votre profil est maintenant visible par les recruteurs et vous pouvez commencer à recevoir des opportunités professionnelles adaptées à votre profil.
-    
-    Voir mon profil : {profile_url}
-    
-    Nous vous souhaitons beaucoup de succès dans votre recherche d'emploi !
-    
-    L'équipe Yemma Solutions
+
+    Excellente nouvelle ! L'administrateur a validé votre profil et terminé l'évaluation. Votre profil candidat est maintenant visible aux yeux des recruteurs.
+
+    Vous pouvez commencer à recevoir des opportunités professionnelles adaptées à votre profil. Accédez à votre tableau de bord pour suivre vos candidatures et offres.
+
+    Accéder à mon tableau de bord : {dashboard_url}
+
+    Nous vous souhaitons beaucoup de succès dans votre recherche d'emploi. L'équipe Yemma Solutions
     """
-    
+
     return subject, html, text
 
 
@@ -406,129 +436,353 @@ def get_recruiter_invitation_template(data: Dict[str, Any]) -> tuple[str, str, s
     return subject, html, text
 
 
+def get_candidate_account_created_template(data: Dict[str, Any]) -> tuple[str, str, str]:
+    """
+    Email candidat après création de compte : compact, pro et responsive.
+    Charte Yemma : #226D68, #e76f51, #0B3C5D.
+    """
+    recipient_name = data.get("recipient_name", "Cher candidat")
+    candidate_name = data.get("candidate_name", recipient_name)
+    onboarding_url = data.get("onboarding_url", f"{settings.FRONTEND_URL}/onboarding")
+
+    primary_color = "#226D68"
+    secondary_color = "#e76f51"
+    blue_deep = "#0B3C5D"
+
+    subject = "Votre compte candidat a été créé – Complétez votre onboarding"
+
+    content = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    Votre compte sur <strong style="color: {primary_color};">Yemma Solutions</strong> est créé. Pour être visible des recruteurs, complétez votre <strong>onboarding</strong> : profil, expériences et préférences.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0 0 8px 0; color: {primary_color}; font-size: 13px; font-weight: 600;">
+                                Prochaines étapes
+                            </p>
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                1. Complétez votre profil &amp; photo<br>
+                                2. Ajoutez expériences et compétences<br>
+                                3. Soumettez pour validation
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 4px 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    <strong style="color: {secondary_color};">Important :</strong> Sans onboarding, votre profil ne sera pas visible. Cliquez ci-dessous pour commencer.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
+    """
+
+    html = get_base_template(
+        title="Compte créé – Complétez votre onboarding",
+        content=content,
+        button_text="Commencer l'onboarding",
+        button_url=onboarding_url,
+        header_color=primary_color,
+    )
+
+    text = f"""
+    ============================================
+    VOTRE COMPTE CANDIDAT A ÉTÉ CRÉÉ
+    ============================================
+
+    Bonjour {recipient_name},
+
+    Votre compte candidat sur Yemma Solutions a bien été créé.
+
+    Pour finaliser votre inscription et être visible par les recruteurs, vous devez suivre le processus d'onboarding : compléter votre profil, vos expériences et vos préférences.
+
+    Prochaines étapes :
+    1. Complétez votre profil (informations personnelles, photo)
+    2. Ajoutez vos expériences et compétences
+    3. Soumettez votre profil pour validation par nos experts
+
+    Important : Sans complétion de l'onboarding, votre profil ne sera pas visible par les recruteurs.
+
+    Commencer l'onboarding : {onboarding_url}
+
+    Nous avons hâte de vous accompagner dans votre recherche d'opportunités.
+
+    L'équipe Yemma Solutions
+    """
+
+    return subject, html, text
+
+
 def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]:
     """
-    Template d'email de bienvenue pour les candidats après complétion de l'onboarding
-    Avec la charte graphique (#226D68 et #e76f51)
+    Email envoyé au candidat après complétion de l'onboarding (soumission du profil).
+    Félicitations, rappel qu'un administrateur prendra contact pour validation, lien dashboard.
+    Compact, pro et responsive. Charte Yemma : #226D68, #e76f51.
     """
     recipient_name = data.get("recipient_name", "Cher candidat")
     candidate_name = data.get("candidate_name", recipient_name)
     dashboard_url = data.get("dashboard_url", f"{settings.FRONTEND_URL}/candidate/dashboard")
-    
-    # Couleurs de la charte graphique
-    primary_color = "#226D68"  # Vert principal
-    secondary_color = "#e76f51"  # Orange secondaire
-    primary_light = "#E8F4F3"
-    secondary_light = "#FDF2F0"
-    
-    subject = "🎉 Bienvenue sur Yemma Solutions !"
-    
+    primary_color = "#226D68"
+    secondary_color = "#e76f51"
+
+    subject = "Félicitations – Vous avez complété votre onboarding"
+
     content = f"""
-    <div style="text-align: center; margin-bottom: 30px;">
-        <div style="width: 80px; height: 80px; margin: 0 auto 20px; background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(34, 109, 104, 0.3);">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="white"/>
-                <path d="M2 17L12 22L22 17" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M2 12L12 17L22 12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-        </div>
-        <h1 style="margin: 0 0 10px 0; color: {primary_color}; font-size: 28px; font-weight: 700; font-family: 'Poppins', sans-serif;">
-            Bienvenue sur Yemma Solutions !
-        </h1>
-        <p style="margin: 0; color: #666666; font-size: 16px; font-family: 'Inter', 'Roboto', sans-serif;">
-            Votre profil a été créé avec succès
-        </p>
-    </div>
-    
-    <p style="margin: 0 0 20px 0; color: #2C2C2C; font-size: 16px; line-height: 1.6; font-family: 'Inter', 'Roboto', sans-serif;">
-        Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
-    </p>
-    
-    <p style="margin: 0 0 20px 0; color: #2C2C2C; font-size: 16px; line-height: 1.6; font-family: 'Inter', 'Roboto', sans-serif;">
-        Félicitations ! Vous avez complété avec succès votre inscription sur <strong style="color: {primary_color};">Yemma Solutions</strong>. Votre profil candidat <strong>{candidate_name}</strong> est maintenant créé et prêt à être soumis pour validation.
-    </p>
-    
-    <div style="background: linear-gradient(135deg, {primary_light} 0%, {secondary_light} 100%); border-left: 4px solid {primary_color}; border-radius: 12px; padding: 25px; margin: 25px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-        <h3 style="margin: 0 0 20px 0; color: {primary_color}; font-size: 18px; font-weight: 600; font-family: 'Poppins', sans-serif; border-bottom: 2px solid {primary_color}; padding-bottom: 10px;">
-            Prochaines étapes
-        </h3>
-        <ul style="margin: 0; padding-left: 20px; color: #2C2C2C; font-size: 15px; line-height: 2.2; font-family: 'Inter', 'Roboto', sans-serif; list-style: none;">
-            <li style="margin: 12px 0; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; color: {primary_color}; font-weight: bold; font-size: 20px;">✓</span>
-                <strong style="color: {primary_color};">Soumettez votre profil</strong> pour validation par nos experts RH
-            </li>
-            <li style="margin: 12px 0; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; color: {primary_color}; font-weight: bold; font-size: 20px;">✓</span>
-                <strong style="color: {primary_color};">Participez à un entretien</strong> de validation (si demandé)
-            </li>
-            <li style="margin: 12px 0; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; color: {primary_color}; font-weight: bold; font-size: 20px;">✓</span>
-                <strong style="color: {primary_color};">Recevez des offres</strong> adaptées à votre profil
-            </li>
-            <li style="margin: 12px 0; padding-left: 25px; position: relative;">
-                <span style="position: absolute; left: 0; color: {primary_color}; font-weight: bold; font-size: 20px;">✓</span>
-                <strong style="color: {primary_color};">Connectez-vous</strong> avec des recruteurs de qualité
-            </li>
-        </ul>
-    </div>
-    
-    <div style="background-color: #E3F2FD; border-left: 4px solid {secondary_color}; padding: 20px; margin: 25px 0; border-radius: 8px;">
-        <h3 style="margin: 0 0 15px 0; color: {secondary_color}; font-size: 16px; font-weight: 600; font-family: 'Poppins', sans-serif;">
-            💡 Astuce
-        </h3>
-        <p style="margin: 0; color: #2C2C2C; font-size: 14px; line-height: 1.6; font-family: 'Inter', 'Roboto', sans-serif;">
-            Assurez-vous que votre profil est complet et à jour pour maximiser vos chances d'être contacté par les recruteurs. Un profil bien rempli augmente votre visibilité de <strong style="color: {secondary_color};">300%</strong> !
-        </p>
-    </div>
-    
-    <p style="margin: 30px 0 10px 0; color: #666666; font-size: 14px; line-height: 1.6; font-family: 'Inter', 'Roboto', sans-serif; text-align: center;">
-        Nous sommes ravis de vous accompagner dans votre recherche d'emploi. Bonne chance !
-    </p>
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    <strong style="color: {primary_color};">Félicitations !</strong> Vous avez complété avec succès votre onboarding sur <strong style="color: {primary_color};">Yemma Solutions</strong>. Votre profil a bien été enregistré.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0 0 8px 0; color: {primary_color}; font-size: 13px; font-weight: 600;">
+                                Prochaine étape
+                            </p>
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                Un administrateur Yemma rentrera en contact avec vous pour finaliser la <strong>validation de votre profil</strong>. Vous serez ensuite visible par les recruteurs et pourrez recevoir des offres adaptées.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    En attendant, vous pouvez accéder à votre tableau de bord candidat via le bouton ci-dessous.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 12px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
     """
-    
+
     html = get_base_template(
-        title="Bienvenue sur Yemma Solutions",
+        title="Onboarding complété – Félicitations",
         content=content,
         button_text="Accéder à mon tableau de bord",
         button_url=dashboard_url,
-        header_color=primary_color
+        header_color=primary_color,
     )
-    
+
     text = f"""
-    ============================================
-    BIENVENUE SUR YEMMA SOLUTIONS
-    ============================================
-    
     Bonjour {recipient_name},
-    
-    Félicitations ! Vous avez complété avec succès votre inscription sur Yemma Solutions. 
-    Votre profil candidat {candidate_name} est maintenant créé et prêt à être soumis pour validation.
-    
-    ============================================
-    PROCHAINES ÉTAPES
-    ============================================
-    
-    ✓ Soumettez votre profil pour validation par nos experts RH
-    ✓ Participez à un entretien de validation (si demandé)
-    ✓ Recevez des offres adaptées à votre profil
-    ✓ Connectez-vous avec des recruteurs de qualité
-    
-    ============================================
-    ASTUCE
-    ============================================
-    
-    Assurez-vous que votre profil est complet et à jour pour maximiser vos chances 
-    d'être contacté par les recruteurs. Un profil bien rempli augmente votre visibilité de 300% !
-    
-    ============================================
-    
-    Accéder à mon tableau de bord : {dashboard_url}
-    
-    Nous sommes ravis de vous accompagner dans votre recherche d'emploi. Bonne chance !
-    
+
+    Félicitations ! Vous avez complété avec succès votre onboarding sur Yemma Solutions. Votre profil a bien été enregistré.
+
+    Prochaine étape : Un administrateur Yemma rentrera en contact avec vous pour finaliser la validation de votre profil. Vous serez ensuite visible par les recruteurs et pourrez recevoir des offres adaptées.
+
+    En attendant, vous pouvez accéder à votre tableau de bord candidat :
+    {dashboard_url}
+
     L'équipe Yemma Solutions
     """
-    
+
+    return subject, html, text
+
+
+def get_company_account_created_template(data: Dict[str, Any]) -> tuple[str, str, str]:
+    """
+    Email recruteur après création du compte (inscription /register/company).
+    Compact, pro et responsive. Charte Yemma : #226D68, #e76f51, #0B3C5D.
+    """
+    recipient_name = data.get("recipient_name", "Cher recruteur")
+    onboarding_url = data.get("onboarding_url", f"{settings.FRONTEND_URL}/company/onboarding")
+    primary_color = "#226D68"
+    secondary_color = "#e76f51"
+    subject = "Votre compte recruteur a été créé – Complétez votre espace entreprise"
+    content = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    Votre compte recruteur sur <strong style="color: {primary_color};">Yemma Solutions</strong> est créé. Complétez votre <strong>espace entreprise</strong> : informations société, contact et préférences pour accéder à la CVthèque.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0 0 8px 0; color: {primary_color}; font-size: 13px; font-weight: 600;">
+                                Prochaines étapes
+                            </p>
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                1. Complétez les infos de votre entreprise<br>
+                                2. Invitez vos recruteurs (optionnel)<br>
+                                3. Accédez au tableau de bord et à la CVthèque
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 4px 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    <strong style="color: {secondary_color};">Important :</strong> Sans complétion de l'onboarding, l'accès à la CVthèque peut être limité. Cliquez ci-dessous pour continuer.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
+    """
+    html = get_base_template(
+        title="Compte recruteur créé – Complétez votre espace",
+        content=content,
+        button_text="Compléter mon espace entreprise",
+        button_url=onboarding_url,
+        header_color=primary_color,
+    )
+    text = f"""
+    Bonjour {recipient_name},
+
+    Votre compte recruteur sur Yemma Solutions est créé. Complétez votre espace entreprise : informations société, contact et préférences pour accéder à la CVthèque.
+
+    Prochaines étapes :
+    1. Complétez les infos de votre entreprise
+    2. Invitez vos recruteurs (optionnel)
+    3. Accédez au tableau de bord et à la CVthèque
+
+    Important : Sans complétion de l'onboarding, l'accès à la CVthèque peut être limité.
+
+    Compléter mon espace : {onboarding_url}
+
+    L'équipe Yemma Solutions
+    """
+    return subject, html, text
+
+
+def get_company_onboarding_completed_template(data: Dict[str, Any]) -> tuple[str, str, str]:
+    """
+    Email envoyé au recruteur après complétion de l'onboarding entreprise.
+    Félicitations, accès au tableau de bord, lien dashboard. Compact, pro, responsive.
+    """
+    recipient_name = data.get("recipient_name", "Cher recruteur")
+    company_name = data.get("company_name", "")
+    dashboard_url = data.get("dashboard_url", f"{settings.FRONTEND_URL}/company/dashboard")
+    primary_color = "#226D68"
+    secondary_color = "#e76f51"
+
+    subject = "Félicitations – Vous avez complété l'onboarding entreprise"
+
+    content = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    <strong style="color: {primary_color};">Félicitations !</strong> Vous avez complété avec succès l'onboarding de votre entreprise <strong style="color: {primary_color};">{company_name}</strong> sur Yemma Solutions.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                Vous pouvez maintenant accéder à votre <strong>tableau de bord recruteur</strong>, rechercher des candidats et gérer vos recrutements.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 12px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
+    """
+
+    html = get_base_template(
+        title="Onboarding entreprise complété – Félicitations",
+        content=content,
+        button_text="Accéder à mon tableau de bord",
+        button_url=dashboard_url,
+        header_color=primary_color,
+    )
+
+    text = f"""
+    Bonjour {recipient_name},
+
+    Félicitations ! Vous avez complété avec succès l'onboarding de votre entreprise {company_name} sur Yemma Solutions.
+
+    Vous pouvez maintenant accéder à votre tableau de bord recruteur, rechercher des candidats et gérer vos recrutements.
+
+    Accéder au tableau de bord : {dashboard_url}
+
+    L'équipe Yemma Solutions
+    """
+
     return subject, html, text
 
 
@@ -672,7 +926,10 @@ def get_email_template_simple(notification_type: str, data: Dict[str, Any]) -> t
         "profile_validated": get_profile_validated_template,
         "profile_rejected": get_profile_rejected_template,
         "recruiter_invitation": get_recruiter_invitation_template,
+        "candidate_account_created": get_candidate_account_created_template,
         "candidate_welcome": get_candidate_welcome_template,
+        "company_account_created": get_company_account_created_template,
+        "company_onboarding_completed": get_company_onboarding_completed_template,
         "company_welcome": get_company_welcome_template,
     }
     

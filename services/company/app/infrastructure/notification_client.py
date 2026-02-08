@@ -139,6 +139,8 @@ async def send_company_welcome_notification(
     Raises:
         Exception: Si l'envoi de la notification échoue (mais ne bloque pas le processus)
     """
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         headers = get_service_token_header("company-service")
         
@@ -168,6 +170,43 @@ async def send_company_welcome_notification(
             logger.info(f"Welcome notification sent successfully to {recipient_email}")
     except Exception as e:
         # Ne pas bloquer le processus si l'envoi d'email échoue
-        logger.error(f"⚠️ Erreur lors de l'envoi de l'email de bienvenue: {str(e)}", exc_info=True)
-        # Ne pas lever l'exception pour ne pas bloquer la création de l'entreprise
+        import logging
+        logging.getLogger(__name__).error("⚠️ Erreur lors de l'envoi de l'email de bienvenue: %s", str(e), exc_info=True)
+
+
+async def send_company_onboarding_completed_notification(
+    recipient_email: str,
+    recipient_name: str,
+    company_name: str,
+    dashboard_url: Optional[str] = None,
+) -> None:
+    """
+    Envoie un email au recruteur après complétion de l'onboarding entreprise (finalisation du formulaire).
+    Appelé par le Company Service après PUT update company (finalize onboarding).
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        headers = get_service_token_header("company-service")
+        if not dashboard_url:
+            dashboard_url = f"{settings.FRONTEND_URL}/company/dashboard"
+        payload = {
+            "recipient_email": recipient_email,
+            "recipient_name": recipient_name or recipient_email.split("@")[0],
+            "company_name": company_name,
+            "dashboard_url": dashboard_url,
+        }
+        logger.info("Sending company onboarding completed notification to %s (%s)", recipient_email, company_name)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{settings.NOTIFICATION_SERVICE_URL}/api/v1/triggers/notify_company_onboarding_completed",
+                json=payload,
+                headers=headers,
+            )
+            if response.status_code != 202:
+                logger.warning("Notification service returned %s: %s", response.status_code, response.text)
+            response.raise_for_status()
+            logger.info("Company onboarding completed email queued for %s", recipient_email)
+    except Exception as e:
+        logger.warning("Failed to send company onboarding completed email to %s: %s", recipient_email, e, exc_info=True)
 

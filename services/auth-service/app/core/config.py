@@ -100,7 +100,9 @@ class Settings(BaseSettings):
 
     # External Services
     DOCUMENT_SERVICE_URL: str = Field(default="http://localhost:8003", description="Document Service URL")
+    NOTIFICATION_SERVICE_URL: str = Field(default="http://localhost:8007", description="Notification service URL")
     INTERNAL_SERVICE_TOKEN_SECRET: str = Field(default="", description="Secret for internal service tokens")
+    FRONTEND_URL: str = Field(default="http://localhost:3000", description="Frontend URL for links in emails")
     
     # Security
     ALLOWED_HOSTS: List[str] = Field(default=["*"], description="Allowed hosts")

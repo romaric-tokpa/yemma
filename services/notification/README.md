@@ -20,6 +20,32 @@ Le service notification gère l'envoi d'emails asynchrones pour toute la platefo
 - ✅ Gestion des erreurs et retry automatique
 - ✅ Statuts de notification (pending, sent, failed)
 
+## ⚙️ Configuration SMTP
+
+Les emails (inscription candidat, invitations, etc.) sont envoyés via SMTP. Configurez les variables d'environnement (fichier `.env` à la racine du projet ou dans Docker).
+
+| Variable | Description | Exemple |
+|----------|-------------|---------|
+| `EMAIL_PROVIDER` | `fastapi_mail` (SMTP) ou `mock` (log uniquement) | `fastapi_mail` |
+| `SMTP_HOST` | Serveur SMTP | `smtp.gmail.com` |
+| `SMTP_PORT` | Port (souvent 587 pour TLS) | `587` |
+| `SMTP_USE_TLS` | Activer TLS | `true` |
+| `SMTP_USER` | Adresse email d'envoi | `votre-email@gmail.com` |
+| `SMTP_PASSWORD` | Mot de passe ou mot de passe d'application | *(à définir dans .env)* |
+| `SMTP_FROM_EMAIL` | Email expéditeur affiché | `noreply@yemma.com` |
+| `SMTP_FROM_NAME` | Nom expéditeur | `Yemma Solutions` |
+
+### Gmail
+
+1. Activez la [validation en 2 étapes](https://myaccount.google.com/security) sur votre compte Google.
+2. Créez un **mot de passe d'application** : Compte Google → Sécurité → Mots de passe des applications.
+3. Dans votre `.env` : `SMTP_USER=votre@gmail.com` et `SMTP_PASSWORD=xxxx xxxx xxxx xxxx`.
+
+### Sans envoi réel (développement)
+
+- Mettez `EMAIL_PROVIDER=mock` : les emails sont loggés et, en `DEBUG`, enregistrés dans `/tmp/yemma_emails/` (dans le conteneur).
+- Ou laissez `SMTP_USER` / `SMTP_PASSWORD` vides : l'envoi SMTP échouera mais l'inscription ne sera pas bloquée.
+
 ## 📁 Structure
 
 ```

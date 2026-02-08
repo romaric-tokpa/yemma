@@ -61,11 +61,20 @@ export default function RegisterCandidat() {
       }, 2000)
     } catch (err) {
       console.error('Erreur d\'inscription:', err)
-      
+
       // Gestion spécifique des erreurs
       let errorMessage = 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.'
-      
-      if (err.response) {
+
+      // Connexion refusée ou serveur inaccessible (backend non démarré)
+      const isNetworkError =
+        err.code === 'ERR_NETWORK' ||
+        err.message?.includes('Network Error') ||
+        err.message?.includes('Connection refused') ||
+        (err.request && !err.response)
+      if (isNetworkError) {
+        errorMessage =
+          'Impossible de contacter le serveur. Vérifiez que le service d\'authentification est démarré (ex. port 8001 en local). En développement : docker-compose -f docker-compose.dev.yml up auth, ou uvicorn depuis services/auth-service.'
+      } else if (err.response) {
         const status = err.response.status
         const detail = err.response.data?.detail || ''
         

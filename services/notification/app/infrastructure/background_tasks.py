@@ -47,8 +47,17 @@ async def send_notification_task(
             **template_data
         }
         
-        # Utiliser les templates simples pour validation, rejection, invitation
-        if notification_type in ["profile_validated", "profile_rejected", "recruiter_invitation"]:
+        # Utiliser les templates simples (charte graphique) pour ces types
+        if notification_type in [
+            "profile_validated",
+            "profile_rejected",
+            "recruiter_invitation",
+            "candidate_account_created",
+            "candidate_welcome",
+            "company_account_created",
+            "company_onboarding_completed",
+            "company_welcome",
+        ]:
             logger.info(f"Using simple template for notification type: {notification_type}")
             subject, html_body, text_body = get_email_template_simple(notification_type, template_data_with_name)
         else:
@@ -101,5 +110,6 @@ async def send_notification_task(
             except Exception as db_error:
                 logger.error(f"Error updating notification status: {str(db_error)}")
         
-        raise
+        # Ne pas relancer l'exception : la réponse HTTP 202 a déjà été envoyée,
+        # une exception ici provoquerait "RuntimeError: Caught handled exception, but response already started"
 

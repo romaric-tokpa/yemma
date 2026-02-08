@@ -203,6 +203,23 @@ async def update_company(
         company.contact_function = company_data.contact_function
     
     company = await repo.update(company)
+
+    # Envoyer l'email "onboarding complété" après finalisation
+    try:
+        from app.infrastructure.notification_client import send_company_onboarding_completed_notification
+        recipient_name = (
+            f"{(company.contact_first_name or '').strip()} {(company.contact_last_name or '').strip()}".strip()
+            or current_user.email.split("@")[0]
+        )
+        await send_company_onboarding_completed_notification(
+            recipient_email=current_user.email,
+            recipient_name=recipient_name,
+            company_name=company.name,
+            dashboard_url=f"{settings.FRONTEND_URL}/company/dashboard",
+        )
+    except Exception as email_error:
+        logger.warning("Failed to send onboarding completed email to %s: %s", current_user.email, email_error)
+
     return CompanyResponse.model_validate(company)
 
 

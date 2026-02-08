@@ -224,6 +224,10 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      # Notification (email après inscription candidat)
+      NOTIFICATION_SERVICE_URL: http://notification:8000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
     volumes:
       - ./services/auth-service:/app
       - ./services/shared:/shared
@@ -239,6 +243,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      notification:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -595,6 +601,8 @@ services:
       context: ./services/notification
       dockerfile: Dockerfile
     container_name: yemma-notification
+    env_file:
+      - .env
     environment:
       # Application
       APP_NAME: notification-service
@@ -616,8 +624,8 @@ services:
       # SMTP
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-noreply.yemma@gmail.com}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-mszr byaj gzmp scfq}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply.yemma@gmail.com}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Yemma Solutions}
@@ -643,6 +651,9 @@ services:
       
       # Frontend
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      
+      # Token inter-services (doit être identique à auth, company, etc.)
+      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
       
       # CORS (format string séparée par virgules)
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
@@ -692,8 +703,8 @@ services:
       # SMTP
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-noreply.yemma@gmail.com}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-mszr byaj gzmp scfq}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply.yemma@gmail.com}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Yemma Solutions}

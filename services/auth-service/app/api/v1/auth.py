@@ -88,7 +88,45 @@ async def register(
         expires_at=datetime.utcnow() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     )
     await refresh_token_repo.create(refresh_token)
-    
+
+    # Envoyer un email après inscription (compte créé + rappel onboarding)
+    import logging
+    _log = logging.getLogger(__name__)
+    if request.role == "ROLE_CANDIDAT":
+        try:
+            from app.infrastructure.notification_client import send_candidate_registration_notification
+            candidate_name = (
+                f"{(request.first_name or '').strip()} {(request.last_name or '').strip()}".strip()
+                or request.email.split("@")[0]
+            )
+            onboarding_url = f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/onboarding"
+            _log.info("Envoi email inscription candidat: %s (notification_url=%s)", request.email, getattr(settings, "NOTIFICATION_SERVICE_URL", "?"))
+            await send_candidate_registration_notification(
+                candidate_email=request.email,
+                candidate_name=candidate_name,
+                onboarding_url=onboarding_url,
+            )
+            _log.info("Demande email inscription candidat envoyée au service notification pour %s", request.email)
+        except Exception as e:
+            _log.warning("Impossible d'envoyer l'email d'inscription candidat à %s: %s", request.email, e, exc_info=True)
+    elif request.role == "ROLE_COMPANY_ADMIN":
+        try:
+            from app.infrastructure.notification_client import send_company_registration_notification
+            recipient_name = (
+                f"{(request.first_name or '').strip()} {(request.last_name or '').strip()}".strip()
+                or request.email.split("@")[0]
+            )
+            onboarding_url = f"{getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')}/company/onboarding"
+            _log.info("Envoi email inscription recruteur: %s (notification_url=%s)", request.email, getattr(settings, "NOTIFICATION_SERVICE_URL", "?"))
+            await send_company_registration_notification(
+                recipient_email=request.email,
+                recipient_name=recipient_name,
+                onboarding_url=onboarding_url,
+            )
+            _log.info("Demande email inscription recruteur envoyée au service notification pour %s", request.email)
+        except Exception as e:
+            _log.warning("Impossible d'envoyer l'email d'inscription recruteur à %s: %s", request.email, e, exc_info=True)
+
     return Token(
         access_token=access_token,
         refresh_token=refresh_token_str,
