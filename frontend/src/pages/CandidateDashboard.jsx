@@ -68,6 +68,10 @@ export default function CandidateDashboard() {
   const [selectedDocumentFile, setSelectedDocumentFile] = useState(null)
   const [selectedDocumentType, setSelectedDocumentType] = useState('CV')
 
+  // États pour la prévisualisation de document
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState(null)
+
   useEffect(() => {
     loadProfile()
     // Définir l'onglet actif selon l'URL ou le hash
@@ -1666,30 +1670,25 @@ export default function CandidateDashboard() {
                             return `${(bytes / 1024 / 1024).toFixed(1)} MB`
                           }
 
-                          const handleViewDocument = async () => {
-                            try {
-                              const viewResponse = await documentApi.getDocumentViewUrl(doc.id)
-                              window.open(viewResponse.view_url, '_blank')
-                            } catch (error) {
-                              console.error('Error viewing document:', error)
-                              alert('Erreur lors de l\'ouverture du document: ' + (error.response?.data?.detail || error.message))
-                            }
+                          const handleViewDocument = () => {
+                            // Ouvrir le popup de prévisualisation
+                            setPreviewDocument({
+                              ...doc,
+                              url: documentApi.getDocumentServeUrl(doc.id)
+                            })
+                            setShowPreviewDialog(true)
                           }
 
-                          const handleDownloadDocument = async () => {
-                            try {
-                              const viewResponse = await documentApi.getDocumentViewUrl(doc.id)
-                              const link = document.createElement('a')
-                              link.href = viewResponse.view_url
-                              link.download = doc.original_filename
-                              link.target = '_blank'
-                              document.body.appendChild(link)
-                              link.click()
-                              document.body.removeChild(link)
-                            } catch (error) {
-                              console.error('Error downloading document:', error)
-                              alert('Erreur lors du téléchargement du document: ' + (error.response?.data?.detail || error.message))
-                            }
+                          const handleDownloadDocument = () => {
+                            // Utiliser l'endpoint serve pour télécharger
+                            const downloadUrl = documentApi.getDocumentServeUrl(doc.id)
+                            const link = document.createElement('a')
+                            link.href = downloadUrl
+                            link.download = doc.original_filename
+                            link.target = '_blank'
+                            document.body.appendChild(link)
+                            link.click()
+                            document.body.removeChild(link)
                           }
 
                           const handleDeleteDocument = async () => {
@@ -2004,6 +2003,83 @@ export default function CandidateDashboard() {
                   Ajouter le document
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale de prévisualisation de document */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-deep" />
+              {previewDocument?.original_filename || 'Document'}
+            </DialogTitle>
+            <DialogDescription>
+              Prévisualisation du document
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-[60vh] bg-gray-100 rounded-lg overflow-hidden">
+            {previewDocument && (
+              previewDocument.mime_type?.startsWith('image/') ? (
+                <img
+                  src={previewDocument.url}
+                  alt={previewDocument.original_filename}
+                  className="w-full h-full object-contain"
+                />
+              ) : previewDocument.mime_type === 'application/pdf' ? (
+                <iframe
+                  src={previewDocument.url}
+                  title={previewDocument.original_filename}
+                  className="w-full h-[60vh] border-0"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full py-12">
+                  <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Prévisualisation non disponible pour ce type de fichier
+                  </p>
+                  <Button
+                    onClick={() => {
+                      const link = document.createElement('a')
+                      link.href = previewDocument.url
+                      link.download = previewDocument.original_filename
+                      link.target = '_blank'
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Télécharger le fichier
+                  </Button>
+                </div>
+              )
+            )}
+          </div>
+          <DialogFooter className="flex justify-between sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setShowPreviewDialog(false)}
+            >
+              Fermer
+            </Button>
+            <Button
+              onClick={() => {
+                if (previewDocument) {
+                  const link = document.createElement('a')
+                  link.href = previewDocument.url
+                  link.download = previewDocument.original_filename
+                  link.target = '_blank'
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Télécharger
             </Button>
           </DialogFooter>
         </DialogContent>
