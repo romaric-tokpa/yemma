@@ -2,9 +2,19 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Controller } from 'react-hook-form'
 import { 
   User, Briefcase, GraduationCap, Award, Code, FileText, MapPin, 
-  Edit, CheckCircle2, AlertCircle
+  Edit, CheckCircle2, AlertCircle, ExternalLink
 } from 'lucide-react'
 
 const formatDate = (dateString) => {
@@ -46,7 +56,9 @@ const generateCompanyAvatar = (companyName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=100&background=random&color=fff&bold=true&format=svg`
 }
 
-export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onEditStep, profileId }) {
+export default function Step8({ form, formData, onSubmit, onPrevious, isFirstStep, onEditStep, profileId }) {
+  const { control, formState: { errors } } = form || {}
+  const [cguOpen, setCguOpen] = useState(false)
   const step1 = formData.step1 || {}
   const step2 = formData.step2 || {}
   const step3 = formData.step3 || {}
@@ -242,7 +254,7 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
             </div>
             <div>
               <span className="font-medium text-muted-foreground">Localisation :</span>
-              <p>{step1.city}, {step1.country}</p>
+              <p>{[step1.city, step1.country].filter(Boolean).join(', ') || '—'}</p>
             </div>
             <div className="col-span-2">
               <span className="font-medium text-muted-foreground">Adresse :</span>
@@ -661,6 +673,108 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
         </div>
       </div>
 
+      {/* Consentement (CGU, RGPD, vérification) – affiché à la fin avant soumission */}
+      <div className="mt-6 p-4 rounded-lg border bg-gray-50 space-y-4">
+        <p className="text-sm font-medium text-gray-800">
+          Avant de soumettre, veuillez accepter les conditions suivantes :
+        </p>
+        {control && (
+          <>
+            <div className="flex items-start gap-3">
+              <Controller
+                name="acceptCGU"
+                control={control}
+                defaultValue={false}
+                render={({ field }) => (
+                  <Checkbox
+                    id="acceptCGU"
+                    checked={field.value || false}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                )}
+              />
+              <div className="space-y-1 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="acceptCGU" className="text-sm font-medium leading-none cursor-pointer">
+                    J&apos;accepte les Conditions Générales d&apos;Utilisation
+                  </Label>
+                  <Dialog open={cguOpen} onOpenChange={setCguOpen}>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-[#226D68] hover:underline inline-flex items-center gap-1 text-sm font-medium"
+                      >
+                        Consulter les conditions d&apos;utilisation
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>Conditions Générales d&apos;Utilisation</DialogTitle>
+                      </DialogHeader>
+                      <div className="flex-1 min-h-0 overflow-auto -m-2 p-2">
+                        <iframe
+                          title="Conditions d'utilisation"
+                          src={`${window.location.origin}/legal/terms`}
+                          className="w-full h-[70vh] border-0 rounded"
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                {errors?.acceptCGU && (
+                  <p className="text-sm text-destructive">{errors.acceptCGU.message}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Controller
+                name="acceptRGPD"
+                control={control}
+                defaultValue={false}
+                render={({ field }) => (
+                  <Checkbox
+                    id="acceptRGPD"
+                    checked={field.value || false}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                )}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="acceptRGPD" className="text-sm font-medium leading-none cursor-pointer">
+                  J&apos;accepte le traitement de mes données personnelles (RGPD)
+                </Label>
+                {errors?.acceptRGPD && (
+                  <p className="text-sm text-destructive">{errors.acceptRGPD.message}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Controller
+                name="acceptVerification"
+                control={control}
+                defaultValue={false}
+                render={({ field }) => (
+                  <Checkbox
+                    id="acceptVerification"
+                    checked={field.value || false}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                )}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="acceptVerification" className="text-sm font-medium leading-none cursor-pointer">
+                  J&apos;autorise la vérification des informations fournies
+                </Label>
+                {errors?.acceptVerification && (
+                  <p className="text-sm text-destructive">{errors.acceptVerification.message}</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Actions */}
       <div className="flex justify-between items-center pt-4">
         {!isFirstStep && (
@@ -668,7 +782,11 @@ export default function Step8({ formData, onSubmit, onPrevious, isFirstStep, onE
             Précédent
           </Button>
         )}
-        <Button onClick={onSubmit} className="ml-auto" size="lg">
+        <Button
+          onClick={form?.handleSubmit ? () => form.handleSubmit(onSubmit)() : onSubmit}
+          className="ml-auto"
+          size="lg"
+        >
           <CheckCircle2 className="w-4 h-4 mr-2" />
           Soumettre mon profil pour validation
         </Button>

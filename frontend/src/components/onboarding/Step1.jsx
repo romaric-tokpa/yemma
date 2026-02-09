@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react'
+import { Controller } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { SearchableSelect } from '@/components/ui/searchable-select'
+import { COUNTRIES_FR } from '@/data/countries'
+import { SECTORS_FR } from '@/data/sectors'
 import { Upload, X } from 'lucide-react'
 
 export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId, formData: parentFormData }) {
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = form
+  const { register, handleSubmit, formState: { errors }, watch, setValue, control } = form
   const [photoPreview, setPhotoPreview] = useState(null)
   const [photoUrl, setPhotoUrl] = useState(watch('photoUrl') || null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
@@ -207,7 +211,20 @@ export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId
 
         <div className="space-y-2">
           <Label htmlFor="nationality">Nationalité *</Label>
-          <Input id="nationality" {...register('nationality')} />
+          <Controller
+            name="nationality"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                id="nationality"
+                options={COUNTRIES_FR}
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                placeholder="Rechercher ou choisir une nationalité..."
+                aria-label="Nationalité"
+              />
+            )}
+          />
           {errors.nationality && (
             <p className="text-sm text-destructive">{errors.nationality.message}</p>
           )}
@@ -238,16 +255,21 @@ export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="city">Ville *</Label>
-          <Input id="city" {...register('city')} />
-          {errors.city && (
-            <p className="text-sm text-destructive">{errors.city.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="country">Pays *</Label>
-          <Input id="country" {...register('country')} />
+          <Controller
+            name="country"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                id="country"
+                options={COUNTRIES_FR}
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                placeholder="Rechercher ou choisir un pays..."
+                aria-label="Pays"
+              />
+            )}
+          />
           {errors.country && (
             <p className="text-sm text-destructive">{errors.country.message}</p>
           )}
@@ -274,8 +296,21 @@ export default function Step1({ form, onNext, onPrevious, isFirstStep, profileId
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="sector">Secteur(s) d'activité *</Label>
-          <Input id="sector" {...register('sector')} />
+          <Label htmlFor="sector">Secteur d'activité *</Label>
+          <Controller
+            name="sector"
+            control={control}
+            render={({ field }) => (
+              <SearchableSelect
+                id="sector"
+                options={SECTORS_FR}
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                placeholder="Rechercher ou choisir un secteur..."
+                aria-label="Secteur d'activité"
+              />
+            )}
+          />
           {errors.sector && (
             <p className="text-sm text-destructive">{errors.sector.message}</p>
           )}

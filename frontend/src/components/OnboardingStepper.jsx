@@ -53,7 +53,7 @@ const STEPS = [
   { id: 5, title: 'Compétences', icon: Zap, component: Step5, schema: step5Schema },
   { id: 6, title: 'Documents', icon: File, component: Step6, schema: step6Schema },
   { id: 7, title: 'Recherche d\'emploi', icon: Search, component: Step7, schema: step7Schema },
-  { id: 8, title: 'Récapitulatif', icon: CheckSquare, component: Step8, schema: null },
+  { id: 8, title: 'Récapitulatif', icon: CheckSquare, component: Step8, schema: step0Schema },
 ]
 
 export default function OnboardingStepper() {
@@ -72,11 +72,10 @@ export default function OnboardingStepper() {
     const match = location.pathname.match(/\/onboarding\/step(\d+)/)
     if (match) {
       const stepNum = parseInt(match[1], 10)
-      if (stepNum >= 0 && stepNum < STEPS.length) {
-        return stepNum
-      }
+      if (stepNum === 0) return 1
+      if (stepNum >= 1 && stepNum <= 8) return stepNum
     }
-    return 0
+    return 1
   }
 
   const currentStep = getStepFromPath()
@@ -97,7 +96,7 @@ export default function OnboardingStepper() {
       progressValue += 0.5
     }
     
-    return Math.min(100, (progressValue / STEPS.length) * 100)
+    return Math.min(100, (progressValue / 8) * 100)
   }, [formData.completionPercentage, completedSteps, formData, currentStep])
 
   useEffect(() => {
@@ -118,23 +117,19 @@ export default function OnboardingStepper() {
           setFormData(transformedData)
           
           const completed = []
-          const lastStep = transformedData.lastStep !== undefined && transformedData.lastStep !== null ? transformedData.lastStep : -1
-          for (let i = 0; i <= lastStep && i < STEPS.length; i++) {
+          const lastStep = transformedData.lastStep !== undefined && transformedData.lastStep !== null ? transformedData.lastStep : 0
+          for (let i = 1; i <= Math.min(lastStep, 8); i++) {
             completed.push(i)
           }
           setCompletedSteps(completed)
           
           if (!initialStepLoaded) {
             const stepFromPath = getStepFromPath()
-            if (location.pathname === '/onboarding' || stepFromPath < transformedData.lastStep) {
-              const targetStep = transformedData.lastStep !== undefined && transformedData.lastStep < STEPS.length - 1
-                ? transformedData.lastStep + 1
-                : 0
+            const lastStep = transformedData.lastStep !== undefined && transformedData.lastStep !== null ? transformedData.lastStep : 0
+            const targetStep = lastStep < 1 ? 1 : Math.min(lastStep + 1, 8)
+            if (location.pathname === '/onboarding' || location.pathname === '/onboarding/step0' || stepFromPath < 1 || stepFromPath > 8) {
               navigate(`/onboarding/step${targetStep}`, { replace: true })
-            } else if (stepFromPath !== getStepFromPath()) {
-              const targetStep = transformedData.lastStep !== undefined && transformedData.lastStep < STEPS.length - 1
-                ? transformedData.lastStep + 1
-                : 0
+            } else if (stepFromPath > targetStep && stepFromPath !== 8) {
               navigate(`/onboarding/step${targetStep}`, { replace: true })
             }
             setInitialStepLoaded(true)
@@ -149,8 +144,18 @@ export default function OnboardingStepper() {
                 last_name: user.last_name || '',
               })
               setProfileId(newProfile.id)
+              // Préremplir step1 avec les infos d'inscription (prénom, nom, email)
+              setFormData((prev) => ({
+                ...prev,
+                step1: {
+                  ...(prev.step1 || {}),
+                  firstName: newProfile.first_name ?? user.first_name ?? '',
+                  lastName: newProfile.last_name ?? user.last_name ?? '',
+                  email: newProfile.email ?? user.email ?? '',
+                },
+              }))
               if (!initialStepLoaded) {
-                navigate('/onboarding/step0', { replace: true })
+                navigate('/onboarding/step1', { replace: true })
                 setInitialStepLoaded(true)
               }
             } catch (createError) {
@@ -178,21 +183,18 @@ export default function OnboardingStepper() {
 
   const currentStepData = useMemo(() => {
     const stepFromPath = getStepFromPath()
-    return formData[`step${stepFromPath}`] || (stepFromPath === 0 ? {
-      acceptCGU: false,
-      acceptRGPD: false,
-      acceptVerification: false,
-    } : {})
+    const stepData = formData[`step${stepFromPath}`] || {}
+    if (stepFromPath === 8) {
+      const step0 = formData.step0 || { acceptCGU: false, acceptRGPD: false, acceptVerification: false }
+      return { ...stepData, ...step0 }
+    }
+    return stepData
   }, [location.pathname, formData])
 
   useEffect(() => {
     const stepFromPath = getStepFromPath()
-    
-    if (previousStepRef.current === stepFromPath) {
-      return
-    }
-    
     previousStepRef.current = stepFromPath
+    // Toujours synchroniser le formulaire avec currentStepData (navigation ou préremplissage après inscription)
     form.reset(currentStepData)
   }, [location.pathname, form, currentStepData])
 
@@ -447,7 +449,7 @@ export default function OnboardingStepper() {
   }
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
+    if (currentStep > 1) {
       handleStepChange(currentStep - 1)
     }
   }
@@ -475,44 +477,15 @@ export default function OnboardingStepper() {
         ...transformedData,
         ...formData,
         [`step${currentStep}`]: data,
-        step0: transformedData.step0 || {
+        step0: currentStep === 8 ? {
+          acceptCGU: data.acceptCGU === true,
+          acceptRGPD: data.acceptRGPD === true,
+          acceptVerification: data.acceptVerification === true,
+        } : (transformedData.step0 || {
           acceptCGU: false,
           acceptRGPD: false,
           acceptVerification: false,
-        },
-      }
-      
-      const backendConsents = {
-        acceptCGU: profile.accept_cgu === true,
-        acceptRGPD: profile.accept_rgpd === true,
-        acceptVerification: profile.accept_verification === true,
-      }
-      
-      console.log('Vérification des consentements avant soumission:', {
-        backend: {
-          accept_cgu: profile.accept_cgu,
-          accept_rgpd: profile.accept_rgpd,
-          accept_verification: profile.accept_verification,
-        },
-        computed: backendConsents,
-        step0_from_transform: transformedData.step0,
-      })
-      
-      if (!backendConsents.acceptCGU || !backendConsents.acceptRGPD || !backendConsents.acceptVerification) {
-        console.warn('Consentements non acceptés dans le backend:', {
-          accept_cgu: profile.accept_cgu,
-          accept_rgpd: profile.accept_rgpd,
-          accept_verification: profile.accept_verification,
-          types: {
-            accept_cgu_type: typeof profile.accept_cgu,
-            accept_rgpd_type: typeof profile.accept_rgpd,
-            accept_verification_type: typeof profile.accept_verification,
-          },
-        })
-        alert('Vous devez accepter les conditions d\'utilisation (CGU, RGPD et vérification) avant de soumettre votre profil. Redirection vers l\'étape des consentements...')
-        navigate('/onboarding/step0')
-        setIsSaving(false)
-        return
+        }),
       }
       
       // Sauvegarder explicitement l'étape courante si ce n'est pas l'étape 8 (récapitulatif)
@@ -658,7 +631,7 @@ export default function OnboardingStepper() {
           <div className="mb-3 sm:mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs sm:text-sm font-medium">
-                Étape {currentStep + 1} sur {STEPS.length}
+                Étape {currentStep} sur 8
               </span>
               <span className="text-xs sm:text-sm font-semibold">{Math.round(progress)}% complété</span>
             </div>
@@ -671,7 +644,8 @@ export default function OnboardingStepper() {
       <div className="bg-white border-b shadow-sm sticky top-0 z-40">
         <div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
           <div className="flex justify-between items-center overflow-x-auto pb-2 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide">
-            {STEPS.slice(0, 8).map((step, index) => {
+            {STEPS.slice(1, 9).map((step) => {
+              const index = step.id
               const isCompleted = completedSteps.includes(index)
               const isCurrent = index === currentStep
               const isAccessible = isCompleted || isCurrent || index < currentStep
@@ -724,7 +698,7 @@ export default function OnboardingStepper() {
               <div className="text-center sm:text-left flex-1 min-w-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-anthracite font-heading">{currentStepConfig.title}</h2>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                  Étape {currentStep + 1} sur {STEPS.length}
+                  Étape {currentStep} sur 8
                 </p>
               </div>
             </div>
@@ -740,7 +714,7 @@ export default function OnboardingStepper() {
               onSubmit={handleSubmit}
               onEditStep={handleStepChange}
               isLastStep={currentStep === STEPS.length - 1}
-              isFirstStep={currentStep === 0}
+              isFirstStep={currentStep === 1}
               profileId={profileId}
             />
           </div>
@@ -751,7 +725,7 @@ export default function OnboardingStepper() {
               type="button"
               variant="outline"
               onClick={handlePrevious}
-              disabled={currentStep === 0 || isSaving}
+              disabled={currentStep === 1 || isSaving}
               className="border-blue-deep text-blue-deep hover:bg-blue-deep/10 w-full sm:w-auto order-2 sm:order-1"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />

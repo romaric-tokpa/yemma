@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress'
 import React from 'react'
 import { Building, Upload, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight, Loader2, Save, FileText, Image as ImageIcon, User, Mail, Phone, Briefcase } from 'lucide-react'
-import { companyApi, documentApi } from '@/services/api'
+import { companyApi, documentApi, authApiService } from '@/services/api'
 
 const companyOnboardingSchema = z.object({
   name: z.string().min(2, 'Le nom de l\'entreprise doit contenir au moins 2 caractères'),
@@ -92,6 +92,18 @@ export default function CompanyOnboarding() {
         setValue('contact_email', companyData.contact_email || '')
         setValue('contact_phone', companyData.contact_phone || '')
         setValue('contact_function', companyData.contact_function || '')
+        // Si le contact référent n'est pas renseigné, préremplir avec l'utilisateur connecté (inscription recruteur)
+        const noContact = !companyData.contact_first_name && !companyData.contact_last_name && !companyData.contact_email
+        if (noContact) {
+          try {
+            const user = await authApiService.getCurrentUser()
+            setValue('contact_first_name', user.first_name || '')
+            setValue('contact_last_name', user.last_name || '')
+            setValue('contact_email', user.email || '')
+          } catch (e) {
+            console.warn('Impossible de récupérer l\'utilisateur pour préremplir le contact:', e)
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading company:', error)
@@ -99,6 +111,15 @@ export default function CompanyOnboarding() {
       if (error.response?.status === 404) {
         setCompany(null)
         setError(null)
+        // Préremplir le contact référent avec l'utilisateur connecté (inscription recruteur)
+        try {
+          const user = await authApiService.getCurrentUser()
+          setValue('contact_first_name', user.first_name || '')
+          setValue('contact_last_name', user.last_name || '')
+          setValue('contact_email', user.email || '')
+        } catch (e) {
+          console.warn('Impossible de récupérer l\'utilisateur pour préremplir le contact:', e)
+        }
       } else if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
         setError('Impossible de se connecter au serveur. Vérifiez votre connexion et que les services sont démarrés.')
       } else if (error.response?.data?.detail) {

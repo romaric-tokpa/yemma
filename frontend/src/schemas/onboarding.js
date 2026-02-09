@@ -22,7 +22,6 @@ export const step1Schema = z.object({
   email: z.string().email("Email invalide"),
   phone: z.string().min(10, "Le numéro de téléphone est invalide"),
   address: z.string().min(5, "L'adresse est requise"),
-  city: z.string().min(2, "La ville est requise"),
   country: z.string().min(2, "Le pays est requis"),
   profileTitle: z.string().min(5, "Le titre du profil doit contenir au moins 5 caractères"),
   professionalSummary: z.string().min(300, "Le résumé professionnel doit contenir au moins 300 caractères"),

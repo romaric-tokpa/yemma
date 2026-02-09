@@ -81,11 +81,19 @@ export default function AppRoutes() {
         path="/onboarding" 
         element={
           <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
-            <Navigate to="/onboarding/step0" replace />
+            <Navigate to="/onboarding/step1" replace />
           </AuthGuard>
         } 
       />
-      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(step => (
+      <Route 
+        path="/onboarding/step0" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+            <Navigate to="/onboarding/step1" replace />
+          </AuthGuard>
+        } 
+      />
+      {[1, 2, 3, 4, 5, 6, 7, 8].map(step => (
         <Route
           key={step}
           path={`/onboarding/step${step}`}
