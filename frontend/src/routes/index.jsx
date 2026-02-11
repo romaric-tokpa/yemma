@@ -20,8 +20,7 @@ const CGU = lazy(() => import('@/pages/legal/CGU'))
 const HowItWorks = lazy(() => import('@/pages/HowItWorks'))
 
 // Routes Candidat
-const OnboardingStepper = lazy(() => import('@/components/OnboardingStepper'))
-const OnboardingComplete = lazy(() => import('@/pages/OnboardingComplete'))
+const CandidateOnboarding = lazy(() => import('@/pages/CandidateOnboarding'))
 const CandidateDashboard = lazy(() => import('@/pages/CandidateDashboard'))
 const EditProfile = lazy(() => import('@/pages/profile/EditProfile'))
 
@@ -38,6 +37,8 @@ const CandidateDetailPage = lazy(() => import('@/pages/CandidateDetailPage'))
 // Routes Admin
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'))
 const AdminReview = lazy(() => import('@/pages/AdminReview'))
+const AdminInvitationsPage = lazy(() => import('@/pages/AdminInvitationsPage'))
+const CreateAdminAccount = lazy(() => import('@/pages/CreateAdminAccount'))
 
 // Page 404
 const NotFound = lazy(() => import('@/pages/NotFound'))
@@ -74,43 +75,39 @@ export default function AppRoutes() {
       <Route path="/register/company" element={<RegisterCompany />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/invitation/accept" element={<AcceptInvitation />} />
+      
+      {/* Route publique pour création de compte admin via token d'invitation */}
+      <Route path="/admin/create-account" element={<CreateAdminAccount />} />
 
       {/* Routes protégées - Candidat */}
-      {/* Onboarding */}
-      <Route 
-        path="/onboarding" 
+      {/* Onboarding simplifié : upload CV → profil créé via Hrflow.ai */}
+      <Route
+        path="/onboarding"
         element={
           <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
-            <Navigate to="/onboarding/step1" replace />
+            <CandidateOnboarding />
           </AuthGuard>
-        } 
+        }
       />
-      <Route 
-        path="/onboarding/step0" 
-        element={
-          <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
-            <Navigate to="/onboarding/step1" replace />
-          </AuthGuard>
-        } 
-      />
-      {[1, 2, 3, 4, 5, 6, 7, 8].map(step => (
+      {/* Redirection des anciennes routes step vers le nouvel onboarding */}
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(step => (
         <Route
           key={step}
           path={`/onboarding/step${step}`}
           element={
             <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
-              <OnboardingStepper />
+              <Navigate to="/onboarding" replace />
             </AuthGuard>
           }
         />
       ))}
-      <Route 
-        path="/onboarding/complete" 
+      <Route
+        path="/onboarding/complete"
         element={
           <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
-            <OnboardingComplete />
+            <Navigate to="/candidate/dashboard" replace />
           </AuthGuard>
-        } 
+        }
       />
       
       {/* Dashboard et profil */}
@@ -221,6 +218,14 @@ export default function AppRoutes() {
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminReview />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/invitations" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_SUPER_ADMIN']}>
+            <AdminInvitationsPage />
           </AuthGuard>
         } 
       />

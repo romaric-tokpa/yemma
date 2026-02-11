@@ -4,11 +4,12 @@ import CandidateDataView from '@/components/admin/CandidateDataView'
 import DocumentViewer from '@/components/admin/DocumentViewer'
 import EvaluationForm from '@/components/admin/EvaluationForm'
 import { candidateApi, documentApi } from '@/services/api'
+import { formatDateTime } from '@/utils/dateUtils'
 import { 
   Loader2, AlertCircle, RefreshCw, ArrowLeft, 
   User, Mail, Phone, MapPin, Briefcase, Award,
   ChevronRight, Calendar, FileText, CheckCircle2, Star,
-  GraduationCap, Target, TrendingUp, Sparkles
+  GraduationCap, Target, TrendingUp, Sparkles, Clock
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -273,20 +274,20 @@ export default function AdminReview() {
   const location = candidateData ? [candidateData.city, candidateData.country].filter(Boolean).join(', ') : ''
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header compact avec navigation */}
-      <div className="bg-white border-b sticky top-0 z-20 shadow-sm">
-        <div className="container mx-auto px-4 py-2">
-          <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-gray-light">
+      {/* Barre supérieure - charte */}
+      <div className="bg-white border-b border-border sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Link to="/admin/dashboard">
-              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs">
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-gray-anthracite hover:text-[#226D68]">
                 <ArrowLeft className="w-3.5 h-3.5 mr-1" />
                 Retour
               </Button>
             </Link>
             <Separator orientation="vertical" className="h-4" />
             <div className="text-xs text-muted-foreground">
-              <Link to="/admin/dashboard" className="hover:text-primary">Dashboard</Link>
+              <Link to="/admin/dashboard" className="hover:text-[#226D68] text-gray-anthracite">Dashboard</Link>
               <ChevronRight className="w-3 h-3 inline mx-1" />
               <span>Validation #{candidateId}</span>
             </div>
@@ -299,7 +300,7 @@ export default function AdminReview() {
               variant="ghost"
               size="sm"
               onClick={() => fetchCandidateData()}
-              className="h-8 px-2 text-xs"
+              className="h-8 px-2 text-xs text-gray-anthracite hover:text-[#226D68]"
               disabled={loading}
             >
               <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} />
@@ -309,88 +310,77 @@ export default function AdminReview() {
         </div>
       </div>
 
-      {/* Header avec gradient (comme CandidateDetailPage) */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex flex-col md:flex-row items-start gap-4">
-            {/* Photo de profil avec badge de score */}
+      {/* Header candidat - bandeau charte vert */}
+      <div className="bg-gradient-to-r from-[#226D68] to-[#1a5a55] text-white">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
             <div className="flex-shrink-0 relative">
-              <div className="relative">
-                <img
-                  src={displayPhoto}
-                  alt={fullName}
-                  className="w-24 h-24 rounded-full object-cover border-4 border-white/30 shadow-xl"
-                  onError={(e) => {
-                    if (!photoError && e.target.src !== defaultAvatar) {
-                      setPhotoError(true)
-                      e.target.src = defaultAvatar
-                    } else if (e.target.src !== defaultAvatar) {
-                      e.target.src = defaultAvatar
-                    }
-                  }}
-                  onLoad={() => {
-                    if (photoError && photoUrl) {
-                      setPhotoError(false)
-                    }
-                  }}
-                />
-                {candidateData?.status === 'VALIDATED' && candidateData?.is_verified && (
-                  <div className="absolute -top-1 -right-1 bg-white rounded-full p-1 shadow-lg z-10">
-                    <CheckCircle2 className="h-4 w-4 text-[#226D68]" />
-                  </div>
-                )}
-                
-                {/* Badge de score */}
-                {candidateData?.admin_score && (
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-[#e76f51] text-white rounded-full px-2.5 py-1 shadow-xl flex items-center gap-1 border-2 border-white z-10">
-                    <Star className="h-3 w-3 fill-current" />
-                    <span className="text-xs font-bold whitespace-nowrap">
-                      {candidateData.admin_score.toFixed(1)}/5
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Informations principales */}
-            <div className="flex-1 text-white min-w-0">
-              <h1 className="text-2xl font-bold mb-1 truncate">{fullName}</h1>
-              
-              {candidateData?.profile_title && (
-                <p className="text-base text-white/90 mb-3 font-medium truncate">{candidateData.profile_title}</p>
+              <img
+                src={displayPhoto}
+                alt={fullName}
+                className="w-20 h-20 rounded-full object-cover border-2 border-white/40 shadow-lg"
+                onError={(e) => {
+                  if (!photoError && e.target.src !== defaultAvatar) {
+                    setPhotoError(true)
+                    e.target.src = defaultAvatar
+                  } else if (e.target.src !== defaultAvatar) {
+                    e.target.src = defaultAvatar
+                  }
+                }}
+                onLoad={() => {
+                  if (photoError && photoUrl) setPhotoError(false)
+                }}
+              />
+              {candidateData?.status === 'VALIDATED' && candidateData?.is_verified && (
+                <div className="absolute -top-0.5 -right-0.5 bg-white rounded-full p-0.5 shadow z-10">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[#226D68]" />
+                </div>
               )}
-              
-              {/* Informations de contact compactes */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+              {candidateData?.admin_score != null && (
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-[#e76f51] text-white rounded-full px-2 py-0.5 shadow flex items-center gap-0.5 border border-white z-10">
+                  <Star className="h-2.5 w-2.5 fill-current" />
+                  <span className="text-[10px] font-bold">{candidateData.admin_score.toFixed(1)}/5</span>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="font-heading text-xl sm:text-2xl font-bold truncate">{fullName}</h1>
+              {candidateData?.profile_title && (
+                <p className="text-sm text-white/90 truncate mb-2">{candidateData.profile_title}</p>
+              )}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/90">
                 {location && (
-                  <div className="flex items-center gap-1.5 text-white/80">
+                  <span className="flex items-center gap-1 truncate">
                     <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate">{location}</span>
-                  </div>
+                    {location}
+                  </span>
                 )}
-                {candidateData?.total_experience !== undefined && (
-                  <div className="flex items-center gap-1.5 text-white/80">
-                    <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{candidateData.total_experience} an{candidateData.total_experience > 1 ? 's' : ''}</span>
-                  </div>
-                )}
+                {location && (candidateData?.email || candidateData?.phone) && <span className="text-white/50">·</span>}
                 {candidateData?.email && (
-                  <div className="flex items-center gap-1.5 text-white/80">
+                  <span className="flex items-center gap-1 truncate">
                     <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate">{candidateData.email}</span>
-                  </div>
+                    {candidateData.email}
+                  </span>
                 )}
+                {candidateData?.email && candidateData?.phone && <span className="text-white/50">·</span>}
                 {candidateData?.phone && (
-                  <div className="flex items-center gap-1.5 text-white/80">
+                  <span className="flex items-center gap-1">
                     <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{candidateData.phone}</span>
-                  </div>
+                    {candidateData.phone}
+                  </span>
                 )}
-                {candidateData?.completion_percentage !== undefined && (
-                  <div className="flex items-center gap-1.5 text-white/80">
+                {(location || candidateData?.email || candidateData?.phone) && (candidateData?.total_experience != null || candidateData?.completion_percentage != null) && <span className="text-white/50">·</span>}
+                {candidateData?.total_experience != null && (
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
+                    {candidateData.total_experience} an{candidateData.total_experience > 1 ? 's' : ''}
+                  </span>
+                )}
+                {candidateData?.completion_percentage != null && (
+                  <span className="flex items-center gap-1">
                     <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>{candidateData.completion_percentage.toFixed(0)}% complété</span>
-                  </div>
+                    {candidateData.completion_percentage.toFixed(0)}% complété
+                  </span>
                 )}
               </div>
             </div>
@@ -400,170 +390,121 @@ export default function AdminReview() {
 
       {/* Contenu principal */}
       <div className="max-w-7xl mx-auto px-4 py-4">
-        {/* Avis Expert en avant - Card mise en évidence */}
+        {/* Dates et historique du profil */}
+        {(candidateData?.created_at || candidateData?.updated_at || candidateData?.submitted_at || candidateData?.validated_at || candidateData?.rejected_at) && (
+          <Card className="mb-4 border border-border overflow-hidden">
+            <CardHeader className="py-2.5 px-4 border-b border-border bg-muted/20">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-gray-anthracite">
+                <Clock className="h-4 w-4 text-[#226D68]" />
+                Dates et historique
+              </CardTitle>
+              <CardDescription className="text-xs">Inscription, modifications et décision admin (date et heure).</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                {candidateData.created_at && (
+                  <div>
+                    <dt className="text-muted-foreground font-medium">Inscription</dt>
+                    <dd className="text-gray-anthracite font-medium mt-0.5">{formatDateTime(candidateData.created_at)}</dd>
+                  </div>
+                )}
+                {candidateData.updated_at && (
+                  <div>
+                    <dt className="text-muted-foreground font-medium">Dernière modification</dt>
+                    <dd className="text-gray-anthracite font-medium mt-0.5">{formatDateTime(candidateData.updated_at)}</dd>
+                  </div>
+                )}
+                {candidateData.submitted_at && (
+                  <div>
+                    <dt className="text-muted-foreground font-medium">Soumission</dt>
+                    <dd className="text-gray-anthracite font-medium mt-0.5">{formatDateTime(candidateData.submitted_at)}</dd>
+                  </div>
+                )}
+                {candidateData.validated_at && (
+                  <div>
+                    <dt className="text-muted-foreground font-medium">Validation (admin)</dt>
+                    <dd className="text-[#1a5a55] font-medium mt-0.5">{formatDateTime(candidateData.validated_at)}</dd>
+                  </div>
+                )}
+                {candidateData.rejected_at && (
+                  <div>
+                    <dt className="text-muted-foreground font-medium">Rejet (admin)</dt>
+                    <dd className="text-[#c04a2f] font-medium mt-0.5">{formatDateTime(candidateData.rejected_at)}</dd>
+                  </div>
+                )}
+              </dl>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Avis Expert - compact (ligne de pastilles + texte) */}
         {candidateData?.admin_report && Object.keys(candidateData.admin_report).length > 0 && (
-          <Card className="mb-4 sm:mb-6 border-l-4 border-l-[#226D68] shadow-lg bg-gradient-to-r from-white to-[#226D68]/5">
-            <CardHeader className="pb-3 sm:pb-4 p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
-                <div className="p-2 bg-[#226D68]/10 rounded-lg flex-shrink-0">
-                  <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#226D68]" />
+          <Card className="mb-4 border-l-4 border-l-[#226D68] shadow-md bg-gradient-to-r from-white to-[#226D68]/5 rounded-lg">
+            <CardHeader className="py-3 px-4">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-[#226D68]/10 rounded-lg">
+                  <Sparkles className="h-4 w-4 text-[#226D68]" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl sm:text-2xl font-bold text-gray-anthracite">Avis de l'Expert</CardTitle>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Évaluation professionnelle du profil</p>
+                  <CardTitle className="font-heading text-base font-bold text-gray-anthracite">Avis de l&apos;Expert</CardTitle>
+                  <p className="text-xs text-muted-foreground">Évaluation professionnelle</p>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0 p-4 sm:p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+            <CardContent className="pt-0 px-4 pb-4">
+              {/* Ligne de pastilles : Globale · Technique · Soft · Com. · Motiv. */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
                 {candidateData.admin_report.overall_score !== undefined && (
-                  <div className="bg-gradient-to-br from-[#226D68]/10 to-[#226D68]/5 rounded-lg p-4 border border-[#226D68]/20">
-                    <p className="text-sm text-muted-foreground mb-2 font-medium">Note globale</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < Math.round(candidateData.admin_report.overall_score)
-                                ? 'text-yellow-500 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-2 font-bold text-xl text-gray-anthracite">
-                        {candidateData.admin_report.overall_score.toFixed(1)}/5
-                      </span>
-                    </div>
-                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[#226D68]/10 border border-[#226D68]/20 px-2.5 py-1 text-xs font-medium text-gray-anthracite">
+                    <Star className="h-3 w-3 text-[#226D68] fill-current" />
+                    Globale {candidateData.admin_report.overall_score.toFixed(1)}/5
+                  </span>
                 )}
-                
                 {candidateData.admin_report.technical_skills_rating !== undefined && (
-                  <div className="bg-blue-deep/5 rounded-lg p-4 border border-blue-deep/20">
-                    <p className="text-sm text-muted-foreground mb-2 font-medium">Compétences techniques</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < candidateData.admin_report.technical_skills_rating
-                                ? 'text-yellow-500 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-2 font-bold text-lg text-gray-anthracite">
-                        {candidateData.admin_report.technical_skills_rating}/5
-                      </span>
-                    </div>
-                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Technique {candidateData.admin_report.technical_skills_rating}/5
+                  </span>
                 )}
-
                 {candidateData.admin_report.soft_skills_rating !== undefined && (
-                  <div className="bg-blue-deep/5 rounded-lg p-4 border border-blue-deep/20">
-                    <p className="text-sm text-muted-foreground mb-2 font-medium">Compétences comportementales</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < candidateData.admin_report.soft_skills_rating
-                                ? 'text-yellow-500 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-2 font-bold text-lg text-gray-anthracite">
-                        {candidateData.admin_report.soft_skills_rating}/5
-                      </span>
-                    </div>
-                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Soft {candidateData.admin_report.soft_skills_rating}/5
+                  </span>
                 )}
-
                 {candidateData.admin_report.communication_rating !== undefined && (
-                  <div className="bg-blue-deep/5 rounded-lg p-4 border border-blue-deep/20">
-                    <p className="text-sm text-muted-foreground mb-2 font-medium">Communication</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < candidateData.admin_report.communication_rating
-                                ? 'text-yellow-500 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-2 font-bold text-lg text-gray-anthracite">
-                        {candidateData.admin_report.communication_rating}/5
-                      </span>
-                    </div>
-                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Com. {candidateData.admin_report.communication_rating}/5
+                  </span>
                 )}
-
                 {candidateData.admin_report.motivation_rating !== undefined && (
-                  <div className="bg-blue-deep/5 rounded-lg p-4 border border-blue-deep/20">
-                    <p className="text-sm text-muted-foreground mb-2 font-medium">Motivation</p>
-                    <div className="flex items-center gap-2">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-5 w-5 ${
-                              i < candidateData.admin_report.motivation_rating
-                                ? 'text-yellow-500 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="ml-2 font-bold text-lg text-gray-anthracite">
-                        {candidateData.admin_report.motivation_rating}/5
-                      </span>
-                    </div>
-                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Motiv. {candidateData.admin_report.motivation_rating}/5
+                  </span>
                 )}
               </div>
-
               {candidateData.admin_report.soft_skills_tags && candidateData.admin_report.soft_skills_tags.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">Tags de compétences comportementales</p>
-                  <div className="flex flex-wrap gap-2">
-                    {candidateData.admin_report.soft_skills_tags.map((tag, index) => (
-                      <Badge key={index} variant="secondary" className="bg-[#226D68]/10 text-[#226D68] border-[#226D68]/20">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {candidateData.admin_report.soft_skills_tags.map((tag, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs bg-[#226D68]/10 text-[#1a5a55] border-[#226D68]/20">
+                      {tag}
+                    </Badge>
+                  ))}
                 </div>
               )}
-
               {candidateData.admin_report.summary && (
-                <div className="mb-4">
-                  <p className="text-sm font-semibold text-gray-anthracite mb-2">Résumé de l'évaluation</p>
-                  <p className="text-foreground whitespace-pre-wrap leading-relaxed">{candidateData.admin_report.summary}</p>
-                </div>
+                <p className="text-sm text-gray-anthracite whitespace-pre-wrap leading-relaxed mb-3">{candidateData.admin_report.summary}</p>
               )}
-
               {(candidateData.admin_report.interview_notes || candidateData.admin_report.recommendations) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 pt-6 border-t border-border">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-border">
                   {candidateData.admin_report.interview_notes && (
                     <div>
-                      <p className="text-sm font-semibold text-gray-anthracite mb-2">Notes d'entretien</p>
-                      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{candidateData.admin_report.interview_notes}</p>
+                      <p className="text-xs font-semibold text-gray-anthracite mb-1">Notes d&apos;entretien</p>
+                      <p className="text-sm text-gray-anthracite whitespace-pre-wrap">{candidateData.admin_report.interview_notes}</p>
                     </div>
                   )}
                   {candidateData.admin_report.recommendations && (
                     <div>
-                      <p className="text-sm font-semibold text-gray-anthracite mb-2">Recommandations</p>
-                      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{candidateData.admin_report.recommendations}</p>
+                      <p className="text-xs font-semibold text-gray-anthracite mb-1">Recommandations</p>
+                      <p className="text-sm text-gray-anthracite whitespace-pre-wrap">{candidateData.admin_report.recommendations}</p>
                     </div>
                   )}
                 </div>
@@ -572,44 +513,43 @@ export default function AdminReview() {
           </Card>
         )}
 
-        {/* Tabs pour le reste du contenu */}
+        {/* Tabs - charte (primary actif, fond muted) */}
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="bg-white mb-3 h-9">
-            <TabsTrigger value="profile" className="text-xs px-3 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsList className="bg-muted/80 mb-3 h-9 rounded-lg p-0.5">
+            <TabsTrigger value="profile" className="text-xs px-3 rounded-md data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-gray-anthracite">
               <User className="w-3.5 h-3.5 mr-1.5" />
               Profil
             </TabsTrigger>
-            <TabsTrigger value="documents" className="text-xs px-3 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <TabsTrigger value="documents" className="text-xs px-3 rounded-md data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-gray-anthracite">
               <FileText className="w-3.5 h-3.5 mr-1.5" />
               Documents ({documents.length})
             </TabsTrigger>
-            <TabsTrigger value="evaluation" className="text-xs px-3 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <TabsTrigger value="evaluation" className="text-xs px-3 rounded-md data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-gray-anthracite">
               <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
               Évaluation
             </TabsTrigger>
           </TabsList>
 
-          {/* Contenu Profile */}
           <TabsContent value="profile" className="mt-3 space-y-3">
             <CandidateDataView data={candidateData} />
           </TabsContent>
 
-          {/* Contenu Documents */}
           <TabsContent value="documents" className="mt-3">
-            <Card className="shadow-md min-h-[400px]">
-              <CardHeader className="py-2 px-3 bg-gradient-to-r from-purple-50 to-purple-100/50 border-b">
-                <CardTitle className="text-sm flex items-center gap-1.5 text-purple-900">
-                  <FileText className="w-4 h-4" />
-                  Documents du Candidat
+            <Card className="shadow-sm rounded-lg border border-border overflow-hidden">
+              <CardHeader className="py-3 px-4 border-b border-border bg-[#226D68]/5">
+                <CardTitle className="text-sm font-heading font-semibold text-gray-anthracite flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-[#226D68]" />
+                  Documents du candidat
                 </CardTitle>
-                <CardDescription className="text-xs mt-0.5 text-purple-700">
-                  {documents.length > 0 
-                    ? `${documents.length} document(s) disponible(s)`
-                    : 'Aucun document disponible'}
+                <CardDescription className="text-xs mt-0.5 text-muted-foreground">
+                  {documents.length > 0
+                    ? 'CV et pièces justificatives pour l\'évaluation du profil.'
+                    : 'Aucun document déposé.'}
+                  {documents.length > 0 && ` · ${documents.length} document${documents.length !== 1 ? 's' : ''}`}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="h-[400px]">
+                <div className="min-h-[480px] flex flex-col">
                   <DocumentViewer
                     documents={documents}
                     selectedDocument={selectedDocument}
@@ -620,19 +560,18 @@ export default function AdminReview() {
             </Card>
           </TabsContent>
 
-          {/* Contenu Évaluation */}
           <TabsContent value="evaluation" className="mt-3">
-            <Card className="shadow-md border-l-4 border-l-[#226D68]">
-              <CardHeader className="py-2 px-3 bg-gradient-to-r from-[#E8F4F3] to-[#D1E9E7]/50 border-b border-[#B8DDD9]">
-                <CardTitle className="text-sm flex items-center gap-1.5 text-[#1a5a55]">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Grille d'Évaluation et Validation
+            <Card className="shadow-md border-l-4 border-l-[#226D68] rounded-lg">
+              <CardHeader className="py-2 px-4 border-b border-border bg-[#226D68]/5">
+                <CardTitle className="text-sm font-heading font-semibold text-gray-anthracite flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#226D68]" />
+                  Grille d&apos;évaluation
                 </CardTitle>
-                <CardDescription className="text-xs mt-0.5 text-[#1a5a55]">
-                  Remplissez cette grille pour valider ou rejeter le profil
+                <CardDescription className="text-xs mt-0.5 text-muted-foreground">
+                  Valider ou rejeter le profil
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <EvaluationForm
                   candidateId={candidateId}
                   candidateData={candidateData}

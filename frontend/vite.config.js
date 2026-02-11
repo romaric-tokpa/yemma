@@ -27,5 +27,13 @@ export default defineConfig({
       protocol: 'ws',
       overlay: true, // Afficher l'overlay pour les erreurs réelles, mais ignorer les warnings HMR
     },
+    // Proxy /api vers la gateway (nginx) en dev pour éviter 404 sur login/auth
+    // Démarrer avec : docker-compose -f docker-compose.dev.yml up nginx auth candidate ...
+    proxy: {
+      '/api': {
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
 })

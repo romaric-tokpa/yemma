@@ -15,7 +15,7 @@ class ProfileNotFoundError(CandidateError):
     """Profil non trouvé"""
     def __init__(self, profile_id: str):
         super().__init__(
-            f"Profile with id {profile_id} not found",
+            "Profil non trouvé",
             status_code=status.HTTP_404_NOT_FOUND
         )
 
@@ -24,7 +24,7 @@ class ProfileAlreadyExistsError(CandidateError):
     """Profil déjà existant pour cet utilisateur"""
     def __init__(self, user_id: str):
         super().__init__(
-            f"Profile already exists for user {user_id}",
+            "Un profil existe déjà pour ce compte.",
             status_code=status.HTTP_409_CONFLICT
         )
 
@@ -33,13 +33,13 @@ class InvalidProfileStatusError(CandidateError):
     """Transition de statut invalide"""
     def __init__(self, current_status: str, target_status: str):
         super().__init__(
-            f"Cannot transition from {current_status} to {target_status}",
+            f"Transition impossible : {current_status} → {target_status}",
             status_code=status.HTTP_400_BAD_REQUEST
         )
 
 
 class ProfileNotCompleteError(CandidateError):
     """Profil incomplet pour soumission"""
-    def __init__(self, message: str = "Profile is not complete enough to be submitted"):
+    def __init__(self, message: str = "Le profil n'est pas assez complet pour être soumis."):
         super().__init__(message, status_code=status.HTTP_400_BAD_REQUEST)
 

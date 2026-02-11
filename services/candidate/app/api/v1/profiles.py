@@ -4,9 +4,10 @@ Endpoints API pour la gestion des profils candidats
 from typing import List, Optional
 from datetime import datetime
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status as http_status
 from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, require_current_user, TokenData
@@ -17,7 +18,8 @@ from app.infrastructure.repositories import (
 )
 from app.domain.models import ProfileStatus
 from app.domain.schemas import (
-    ProfileResponse, ProfileDetailResponse, ProfileCreate, ProfileUpdate,
+    ProfileResponse, ProfileDetailResponse, PaginatedProfilesResponse,
+    ProfileCreate, ProfileUpdate,
     ExperienceCreate, ExperienceResponse,
     EducationCreate, EducationResponse,
     CertificationCreate, CertificationResponse,
@@ -46,21 +48,195 @@ async def create_profile(
     session: AsyncSession = Depends(get_session),
     current_user: Optional[TokenData] = Depends(get_current_user)
 ):
-    """Crée un nouveau profil candidat"""
+    """
+    Crée un nouveau profil candidat ou retourne le profil existant.
+
+    En mode développement, si un profil existe déjà pour l'utilisateur,
+    le profil existant est retourné au lieu de lever une erreur.
+    """
     # Vérifier que current_user existe
     current_user = require_current_user(current_user)
-    
+
     # Vérifier qu'un profil n'existe pas déjà pour cet utilisateur
     existing = await ProfileRepository.get_by_user_id(session, current_user.user_id)
     if existing:
-        raise ProfileAlreadyExistsError(str(current_user.user_id))
-    
-    # Créer le profil
+        # Retourner le profil existant au lieu de lever une erreur
+        # Cela facilite le développement et évite les erreurs de doublon
+        logger.info(f"Profile already exists for user {current_user.user_id}, returning existing profile")
+        return ProfileResponse.model_validate(existing)
+
+    # Créer le profil (gérer la race : un autre request peut avoir créé entre le get et l'insert)
+    profile_dict = profile_data.model_dump()
+    profile_dict["user_id"] = current_user.user_id
+    try:
+        profile = await ProfileRepository.create(session, profile_dict)
+    except IntegrityError as e:
+        await session.rollback()  # Nécessaire avec AsyncSession
+        logger.warning(f"IntegrityError creating profile for user {current_user.user_id}: {str(e)}")
+        # Race condition : le profil a été créé entre le get et l'insert
+        # Récupérer le profil existant et le retourner
+        existing = await ProfileRepository.get_by_user_id(session, current_user.user_id)
+        if existing:
+            return ProfileResponse.model_validate(existing)
+        # Si le profil n'existe toujours pas, lever une erreur générique
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create profile: {str(e)}"
+        )
+
+    return ProfileResponse.model_validate(profile)
+
+
+@router.post("/from-cv", status_code=http_status.HTTP_201_CREATED)
+async def create_profile_from_cv(
+    file: UploadFile = File(..., description="Fichier CV (PDF ou DOCX)"),
+    session: AsyncSession = Depends(get_session),
+    current_user: Optional[TokenData] = Depends(get_current_user),
+):
+    """
+    Crée un profil candidat à partir d'un CV en utilisant le parsing Hrflow.ai.
+    Le candidat upload son CV : le profil est extrait et créé automatiquement.
+    """
+    current_user = require_current_user(current_user)
+    logger.info("POST /from-cv: création de profil depuis CV (user_id=%s, filename=%s)", current_user.user_id, getattr(file, "filename", None))
+
+    existing = await ProfileRepository.get_by_user_id(session, current_user.user_id)
+    if existing:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail="Un profil existe déjà pour ce compte. Utilisez la modification de profil.",
+        )
+
+    if not file.filename or not file.filename.lower().endswith((".pdf", ".docx")):
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Format de fichier non supporté. Utilisez un PDF ou DOCX.",
+        )
+
+    file_content = await file.read()
+    if len(file_content) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Le fichier ne doit pas dépasser 10 Mo.",
+        )
+
+    hrflow_profile = None
+    try:
+        from app.infrastructure.hrflow_client import parse_resume_file
+        hrflow_profile = await parse_resume_file(file_content, file.filename or "cv.pdf")
+        if hrflow_profile:
+            logger.info("Hrflow parsing successful, extracted profile data: %s", {
+                "has_info": "info" in hrflow_profile or "Information" in hrflow_profile,
+                "has_experiences": bool(hrflow_profile.get("experiences") or hrflow_profile.get("experience")),
+                "has_educations": bool(hrflow_profile.get("education") or hrflow_profile.get("educations")),
+                "has_skills": bool(hrflow_profile.get("skills") or hrflow_profile.get("skill")),
+            })
+    except Exception as e:
+        logger.warning("Hrflow parsing failed, creating minimal profile: %s", e)
+
+    email = getattr(current_user, "email", None) or ""
+    if not hrflow_profile:
+        logger.info("Création d'un profil minimal (pas de données Hrflow)")
+
+    if hrflow_profile:
+        from app.utils.hrflow_mapper import (
+            map_hrflow_to_profile_create,
+            map_hrflow_to_step1_update,
+            map_hrflow_experiences,
+            map_hrflow_educations,
+            map_hrflow_skills,
+        )
+        profile_data = map_hrflow_to_profile_create(hrflow_profile, email)
+        step1 = map_hrflow_to_step1_update(hrflow_profile, email)
+    else:
+        profile_data = ProfileCreate(email=email, first_name=None, last_name=None)
+        step1 = {}
+
     profile_dict = profile_data.model_dump()
     profile_dict["user_id"] = current_user.user_id
     profile = await ProfileRepository.create(session, profile_dict)
-    
-    return ProfileResponse.model_validate(profile)
+
+    if hrflow_profile:
+        # Appliquer toutes les données step1 au profil créé
+        update_dict = {}
+        for key, value in step1.items():
+            if value is not None and hasattr(profile, key):
+                update_dict[key] = value
+        
+        if update_dict:
+            logger.info("Updating profile with parsed data: %s", list(update_dict.keys()))
+            # Utiliser ProfileRepository.update pour mettre à jour proprement
+            await ProfileRepository.update(session, profile.id, update_dict)
+            await session.refresh(profile)
+        # Clé HrFlow pour Profile Asking (CvGPT)
+        hrflow_key = hrflow_profile.get("key")
+        if hrflow_key:
+            await ProfileRepository.update(session, profile.id, {"hrflow_profile_key": hrflow_key})
+            await session.refresh(profile)
+        
+        # Créer les expériences
+        exp_list = map_hrflow_experiences(hrflow_profile)
+        logger.info("Creating %d experiences from parsed CV", len(exp_list))
+        for exp in exp_list:
+            exp["profile_id"] = profile.id
+            try:
+                await ExperienceRepository.create(session, exp)
+            except Exception as ex:
+                logger.warning("Skip experience create: %s", ex)
+        
+        # Créer les formations
+        edu_list = map_hrflow_educations(hrflow_profile)
+        logger.info("Creating %d educations from parsed CV", len(edu_list))
+        for edu in edu_list:
+            edu["profile_id"] = profile.id
+            try:
+                await EducationRepository.create(session, edu)
+            except Exception as ex:
+                logger.warning("Skip education create: %s", ex)
+        
+        # Créer les compétences
+        skill_list = map_hrflow_skills(hrflow_profile)
+        logger.info("Creating %d skills from parsed CV", len(skill_list))
+        for sk in skill_list:
+            sk["profile_id"] = profile.id
+            try:
+                await SkillRepository.create(session, sk)
+            except Exception as ex:
+                logger.warning("Skip skill create: %s", ex)
+
+
+    profile = await ProfileRepository.get_by_user_id_with_relations(session, current_user.user_id)
+    if not profile:
+        raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profil non trouvé après création")
+
+    response_data = ProfileResponse.model_validate(profile).model_dump()
+    response_data["experiences"] = [ExperienceResponse.model_validate(e).model_dump() for e in profile.experiences]
+    response_data["educations"] = [EducationResponse.model_validate(e).model_dump() for e in profile.educations]
+    response_data["certifications"] = [CertificationResponse.model_validate(c).model_dump() for c in profile.certifications]
+    response_data["skills"] = [SkillResponse.model_validate(s).model_dump() for s in profile.skills]
+    if profile.job_preferences:
+        try:
+            response_data["job_preferences"] = JobPreferenceResponse.model_validate(profile.job_preferences).model_dump()
+        except Exception:
+            response_data["job_preferences"] = None
+    else:
+        response_data["job_preferences"] = None
+    response_data.update({
+        "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
+        "nationality": profile.nationality,
+        "phone": profile.phone,
+        "address": profile.address,
+        "city": profile.city,
+        "country": profile.country,
+        "sector": profile.sector,
+        "main_job": profile.main_job,
+        "total_experience": profile.total_experience,
+        "last_step_completed": profile.last_step_completed,
+        "accept_cgu": profile.accept_cgu,
+        "accept_rgpd": profile.accept_rgpd,
+        "accept_verification": profile.accept_verification,
+    })
+    return response_data
 
 
 @router.get("/me")
@@ -105,7 +281,7 @@ async def get_my_profile(
                     "salary_max": getattr(profile.job_preferences, 'salary_max', None),
                 }
         
-        # Ajouter les champs supplémentaires
+        # Ajouter les champs supplémentaires (dont photo_url et tracking des dates)
         response_data.update({
             "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
             "nationality": profile.nationality,
@@ -116,9 +292,14 @@ async def get_my_profile(
             "sector": profile.sector,
             "main_job": profile.main_job,
             "total_experience": profile.total_experience,
+            "photo_url": profile.photo_url,
             "admin_report": profile.admin_report,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+            "submitted_at": profile.submitted_at.isoformat() if profile.submitted_at else None,
             "validated_at": profile.validated_at.isoformat() if profile.validated_at else None,
-            # Consentements (étape 0)
+            "rejected_at": profile.rejected_at.isoformat() if profile.rejected_at else None,
+            "last_step_completed": profile.last_step_completed,
             "accept_cgu": profile.accept_cgu,
             "accept_rgpd": profile.accept_rgpd,
             "accept_verification": profile.accept_verification,
@@ -135,7 +316,7 @@ async def get_my_profile(
         )
 
 
-@router.get("", response_model=List[ProfileResponse])
+@router.get("", response_model=PaginatedProfilesResponse)
 async def list_profiles(
     status: Optional[str] = None,
     page: int = 1,
@@ -144,49 +325,53 @@ async def list_profiles(
     current_user: TokenData = Depends(get_current_user)
 ):
     """
-    Liste les profils (réservé aux administrateurs)
-    
-    Permet de filtrer par statut et paginer les résultats.
+    Liste les profils (réservé aux administrateurs).
+    Retourne une réponse paginée (items + total) pour afficher la pagination côté admin.
     """
     # Vérifier que l'utilisateur est admin
     if not current_user or not current_user.roles:
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Authentication required"
+            detail="Authentification requise"
         )
     
     if "ROLE_ADMIN" not in current_user.roles and "ROLE_SUPER_ADMIN" not in current_user.roles:
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can list profiles"
+            detail="Réservé aux administrateurs"
         )
     
-    from sqlalchemy import select, and_
+    from sqlalchemy import select, func
     from app.domain.models import Profile
     
-    # Construire la requête
-    query = select(Profile).where(Profile.deleted_at.is_(None))
-    
-    # Filtrer par statut si fourni
+    base_filter = Profile.deleted_at.is_(None)
     if status:
         try:
             status_enum = ProfileStatus(status.upper())
-            query = query.where(Profile.status == status_enum)
+            base_filter = base_filter & (Profile.status == status_enum)
         except ValueError:
             raise HTTPException(
                 status_code=http_status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid status: {status}. Valid values: DRAFT, SUBMITTED, IN_REVIEW, VALIDATED, REJECTED, ARCHIVED"
+                detail=f"Statut invalide : {status}. Valeurs : DRAFT, SUBMITTED, IN_REVIEW, VALIDATED, REJECTED, ARCHIVED"
             )
     
-    # Pagination
-    offset = (page - 1) * size
-    query = query.order_by(Profile.submitted_at.desc().nullsfirst(), Profile.created_at.desc())
-    query = query.offset(offset).limit(size)
+    # Total pour la pagination
+    count_q = select(func.count()).select_from(Profile).where(base_filter)
+    total_result = await session.execute(count_q)
+    total = total_result.scalar() or 0
     
+    # Page d'éléments
+    offset = (page - 1) * size
+    query = select(Profile).where(base_filter).order_by(
+        Profile.submitted_at.desc().nullsfirst(), Profile.created_at.desc()
+    ).offset(offset).limit(size)
     result = await session.execute(query)
     profiles = result.scalars().all()
     
-    return [ProfileResponse.model_validate(profile) for profile in profiles]
+    return PaginatedProfilesResponse(
+        items=[ProfileResponse.model_validate(p) for p in profiles],
+        total=total
+    )
 
 
 @router.patch("/me", response_model=ProfileResponse)
@@ -478,8 +663,9 @@ async def get_profile(
         else:
             response_data["job_preferences"] = None
         
-        # Ajouter les champs supplémentaires pour ProfileDetailResponse
+        # Ajouter les champs supplémentaires pour ProfileDetailResponse (tracking des dates en ISO)
         response_data.update({
+            "hrflow_profile_key": getattr(profile, "hrflow_profile_key", None),
             "date_of_birth": profile.date_of_birth.isoformat() if profile.date_of_birth else None,
             "nationality": profile.nationality,
             "phone": profile.phone,
@@ -490,7 +676,11 @@ async def get_profile(
             "main_job": profile.main_job,
             "total_experience": profile.total_experience,
             "admin_report": profile.admin_report,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+            "submitted_at": profile.submitted_at.isoformat() if profile.submitted_at else None,
             "validated_at": profile.validated_at.isoformat() if profile.validated_at else None,
+            "rejected_at": profile.rejected_at.isoformat() if profile.rejected_at else None,
             "accept_cgu": profile.accept_cgu,
             "accept_rgpd": profile.accept_rgpd,
             "accept_verification": profile.accept_verification,
@@ -588,12 +778,23 @@ async def update_profile(
                 except Exception as e:
                     # Log l'erreur mais ne bloque pas la mise à jour du profil
                     logger.warning(f"Failed to remove profile {profile_id} from search index: {str(e)}")
-    # Pour les services internes, permettre la mise à jour du statut même si le profil est déjà validé/rejeté
+    # Pour les services internes, permettre la mise à jour du statut et fixer les dates de validation/rejet
+    if is_internal_service:
+        from datetime import datetime
+        now = datetime.utcnow()
+        new_status = update_dict.get("status")
+        if new_status == ProfileStatus.VALIDATED or (isinstance(new_status, str) and new_status == "VALIDATED"):
+            update_dict.setdefault("validated_at", now)
+            update_dict["rejected_at"] = None
+            update_dict["rejection_reason"] = None
+        elif new_status == ProfileStatus.REJECTED or (isinstance(new_status, str) and new_status == "REJECTED"):
+            update_dict.setdefault("rejected_at", now)
+            update_dict["validated_at"] = None
     
     updated_profile = await ProfileRepository.update(
         session,
         profile_id,
-        update_data.model_dump(exclude_unset=True)
+        update_dict
     )
     
     if not updated_profile:

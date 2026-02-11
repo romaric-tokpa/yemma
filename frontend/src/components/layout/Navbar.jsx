@@ -38,13 +38,13 @@ export default function Navbar({ variant = 'default' }) {
   ]
 
   return (
-    <header className={`sticky top-0 z-50 w-full border-b ${
+    <header className={`sticky top-0 z-50 w-full border-b safe-top ${
       variant === 'transparent' 
         ? 'bg-white/80 backdrop-blur-md border-transparent' 
         : 'bg-white border-gray-200'
     } shadow-sm`}>
-      <nav className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+      <nav className="container mx-auto px-4 safe-x">
+        <div className="flex h-14 sm:h-16 items-center justify-between gap-2">
           {/* Logo */}
           <Link to="/" className="group">
             <span className="text-xl font-bold text-blue-deep font-heading transition-colors group-hover:text-[#226D68]">
@@ -103,23 +103,23 @@ export default function Navbar({ variant = 'default' }) {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 rounded-md text-gray-700 hover:bg-gray-100"
+            className="md:hidden p-3 rounded-md text-gray-700 hover:bg-gray-100 min-h-[2.75rem] min-w-[2.75rem] flex items-center justify-center touch-target-min"
             onClick={() => setIsOpen(!isOpen)}
-            aria-label="Toggle menu"
+            aria-label="Ouvrir le menu"
           >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
         {/* Mobile Navigation */}
         {isOpen && (
-          <div className="md:hidden py-4 border-t border-gray-200">
-            <div className="flex flex-col gap-2">
+          <div className="md:hidden py-4 border-t border-gray-200 safe-x">
+            <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   to={link.href}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-deep hover:bg-gray-50 rounded-md transition-colors"
+                  className="px-3 py-3 text-sm font-medium text-gray-700 hover:text-blue-deep hover:bg-gray-50 rounded-md transition-colors min-h-[2.75rem] flex items-center touch-target-min"
                   onClick={() => setIsOpen(false)}
                 >
                   {link.label}

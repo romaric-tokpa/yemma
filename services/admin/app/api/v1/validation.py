@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status
+from app.infrastructure.hrflow_asking_client import ask_profile, HrFlowAskingError
 from app.infrastructure.search_client import index_candidate_in_search, remove_candidate_from_search
 from app.infrastructure.notification_client import send_profile_validated_notification
 from app.infrastructure.audit_client import log_incident
@@ -360,5 +361,33 @@ async def get_candidate_evaluation(candidate_id: int):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve candidate evaluation: {str(e)}"
+        )
+
+
+@router.post("/profile-ask/{candidate_id}", status_code=status.HTTP_200_OK)
+async def profile_ask(candidate_id: int, body: ProfileAskRequest):
+    """
+    Pose une question en langage naturel sur le profil candidat (API HrFlow Profile Asking / CvGPT).
+
+    Le profil doit avoir été indexé dans HrFlow (création depuis un CV avec indexation).
+    Réponse générée par l'IA pour aider à la synthèse d'évaluation.
+    """
+    try:
+        profile_data = await get_candidate_profile(candidate_id)
+        hrflow_key = profile_data.get("hrflow_profile_key")
+        if not hrflow_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ce profil n'est pas disponible pour l'analyse IA (CvGPT). "
+                       "Seuls les profils créés à partir d'un CV avec indexation HrFlow le sont.",
+            )
+        answer = await ask_profile(hrflow_key, body.question)
+        return {"answer": answer}
+    except HrFlowAskingError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+    except CandidateNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate with id {candidate_id} not found",
         )
 

@@ -53,22 +53,33 @@ class ProfileUpdate(BaseModel):
 
 
 class ProfileResponse(ProfileBase):
-    """Schéma de réponse pour Profile"""
+    """Schéma de réponse pour Profile (inclut le tracking des dates)"""
     id: int
     user_id: int
     email: EmailStr
     status: str
     completion_percentage: float
     admin_score: Optional[float] = None
+    photo_url: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
+    submitted_at: Optional[datetime] = None
+    validated_at: Optional[datetime] = None
+    rejected_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
 
+class PaginatedProfilesResponse(BaseModel):
+    """Réponse paginée pour la liste des profils (admin)"""
+    items: List[ProfileResponse]
+    total: int
+
+
 class ProfileDetailResponse(ProfileResponse):
     """Schéma de réponse détaillé pour Profile"""
+    hrflow_profile_key: Optional[str] = None
     date_of_birth: Optional[datetime] = None
     nationality: Optional[str] = None
     phone: Optional[str] = None
@@ -79,7 +90,6 @@ class ProfileDetailResponse(ProfileResponse):
     main_job: Optional[str] = None
     total_experience: Optional[int] = None
     admin_report: Optional[Dict[str, Any]] = None
-    validated_at: Optional[datetime] = None
     # Relations - définies après pour éviter les forward references
     experiences: List[Dict[str, Any]] = []
     educations: List[Dict[str, Any]] = []
@@ -194,12 +204,16 @@ class SkillResponse(SkillCreate):
 
 class JobPreferenceCreate(BaseModel):
     """Schéma pour la création des préférences"""
-    desired_positions: List[str] = Field(default=[], max_length=5)
-    contract_type: Optional[str] = None
-    target_sectors: List[str] = []
-    desired_location: Optional[str] = None
-    mobility: Optional[str] = None
-    availability: Optional[str] = None
+    desired_positions: List[str] = Field(default=[], description="Postes recherchés (max 5)")
+    contract_type: Optional[str] = Field(default=None, description="Type de contrat (legacy)")
+    contract_types: List[str] = Field(default=[], description="Types de contrat souhaités")
+    target_sectors: List[str] = Field(default=[], description="Secteurs ciblés")
+    desired_location: Optional[str] = Field(default=None, description="Localisation souhaitée")
+    preferred_locations: Optional[str] = Field(default=None, description="Zones géographiques préférées")
+    mobility: Optional[str] = Field(default=None, description="Mobilité géographique")
+    remote_preference: Optional[str] = Field(default=None, description="Préférence télétravail (onsite, hybrid, remote, flexible)")
+    willing_to_relocate: Optional[bool] = Field(default=False, description="Prêt à déménager")
+    availability: Optional[str] = Field(default=None, description="Disponibilité")
     salary_min: Optional[float] = Field(default=None, description="Salaire minimum (CFA/mois)")
     salary_max: Optional[float] = Field(default=None, description="Salaire maximum (CFA/mois)")
     salary_expectations: Optional[float] = Field(default=None, description="Prétentions salariales (pour compatibilité)")
@@ -210,7 +224,7 @@ class JobPreferenceResponse(JobPreferenceCreate):
     id: int
     profile_id: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 

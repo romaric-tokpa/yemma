@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api.v1 import auth, users, anonymization
+from app.api.v1 import auth, users, anonymization, admin_invitations
 from app.core.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.infrastructure.database import init_db
@@ -54,6 +54,7 @@ setup_exception_handlers(app)
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(anonymization.router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(admin_invitations.router, prefix="/api/v1", tags=["Admin Invitations"])
 
 
 @app.get("/health", tags=["Health"])

@@ -5,7 +5,24 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    screens: {
+      xs: '375px',
+      sm: '640px',
+      md: '768px',
+      lg: '1024px',
+      xl: '1280px',
+      '2xl': '1536px',
+    },
     extend: {
+      minHeight: {
+        'touch': '44px',
+        'touch-lg': '48px',
+      },
+      maxWidth: {
+        'readable': '65ch',
+        'form': '32rem',
+        'form-lg': '42rem',
+      },
       colors: {
         // Charte graphique Yemma Solutions - Nouvelle charte
         'blue-deep': '#0B3C5D',

@@ -25,8 +25,12 @@ const getBaseUrl = (envVar, defaultPort) => {
       return ''
     }
 
-    // Développement local uniquement (localhost:3000 avec Vite)
+    // Développement local (localhost:3000 avec Vite) : utiliser chemins relatifs
+    // pour que le proxy Vite (/api → nginx:8080) soit utilisé (évite 404 sur login)
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      if (port === '3000') {
+        return ''
+      }
       const protocol = window.location.protocol || 'http:'
       return `${protocol}//${hostname}:${defaultPort}`
     }
@@ -47,11 +51,16 @@ const PAYMENT_API_URL = getBaseUrl('VITE_PAYMENT_API_URL', 8006)
 const NOTIFICATION_API_URL = getBaseUrl('VITE_NOTIFICATION_API_URL', 8007)
 const AUDIT_API_URL = getBaseUrl('VITE_AUDIT_API_URL', 8008)
 const ADMIN_API_URL = getBaseUrl('VITE_ADMIN_API_URL', 8009)
+const PARSING_API_URL = getBaseUrl('VITE_PARSING_API_URL', 8010)
+
+// Timeout par défaut pour les appels API (ms)
+const DEFAULT_TIMEOUT = 15000
 
 // Helper pour créer un client axios avec authentification
 const createApiClient = (baseURL) => {
   const client = axios.create({
     baseURL,
+    timeout: DEFAULT_TIMEOUT,
     headers: {
       'Content-Type': 'application/json',
     },
@@ -62,36 +71,36 @@ const createApiClient = (baseURL) => {
     const token = localStorage.getItem('auth_token')
     
     // Routes publiques qui ne nécessitent pas de token
-    const publicRoutes = ['/api/v1/auth/register', '/api/v1/auth/login', '/api/v1/auth/refresh', '/api/v1/auth/password-reset']
+    const publicRoutes = [
+      '/api/v1/auth/register', 
+      '/api/v1/auth/login', 
+      '/api/v1/auth/refresh', 
+      '/api/v1/auth/password-reset',
+      '/api/v1/admin-invitations/validate',
+      '/api/v1/admin-invitations/register'
+    ]
     const isPublicRoute = publicRoutes.some(route => config.url?.includes(route))
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     } else if (!isPublicRoute) {
-      // Ne pas afficher le warning pour les routes publiques
       console.warn('No auth token found in localStorage for request:', config.url)
     }
     return config
   })
 
-  // Intercepteur pour gérer les erreurs
+  // Intercepteur pour gérer les erreurs (401 → déconnexion + redirection login)
   client.interceptors.response.use(
     (response) => response,
     (error) => {
-      // Gérer les erreurs 401 (non autorisé) - rediriger vers login
       if (error.response?.status === 401) {
         console.warn('401 Unauthorized - Token may be invalid or expired:', error.config?.url)
-        const token = localStorage.getItem('auth_token')
-        if (token) {
-          console.log('Token exists but is invalid. Removing from localStorage.')
-        } else {
-          console.log('No token found in localStorage.')
-        }
         localStorage.removeItem('auth_token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user')
-        // Optionnel: rediriger vers la page de login
-        // window.location.href = '/login'
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login'
+        }
       }
       return Promise.reject(error)
     }
@@ -109,9 +118,8 @@ const authApi = createApiClient(AUTH_API_URL)
 // Client pour le service Document (avec support multipart/form-data)
 const documentApiClient = axios.create({
   baseURL: DOCUMENT_API_URL,
-  headers: {
-    // Ne pas définir Content-Type ici, laisser axios le gérer pour FormData
-  },
+  timeout: 60000, // 60s pour les uploads
+  headers: {},
 })
 
 // Intercepteur pour ajouter le token JWT si disponible
@@ -127,13 +135,16 @@ documentApiClient.interceptors.request.use((config) => {
   return config
 })
 
-// Intercepteur pour gérer les erreurs
 documentApiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token')
+      localStorage.removeItem('refresh_token')
       localStorage.removeItem('user')
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
@@ -145,6 +156,37 @@ const companyApiClient = createApiClient(COMPANY_API_URL)
 const paymentApiClient = createApiClient(PAYMENT_API_URL)
 const auditApi = createApiClient(AUDIT_API_URL)
 const adminApiClient = createApiClient(ADMIN_API_URL)
+
+// Client pour le service Parsing (avec support multipart/form-data)
+const parsingApiClient = axios.create({
+  baseURL: PARSING_API_URL,
+  headers: {},
+})
+
+// Intercepteur pour ajouter le token JWT si disponible
+parsingApiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  // Ne pas définir Content-Type pour FormData, axios le fera automatiquement
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
+  return config
+})
+
+// Intercepteur pour gérer les erreurs
+parsingApiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('user')
+    }
+    return Promise.reject(error)
+  }
+)
 
 // ============================================
 // SERVICE AUTH
@@ -226,15 +268,75 @@ export const authApiService = {
     })
     return response.data
   },
+
+  // Valider un token d'invitation admin (publique)
+  validateAdminInvitationToken: async (token) => {
+    const response = await authApi.get(`/api/v1/admin-invitations/validate/${token}`)
+    return response.data
+  },
+
+  // Créer un compte admin via token d'invitation (publique)
+  registerAdminViaToken: async (data) => {
+    const response = await authApi.post('/api/v1/admin-invitations/register', data)
+    // Stocker le token dans localStorage après l'inscription
+    if (response.data.access_token) {
+      localStorage.setItem('auth_token', response.data.access_token)
+      if (response.data.refresh_token) {
+        localStorage.setItem('refresh_token', response.data.refresh_token)
+      }
+    }
+    return response.data
+  },
+
+  // Générer un token d'invitation admin (SUPER_ADMIN uniquement)
+  generateAdminInvitation: async (data) => {
+    const response = await authApi.post('/api/v1/admin-invitations/generate', data)
+    return response.data
+  },
+
+  // Lister les tokens d'invitation admin (SUPER_ADMIN uniquement)
+  listAdminInvitations: async () => {
+    const response = await authApi.get('/api/v1/admin-invitations')
+    return response.data
+  },
 }
 
 // ============================================
 // SERVICE CANDIDATE
 // ============================================
+/** Retourne un message d'erreur utilisateur pour les appels candidat (français). */
+export function getCandidateErrorMessage(err) {
+  const status = err?.response?.status
+  const detail = err?.response?.data?.detail
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map(e => e.msg || e.message).filter(Boolean).join('. ') || 'Données invalides.'
+  if (status === 401) return 'Session expirée. Veuillez vous reconnecter.'
+  if (status === 403) return 'Accès refusé.'
+  if (status === 404) return 'Profil non trouvé.'
+  if (status === 409) return 'Un profil existe déjà pour ce compte.'
+  if (status === 422) return 'Données invalides. Vérifiez les champs.'
+  if (status >= 500) return 'Service temporairement indisponible. Réessayez plus tard.'
+  return err?.message || 'Une erreur est survenue.'
+}
+
 export const candidateApi = {
   // Créer un profil candidat
   createProfile: async (data) => {
     const response = await api.post('/api/v1/profiles', data)
+    return response.data
+  },
+
+  /**
+   * Crée un profil à partir d'un CV (parsing Hrflow.ai).
+   * @param {File} file - Fichier CV (PDF ou DOCX)
+   * @returns {Promise<object>} Profil créé
+   */
+  createProfileFromCv: async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post('/api/v1/profiles/from-cv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return response.data
   },
 
@@ -244,7 +346,7 @@ export const candidateApi = {
     return response.data
   },
 
-  // Récupérer mon profil
+  // Récupérer mon profil (inclut experiences, educations, certifications, skills, job_preferences)
   getMyProfile: async () => {
     const response = await api.get('/api/v1/profiles/me')
     return response.data
@@ -395,6 +497,35 @@ export const candidateApi = {
   },
 
   // ===== STATISTIQUES PROFILS (ADMIN) =====
+  /** Nombre de candidats inscrits et validés par secteur d'activité */
+  getProfileStatsBySector: async () => {
+    try {
+      const response = await api.get('/api/v1/profiles/stats/by-sector')
+      return Array.isArray(response.data) ? response.data : []
+    } catch (err) {
+      console.warn('getProfileStatsBySector:', err?.response?.status, err?.message)
+      return []
+    }
+  },
+  /**
+   * Statistiques par période : inscriptions, validations, rejets.
+   * @param {string} [fromDate] - YYYY-MM-DD
+   * @param {string} [toDate] - YYYY-MM-DD
+   * @param {string} [groupBy] - 'day' | 'month' | 'year'
+   */
+  getProfileStatsByPeriod: async (fromDate, toDate, groupBy = 'month') => {
+    try {
+      const params = new URLSearchParams()
+      if (fromDate) params.set('from_date', fromDate)
+      if (toDate) params.set('to_date', toDate)
+      if (groupBy) params.set('group_by', groupBy)
+      const response = await api.get(`/api/v1/profiles/stats/by-period?${params.toString()}`)
+      return Array.isArray(response.data) ? response.data : []
+    } catch (err) {
+      console.warn('getProfileStatsByPeriod:', err?.response?.status, err?.message)
+      return []
+    }
+  },
   getProfileStats: async () => {
     // Essayer d'utiliser l'endpoint stats si disponible
     try {
@@ -415,6 +546,55 @@ export const candidateApi = {
       }
       return null
     }
+  },
+}
+
+// ============================================
+// SERVICE PARSING (CV via HRFlow.ai)
+// ============================================
+export const parsingApi = {
+  /**
+   * Parse un CV via HRFlow.ai et retourne les données structurées
+   * @param {File} file - Fichier CV (PDF ou DOCX)
+   * @param {string} emailOverride - Email à utiliser pour le profil (optionnel)
+   * @returns {Promise<object>} Données parsées au format Yemma
+   */
+  parseCv: async (file, emailOverride = null) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (emailOverride) {
+      formData.append('email_override', emailOverride)
+    }
+
+    const response = await parsingApiClient.post('/api/v1/parse/cv', formData)
+    return response.data
+  },
+
+  /**
+   * Parse un CV de manière asynchrone (retourne un job_id)
+   * @param {File} file - Fichier CV (PDF ou DOCX)
+   * @param {string} emailOverride - Email à utiliser pour le profil (optionnel)
+   * @returns {Promise<object>} Job info avec job_id
+   */
+  parseCvAsync: async (file, emailOverride = null) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (emailOverride) {
+      formData.append('email_override', emailOverride)
+    }
+
+    const response = await parsingApiClient.post('/api/v1/parse/cv/async', formData)
+    return response.data
+  },
+
+  /**
+   * Récupère le statut d'un job de parsing asynchrone
+   * @param {string} jobId - ID du job
+   * @returns {Promise<object>} Statut et résultat si disponible
+   */
+  getParseStatus: async (jobId) => {
+    const response = await parsingApiClient.get(`/api/v1/parse/status/${jobId}`)
+    return response.data
   },
 }
 
@@ -477,6 +657,15 @@ export const adminApi = {
   // Récupérer le rapport d'évaluation d'un candidat
   getCandidateEvaluation: async (candidateId) => {
     const response = await adminApiClient.get(`/api/v1/admin/evaluation/${candidateId}`)
+    return response.data
+  },
+
+  /**
+   * Pose une question sur le profil candidat (CvGPT / Profile Asking HrFlow).
+   * Retourne une réponse IA pour aider à la synthèse d'évaluation.
+   */
+  askProfileQuestion: async (candidateId, question) => {
+    const response = await adminApiClient.post(`/api/v1/admin/profile-ask/${candidateId}`, { question })
     return response.data
   },
 }
@@ -783,4 +972,5 @@ export {
   paymentApiClient,
   auditApi,
   adminApiClient,
+  parsingApiClient,
 }

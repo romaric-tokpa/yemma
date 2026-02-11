@@ -16,10 +16,21 @@ import { Progress } from '../components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Separator } from '../components/ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import { Checkbox } from '../components/ui/checkbox'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { RichTextEditor } from '../components/ui/rich-text-editor'
+import { SearchableSelect } from '../components/ui/searchable-select'
+import { SECTORS_FR } from '../data/sectors'
+import {
+  experienceToApiPayload,
+  educationToApiPayload,
+  skillToApiPayload,
+  certificationToApiPayload,
+  jobPreferencesToApiPayload,
+} from '../utils/profilePayloads'
+import { formatDateTime } from '../utils/dateUtils'
 
 // Générer un avatar par défaut basé sur les initiales
 const generateAvatarUrl = (firstName, lastName) => {
@@ -45,7 +56,7 @@ export default function CandidateDashboard() {
   const [skills, setSkills] = useState([])
   const [jobPreferences, setJobPreferences] = useState(null)
   const [documents, setDocuments] = useState([])
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('profile')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   
   // États pour les modales
@@ -72,6 +83,27 @@ export default function CandidateDashboard() {
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [previewDocument, setPreviewDocument] = useState(null)
 
+  // Toast (remplace alert) : { message, type: 'success'|'error' }
+  const [toast, setToast] = useState(null)
+  // Modale de confirmation (remplace confirm) : { title, message, onConfirm, variant?: 'danger' }
+  const [confirmDialog, setConfirmDialog] = useState(null)
+  // Modale consentements avant soumission du profil (un seul consentement combiné)
+  const [showSubmitConsentModal, setShowSubmitConsentModal] = useState(false)
+  const [consentAccepted, setConsentAccepted] = useState(false)
+  const [submittingProfile, setSubmittingProfile] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
+  
+  // États pour les filtres et recherche des compétences
+  const [skillSearchQuery, setSkillSearchQuery] = useState('')
+  const [skillFilterType, setSkillFilterType] = useState('ALL')
+  const [skillFilterLevel, setSkillFilterLevel] = useState('ALL')
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   useEffect(() => {
     loadProfile()
     // Définir l'onglet actif selon l'URL ou le hash
@@ -83,110 +115,73 @@ export default function CandidateDashboard() {
     }
   }, [location])
 
-  // Debug: vérifier la photo_url
-  useEffect(() => {
-    if (profile?.photo_url) {
-      console.log('Photo URL:', profile.photo_url)
-    }
-  }, [profile?.photo_url])
-
-  // Gérer l'affichage de la photo avec fallback - DOIT être avant les returns conditionnels
   const [photoError, setPhotoError] = useState(false)
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null)
-  
-  // Si photo_url change, réinitialiser l'erreur et construire l'URL complète si nécessaire
+
   useEffect(() => {
     const loadPhotoUrl = async () => {
       if (!profile?.id) {
         setCurrentPhotoUrl(null)
         return
       }
-
-      // D'abord, essayer d'utiliser photo_url du profil
       if (profile.photo_url) {
         let photoUrl = profile.photo_url
-        console.log('Processing photo_url from profile:', photoUrl)
-        
-        // Si c'est une URL relative (commence par /), construire l'URL complète
         if (photoUrl && photoUrl.startsWith('/')) {
-          // Extraire l'ID du document depuis l'URL relative
           const match = photoUrl.match(/\/api\/v1\/documents\/serve\/(\d+)/)
-          if (match && match[1]) {
-            const documentId = parseInt(match[1])
-            photoUrl = documentApi.getDocumentServeUrl(documentId)
-            console.log('Converted relative URL to full URL:', photoUrl, 'Document ID:', documentId)
+          if (match?.[1]) {
+            photoUrl = documentApi.getDocumentServeUrl(parseInt(match[1]))
           }
         }
-        
-        // Vérifier que ce n'est pas déjà l'URL de l'avatar
         if (photoUrl && !photoUrl.includes('ui-avatars.com') && photoUrl.trim() !== '') {
-          console.log('Setting photo URL from profile.photo_url:', photoUrl)
           setCurrentPhotoUrl(photoUrl)
           setPhotoError(false)
           return
         }
       }
-
-      // Si photo_url n'existe pas ou est invalide, chercher le document PROFILE_PHOTO
-      console.log('photo_url not found or invalid, searching for PROFILE_PHOTO document...')
       try {
         const docs = await documentApi.getCandidateDocuments(profile.id)
         const photoDoc = docs
-          .filter(doc => 
-            (doc.document_type === 'PROFILE_PHOTO' || doc.document_type === 'OTHER') &&
-            !doc.deleted_at
+          ?.filter(doc =>
+            (doc.document_type === 'PROFILE_PHOTO' || doc.document_type === 'OTHER') && !doc.deleted_at
           )
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
-        
+          ?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
         if (photoDoc) {
           const serveUrl = documentApi.getDocumentServeUrl(photoDoc.id)
-          console.log('Found PROFILE_PHOTO document, using serve URL:', serveUrl)
           setCurrentPhotoUrl(serveUrl)
           setPhotoError(false)
-          
-          // Mettre à jour le profil avec cette URL si elle n'était pas déjà là
           if (!profile.photo_url || profile.photo_url !== serveUrl) {
             await candidateApi.updateProfile(profile.id, { photo_url: serveUrl })
-            console.log('Updated profile.photo_url with:', serveUrl)
           }
         } else {
-          console.log('No PROFILE_PHOTO document found')
           setCurrentPhotoUrl(null)
         }
-      } catch (error) {
-        console.error('Error loading photo document:', error)
+      } catch {
         setCurrentPhotoUrl(null)
       }
     }
-
     loadPhotoUrl()
   }, [profile?.id, profile?.photo_url])
 
   const loadProfile = async () => {
     try {
       setLoading(true)
+      // Un seul appel backend : /profiles/me renvoie déjà profil + experiences, educations, certifications, skills, job_preferences
       const profileData = await candidateApi.getMyProfile()
       setProfile(profileData)
-      
+
       if (profileData.id) {
+        setExperiences(Array.isArray(profileData.experiences) ? profileData.experiences : [])
+        setEducations(Array.isArray(profileData.educations) ? profileData.educations : [])
+        setCertifications(Array.isArray(profileData.certifications) ? profileData.certifications : [])
+        setSkills(Array.isArray(profileData.skills) ? profileData.skills : [])
+        setJobPreferences(profileData.job_preferences ?? null)
+        // Documents : service séparé, chargement en parallèle après réception du profil
         try {
-          const [exps, edus, certs, skls, prefs, docs] = await Promise.all([
-            candidateApi.getExperiences(profileData.id).catch(() => []),
-            candidateApi.getEducations(profileData.id).catch(() => []),
-            candidateApi.getCertifications(profileData.id).catch(() => []),
-            candidateApi.getSkills(profileData.id).catch(() => []),
-            candidateApi.getJobPreferences(profileData.id).catch(() => null),
-            documentApi.getCandidateDocuments(profileData.id).catch(() => []),
-          ])
-          
-          setExperiences(exps || [])
-          setEducations(edus || [])
-          setCertifications(certs || [])
-          setSkills(skls || [])
-          setJobPreferences(prefs)
+          const docs = await documentApi.getCandidateDocuments(profileData.id)
           setDocuments(docs || [])
-        } catch (error) {
-          console.error('Error loading relations:', error)
+        } catch (docErr) {
+          console.error('Error loading documents:', docErr)
+          setDocuments([])
         }
       }
     } catch (error) {
@@ -195,6 +190,19 @@ export default function CandidateDashboard() {
         navigate('/onboarding')
         return
       }
+      if (error.response?.status === 401) {
+        navigate('/login')
+        return
+      }
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        setToast({ message: 'Le serveur met trop de temps à répondre. Réessayez.', type: 'error' })
+        return
+      }
+      if (error.code === 'ERR_NETWORK' || !error.response) {
+        setToast({ message: 'Impossible de joindre le serveur. Vérifiez votre connexion.', type: 'error' })
+        return
+      }
+      setToast({ message: 'Erreur lors du chargement du profil.', type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -212,38 +220,40 @@ export default function CandidateDashboard() {
 
   const handleDocumentUpload = async () => {
     if (!selectedDocumentFile || !profile?.id) {
-      alert('Veuillez sélectionner un fichier')
+      setToast({ message: 'Veuillez sélectionner un fichier.', type: 'error' })
       return
     }
-
-    // Vérifier la taille du fichier (max 10MB)
     if (selectedDocumentFile.size > 10 * 1024 * 1024) {
-      alert('Le fichier ne doit pas dépasser 10MB')
+      setToast({ message: 'Le fichier ne doit pas dépasser 10 Mo.', type: 'error' })
       return
     }
-
     try {
       setUploadingDocument(true)
       await documentApi.uploadDocument(selectedDocumentFile, profile.id, selectedDocumentType)
-      alert('Document ajouté avec succès')
+      setToast({ message: 'Document ajouté avec succès.', type: 'success' })
       setShowDocumentDialog(false)
       setSelectedDocumentFile(null)
       setSelectedDocumentType('CV')
-      // Recharger les documents
       await loadDocuments()
     } catch (error) {
       console.error('Error uploading document:', error)
-      alert('Erreur lors de l\'upload du document: ' + (error.response?.data?.detail || error.message))
+      setToast({ message: 'Erreur : ' + (error.response?.data?.detail || error.message), type: 'error' })
     } finally {
       setUploadingDocument(false)
     }
   }
 
   const handleLogout = () => {
-    if (window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
-      authApiService.logout()
-      navigate('/login')
-    }
+    setConfirmDialog({
+      title: 'Déconnexion',
+      message: 'Vous allez être déconnecté. Continuer ?',
+      variant: 'danger',
+      onConfirm: () => {
+        setConfirmDialog(null)
+        authApiService.logout()
+        navigate('/login')
+      },
+    })
   }
 
   const getStatusBadge = (status) => {
@@ -267,56 +277,110 @@ export default function CandidateDashboard() {
     )
   }
 
-  const handleDeleteExperience = async (experienceId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette expérience ?')) return
-    try {
-      await candidateApi.deleteExperience(profile.id, experienceId)
-      setExperiences(experiences.filter(exp => exp.id !== experienceId))
-    } catch (error) {
-      console.error('Error deleting experience:', error)
-      alert('Erreur lors de la suppression')
-    }
+  const handleDeleteExperience = (experienceId) => {
+    const exp = experiences.find(e => e.id === experienceId)
+    setConfirmDialog({
+      title: 'Supprimer cette expérience ?',
+      message: exp?.company_name ? `« ${exp.company_name} » sera supprimée.` : 'Cette expérience sera supprimée.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        try {
+          await candidateApi.deleteExperience(profile.id, experienceId)
+          setExperiences(experiences.filter(exp => exp.id !== experienceId))
+          setToast({ message: 'Expérience supprimée.', type: 'success' })
+        } catch (error) {
+          console.error('Error deleting experience:', error)
+          setToast({ message: 'Erreur lors de la suppression.', type: 'error' })
+        }
+      },
+    })
   }
 
-  const handleDeleteEducation = async (educationId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette formation ?')) return
-    try {
-      await candidateApi.deleteEducation(profile.id, educationId)
-      setEducations(educations.filter(edu => edu.id !== educationId))
-    } catch (error) {
-      console.error('Error deleting education:', error)
-      alert('Erreur lors de la suppression')
-    }
+  const handleDeleteEducation = (educationId) => {
+    const edu = educations.find(e => e.id === educationId)
+    setConfirmDialog({
+      title: 'Supprimer cette formation ?',
+      message: edu?.institution ? `« ${edu.institution} » sera supprimée.` : 'Cette formation sera supprimée.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        try {
+          await candidateApi.deleteEducation(profile.id, educationId)
+          setEducations(educations.filter(e => e.id !== educationId))
+          setToast({ message: 'Formation supprimée.', type: 'success' })
+        } catch (error) {
+          console.error('Error deleting education:', error)
+          setToast({ message: 'Erreur lors de la suppression.', type: 'error' })
+        }
+      },
+    })
   }
 
-  const handleDeleteCertification = async (certificationId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette certification ?')) return
-    try {
-      await candidateApi.deleteCertification(profile.id, certificationId)
-      setCertifications(certifications.filter(cert => cert.id !== certificationId))
-    } catch (error) {
-      console.error('Error deleting certification:', error)
-      alert('Erreur lors de la suppression')
-    }
+  const handleDeleteCertification = (certificationId) => {
+    setConfirmDialog({
+      title: 'Supprimer cette certification ?',
+      message: 'Cette certification sera supprimée définitivement.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        try {
+          await candidateApi.deleteCertification(profile.id, certificationId)
+          setCertifications(certifications.filter(c => c.id !== certificationId))
+          setToast({ message: 'Certification supprimée.', type: 'success' })
+        } catch (error) {
+          console.error('Error deleting certification:', error)
+          setToast({ message: 'Erreur lors de la suppression.', type: 'error' })
+        }
+      },
+    })
   }
 
-  const handleDeleteSkill = async (skillId) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette compétence ?')) return
-    try {
-      await candidateApi.deleteSkill(profile.id, skillId)
-      setSkills(skills.filter(skill => skill.id !== skillId))
-    } catch (error) {
-      console.error('Error deleting skill:', error)
-      alert('Erreur lors de la suppression')
-    }
+  const handleDeleteSkill = (skillId) => {
+    setConfirmDialog({
+      title: 'Supprimer cette compétence ?',
+      message: 'Cette compétence sera retirée de votre profil.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        try {
+          await candidateApi.deleteSkill(profile.id, skillId)
+          setSkills(skills.filter(s => s.id !== skillId))
+          setToast({ message: 'Compétence supprimée.', type: 'success' })
+        } catch (error) {
+          console.error('Error deleting skill:', error)
+          setToast({ message: 'Erreur lors de la suppression.', type: 'error' })
+        }
+      },
+    })
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: '#226D68' }}></div>
-          <p className="text-muted-foreground">Chargement de votre profil...</p>
+      <div className="min-h-screen bg-gray-light flex flex-col">
+        <div className="flex-1 container mx-auto p-4 md:p-6 max-w-7xl">
+          <div className="animate-pulse space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-muted" />
+              <div className="flex-1 space-y-2">
+                <div className="h-5 w-48 bg-muted rounded" />
+                <div className="h-4 w-24 bg-muted rounded" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-2 flex-1 bg-muted rounded-full" />
+              <div className="h-4 w-16 bg-muted rounded" />
+            </div>
+            <div className="rounded-[12px] border border-border bg-card overflow-hidden">
+              <div className="h-12 bg-muted/50 border-b border-border" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 w-full bg-muted rounded" />
+                <div className="h-4 w-4/5 bg-muted rounded" />
+                <div className="h-4 w-3/5 bg-muted rounded" />
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground text-center mt-4">Chargement de votre profil...</p>
         </div>
       </div>
     )
@@ -357,70 +421,68 @@ export default function CandidateDashboard() {
     ? currentPhotoUrl 
     : defaultAvatar
 
-  // Sidebar simplifiée - seulement overview
-  const sidebarItems = [
-    { id: 'overview', label: 'Vue d\'ensemble', icon: Home },
+  // Navigation principale : 7 sections (sidebar = menu compte)
+  const navItems = [
+    { id: 'profile', label: 'Profil', icon: User },
+    { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
+    { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
+    { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
+    { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
+    { id: 'preferences', label: 'Préférences', icon: MapPin },
+    { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
   ]
 
   return (
-    <div className="h-screen bg-gray-light flex overflow-hidden max-h-screen">
-      {/* Sidebar - Compact */}
+    <div className="h-screen bg-gray-light flex overflow-hidden max-h-[100dvh] max-h-screen safe-top safe-bottom">
+      <a href="#dashboard-main" className="absolute left-[-9999px] top-2 z-[100] px-3 py-2 bg-primary text-white rounded-md font-medium text-sm focus:left-2 focus:inline-block focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+        Aller au contenu principal
+      </a>
+      {/* Sidebar compacte et professionnelle */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
-        bg-white border-r border-gray-200
-        transition-all duration-300 ease-in-out
-        ${sidebarOpen ? 'w-56 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16'}
-        flex flex-col
-      `}>
-        {/* Header Sidebar - Compact */}
-        <div className="h-12 border-b border-gray-200 flex items-center justify-between px-3">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#226D68' }}>
-                <Users className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-bold text-sm text-gray-anthracite font-heading">Yemma</span>
+        bg-card border-r border-border shadow-xl lg:shadow-none
+        transition-[transform,width] duration-300 ease-out
+        flex flex-col safe-left
+        ${sidebarOpen
+          ? 'w-[min(240px,75vw)] sm:w-56 translate-x-0 lg:w-56'
+          : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16 lg:min-w-[4rem]'
+        }
+      `}
+        aria-label="Menu principal"
+        aria-hidden={!sidebarOpen}
+      >
+        {/* Header Sidebar compact */}
+        <div className="h-12 border-b border-border flex items-center justify-between px-3 shrink-0 safe-top bg-[#E8F4F3]/30">
+          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'justify-center w-full'}`}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#226D68] shrink-0">
+              <Users className="w-3.5 h-3.5 text-white" />
             </div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden h-8 w-8"
+            {sidebarOpen && (
+              <span className="font-bold text-sm text-gray-900">Yemma</span>
+            )}
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setSidebarOpen(!sidebarOpen)} 
+            className="h-7 w-7 shrink-0 hover:bg-muted"
+            title={sidebarOpen ? 'Réduire' : 'Agrandir'}
           >
-            {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            {sidebarOpen ? <X className="w-3.5 h-3.5" /> : <Menu className="w-3.5 h-3.5" />}
           </Button>
         </div>
 
-        {/* Navigation - Compact */}
-        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {sidebarItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <Button
-                key={item.id}
-                variant={activeTab === item.id ? 'default' : 'ghost'}
-                className="w-full justify-start h-9 text-sm px-2"
-                onClick={() => {
-                  setActiveTab(item.id)
-                  navigate({ hash: `#${item.id}` })
-                }}
-              >
-                <Icon className="w-3.5 h-3.5 mr-2" />
-                {sidebarOpen && <span>{item.label}</span>}
-              </Button>
-            )
-          })}
-        </nav>
+        {/* Espace flexible */}
+        <div className="flex-1" />
 
-        {/* Footer Sidebar - Compact */}
-        <div className="border-t border-gray-200 p-2 space-y-2">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-50 transition-colors mb-2">
+        {/* Footer Sidebar compact */}
+        <div className="border-t border-border p-2 space-y-1.5 shrink-0 safe-bottom">
+          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'justify-center'} p-1.5 rounded-lg hover:bg-muted/50 transition-colors`}>
+            <div className="relative shrink-0">
               <img
                 src={displayPhoto}
-                alt={fullName}
-                className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                alt={`Photo de profil de ${fullName}`}
+                className="w-8 h-8 rounded-lg object-cover border border-border"
                 onError={(e) => {
                   if (!photoError && e.target.src !== defaultAvatar) {
                     setPhotoError(true)
@@ -435,19 +497,31 @@ export default function CandidateDashboard() {
                   }
                 }}
               />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-gray-anthracite">{fullName}</p>
-                <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
-              </div>
+              {profile?.status && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card"
+                  style={{ 
+                    backgroundColor: profile.status === 'VALIDATED' ? '#22c55e' : 
+                                  profile.status === 'REJECTED' ? '#ef4444' : 
+                                  profile.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8'
+                  }}
+                />
+              )}
             </div>
-          )}
+            {sidebarOpen && (
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate text-gray-900">{fullName}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{profile.email}</p>
+              </div>
+            )}
+          </div>
           <Button
             variant="ghost"
-            className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 h-9 text-sm px-2"
+            className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'} text-red-600 hover:text-red-700 hover:bg-red-50 h-8 text-xs px-2`}
             onClick={handleLogout}
+            title={!sidebarOpen ? 'Déconnexion' : ''}
           >
-            <LogOut className="w-3.5 h-3.5 mr-2" />
-            {sidebarOpen && <span>Déconnexion</span>}
+            <LogOut className="w-3.5 h-3.5 shrink-0" />
+            {sidebarOpen && <span className="ml-1.5">Déconnexion</span>}
           </Button>
         </div>
       </aside>
@@ -461,172 +535,208 @@ export default function CandidateDashboard() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="container mx-auto p-3 sm:p-4 md:p-6 max-w-7xl">
-          {/* Header - Responsive */}
-          <div className="mb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3">
-              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <img
-                  src={displayPhoto}
-                  alt={fullName}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 flex-shrink-0"
-                  style={{ borderColor: 'rgba(34, 109, 104, 0.2)' }}
-                  onError={(e) => {
-                    if (!photoError && e.target.src !== defaultAvatar) {
-                      setPhotoError(true)
-                      e.target.src = defaultAvatar
-                    } else if (e.target.src !== defaultAvatar) {
-                      e.target.src = defaultAvatar
-                    }
-                  }}
-                  onLoad={() => {
-                    if (photoError && currentPhotoUrl) {
-                      setPhotoError(false)
-                    }
-                  }}
-                />
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-lg sm:text-xl font-bold bg-clip-text text-transparent truncate" style={{ background: `linear-gradient(to right, #226D68, #1a5a55)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                    {fullName}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-0.5">
-                    {getStatusBadge(profile.status)}
-                    {profile.profile_title && (
-                      <span className="text-xs text-muted-foreground truncate">• {profile.profile_title}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {profile.status === 'DRAFT' && (
-                  <Button 
-                    size="sm"
-                    className="text-white h-8 px-2 sm:px-3 text-xs flex items-center gap-1"
-                    style={{ backgroundColor: '#226D68' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1a5a55' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#226D68' }}
-                    onClick={async () => {
-                      try {
-                        await candidateApi.submitProfile(profile.id)
-                        alert('Profil soumis avec succès !')
-                        loadProfile()
-                      } catch (error) {
-                        alert('Erreur lors de la soumission: ' + (error.response?.data?.detail || error.message))
-                      }
-                    }}
-                  >
-                    <FileCheck className="w-3.5 h-3.5 sm:mr-1" />
-                    <span className="hidden sm:inline">Soumettre</span>
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate('/profile/edit')}
-                  className="h-8 px-2 sm:px-3 text-xs flex items-center gap-1"
-                >
-                  <Edit className="w-3.5 h-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline">Modifier</span>
-                </Button>
+      <main id="dashboard-main" className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-light min-w-0" aria-label="Contenu du profil">
+        <div className="container mx-auto px-4 py-3 sm:px-5 md:px-6 lg:px-8 max-w-7xl safe-x">
+          {/* Alerte statut IN_REVIEW compacte */}
+          {profile?.status === 'IN_REVIEW' && (
+            <div className="mb-3 rounded-lg border-l-3 border-l-amber-500 bg-amber-50/80 p-2.5 flex items-start gap-2" role="status">
+              <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-amber-900 text-xs mb-0.5">Profil en cours de validation</p>
+                <p className="text-[10px] text-amber-800">Notre équipe examine votre dossier. Vous serez contacté prochainement.</p>
               </div>
             </div>
+          )}
 
-            {/* Onglets du profil - Responsive */}
-            <Tabs value={activeTab} onValueChange={(value) => {
-              setActiveTab(value)
-              navigate({ hash: `#${value}` })
-            }} className="w-full">
-              <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-                <TabsList className="inline-flex w-full sm:grid sm:grid-cols-7 h-auto sm:h-9 bg-white border mb-3 min-w-max sm:min-w-0">
-                  <TabsTrigger value="profile" className="text-xs data-[state=active]:text-white whitespace-nowrap px-3 sm:px-2 py-2 sm:py-1.5" style={{ '--active-bg': '#226D68' }} data-style-active-bg="#226D68">
-                    <User className="w-3.5 h-3.5 sm:mr-1.5" />
-                    <span className="ml-1.5 sm:ml-0">Profil</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="experiences" className="text-xs data-[state=active]:bg-[#226D68] data-[state=active]:text-white whitespace-nowrap px-3 sm:px-2 py-2 sm:py-1.5">
-                    <Briefcase className="w-3.5 h-3.5 sm:mr-1.5" />
-                    <span className="ml-1.5 sm:ml-0">Expériences</span>
-                    {experiences.length > 0 && (
-                      <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-xs">
-                        {experiences.length}
+          {/* Header principal compact */}
+          <div className="mb-3">
+            <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+              {/* Bandeau de statut */}
+              <div 
+                className="h-0.5"
+                style={{
+                  backgroundColor: profile?.status === 'VALIDATED' ? '#22c55e' : 
+                                  profile?.status === 'REJECTED' ? '#ef4444' : 
+                                  profile?.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8'
+                }}
+              />
+              
+              <CardContent className="p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  {/* Informations candidat compactes */}
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <div className="relative shrink-0">
+                      <img
+                        src={displayPhoto}
+                        alt={`Photo de profil de ${fullName}`}
+                        className="w-12 h-12 rounded-lg object-cover border-2"
+                        style={{ borderColor: 'rgba(34, 109, 104, 0.2)' }}
+                        onError={(e) => {
+                          if (!photoError && e.target.src !== defaultAvatar) {
+                            setPhotoError(true)
+                            e.target.src = defaultAvatar
+                          } else if (e.target.src !== defaultAvatar) {
+                            e.target.src = defaultAvatar
+                          }
+                        }}
+                        onLoad={() => {
+                          if (photoError && currentPhotoUrl) {
+                            setPhotoError(false)
+                          }
+                        }}
+                      />
+                      {profile?.status && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-card"
+                          style={{ 
+                            backgroundColor: profile.status === 'VALIDATED' ? '#22c55e' : 
+                                          profile.status === 'REJECTED' ? '#ef4444' : 
+                                          profile.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8'
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <h1 className="text-base font-semibold text-gray-900 truncate">{fullName}</h1>
+                        {getStatusBadge(profile.status)}
+                      </div>
+                      {profile.profile_title && (
+                        <p className="text-xs text-gray-700 font-medium mb-0.5 truncate">{profile.profile_title}</p>
+                      )}
+                      <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground">
+                        {profile.email && (
+                          <span className="flex items-center gap-1 truncate">
+                            <Mail className="h-2.5 w-2.5" />
+                            <span className="truncate">{profile.email}</span>
+                          </span>
+                        )}
+                        {profile.phone && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-2.5 w-2.5" />
+                              <span>{profile.phone}</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions compactes */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {profile.status === 'DRAFT' && (
+                      <Button 
+                        size="sm"
+                        className="text-white h-8 px-3 text-xs flex items-center gap-1.5 bg-[#226D68] hover:bg-[#1a5a55] shadow-sm"
+                        onClick={() => setShowSubmitConsentModal(true)}
+                        disabled={completionPercentage < 80}
+                      >
+                        <FileCheck className="w-3.5 h-3.5" />
+                        <span>Soumettre</span>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate('/profile/edit')}
+                      className="h-8 px-3 text-xs border hover:bg-muted"
+                    >
+                      <Edit className="w-3.5 h-3.5 mr-1" />
+                      Modifier
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Barre de progression compacte */}
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3 w-3 text-[#226D68]" />
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Complétion</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
+                      {completionPercentage >= 80 && (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                      )}
+                    </div>
+                  </div>
+                  <Progress 
+                    value={completionPercentage} 
+                    className="h-2 rounded-full bg-muted"
+                  />
+                  {completionPercentage < 80 && profile.status === 'DRAFT' && (
+                    <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                      <Clock className="h-2.5 w-2.5" />
+                      <span>Complétez à 80% minimum pour soumettre</span>
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Barre d'onglets compacte */}
+          <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); navigate({ hash: `#${value}` }) }} className="w-full">
+            <TabsList className="w-full justify-start h-auto p-0.5 bg-[#E8F4F3]/30 border border-border rounded-lg overflow-x-auto">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <TabsTrigger
+                    key={item.id}
+                    value={item.id}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all hover:bg-muted data-[state=active]:hover:bg-[#1a5a55]"
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="whitespace-nowrap">{item.label}</span>
+                    {item.count != null && item.count > 0 && (
+                      <Badge 
+                        variant="secondary" 
+                        className="ml-1 h-4 px-1 text-[10px] font-medium data-[state=active]:bg-white/20 data-[state=active]:text-white"
+                      >
+                        {item.count}
                       </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="educations" className="text-xs data-[state=active]:bg-[#226D68] data-[state=active]:text-white whitespace-nowrap px-3 sm:px-2 py-2 sm:py-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 sm:mr-1.5" />
-                    <span className="ml-1.5 sm:ml-0">Formations</span>
-                    {educations.length > 0 && (
-                      <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-xs">
-                        {educations.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="certifications" className="text-xs data-[state=active]:bg-[#226D68] data-[state=active]:text-white whitespace-nowrap px-3 sm:px-2 py-2 sm:py-1.5">
-                    <Award className="w-3.5 h-3.5 sm:mr-1.5" />
-                    <span className="ml-1.5 sm:ml-0">Certifications</span>
-                    {certifications.length > 0 && (
-                      <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-xs">
-                        {certifications.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="skills" className="text-xs data-[state=active]:bg-[#226D68] data-[state=active]:text-white whitespace-nowrap px-3 sm:px-2 py-2 sm:py-1.5">
-                    <Code className="w-3.5 h-3.5 sm:mr-1.5" />
-                    <span className="ml-1.5 sm:ml-0">Compétences</span>
-                    {skills.length > 0 && (
-                      <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-xs">
-                        {skills.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="preferences" className="text-xs data-[state=active]:bg-[#226D68] data-[state=active]:text-white whitespace-nowrap px-3 sm:px-2 py-2 sm:py-1.5">
-                    <MapPin className="w-3.5 h-3.5 sm:mr-1.5" />
-                    <span className="ml-1.5 sm:ml-0">Préférences</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="documents" className="text-xs data-[state=active]:bg-[#226D68] data-[state=active]:text-white whitespace-nowrap px-3 sm:px-2 py-2 sm:py-1.5">
-                    <FileText className="w-3.5 h-3.5 sm:mr-1.5" />
-                    <span className="ml-1.5 sm:ml-0">Documents</span>
-                    {documents.length > 0 && (
-                      <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-xs">
-                        {documents.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+                )
+              })}
+            </TabsList>
 
               {/* Contenu des onglets */}
-              {/* Onglet Profil Général */}
-              <TabsContent value="profile" className="mt-0">
-                <Card className="rounded-[12px] shadow-lg border-l-4" style={{ borderLeftColor: '#226D68' }}>
-                  <CardHeader className="border-b py-2 px-3" style={{ background: `linear-gradient(to right, rgba(34, 109, 104, 0.05), rgba(34, 109, 104, 0.1))` }}>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                        <User className="h-4 w-4 flex-shrink-0" style={{ color: '#226D68' }} />
-                        <span className="truncate">Informations Générales</span>
+              <TabsContent value="profile" className="mt-3">
+                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
+                        <div className="p-1 bg-[#226D68] rounded">
+                          <User className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span>Informations Générales</span>
                       </CardTitle>
                       <Button 
                         size="sm"
+                        variant="ghost"
                         onClick={() => navigate('/profile/edit')}
-                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2 text-xs w-full sm:w-auto flex items-center justify-center gap-1"
+                        className="h-7 px-2.5 text-xs hover:bg-[#E8F4F3] hover:text-[#226D68]"
                       >
-                        <Edit className="h-3.5 w-3.5" />
+                        <Edit className="h-3 w-3 mr-1" />
                         Modifier
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="space-y-4">
-                      {/* Photo et informations principales */}
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
+                  <CardContent className="p-2.5">
+                    <div className="space-y-2.5">
+                      {/* Photo de profil et informations principales */}
+                      <div className="flex flex-col sm:flex-row gap-2.5 items-start pb-2.5 border-b border-[#E8F4F3]">
                         <div className="relative group self-center sm:self-start">
+                          <span className="sr-only">Photo de profil</span>
                           <img
                             src={displayPhoto}
-                            alt={fullName}
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 flex-shrink-0"
-                            style={{ borderColor: 'rgba(34, 109, 104, 0.2)' }}
+                            alt={`Photo de profil de ${fullName}`}
+                            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 flex-shrink-0 shadow-sm"
+                            style={{ borderColor: 'rgba(34, 109, 104, 0.3)' }}
                             onError={(e) => {
-                              console.error('Error loading profile photo:', displayPhoto, 'Falling back to default avatar')
                               if (!photoError && e.target.src !== defaultAvatar) {
                                 setPhotoError(true)
                                 e.target.src = defaultAvatar
@@ -634,22 +744,19 @@ export default function CandidateDashboard() {
                                 e.target.src = defaultAvatar
                               }
                             }}
-                            onLoad={(e) => {
-                              console.log('Profile photo loaded successfully:', e.target.src)
-                              console.log('Was using:', currentPhotoUrl ? 'photo URL' : 'default avatar')
-                              if (photoError && currentPhotoUrl) {
-                                setPhotoError(false)
-                              }
+                            onLoad={() => {
+                              if (photoError && currentPhotoUrl) setPhotoError(false)
                             }}
                           />
                           <label
                             htmlFor="photo-upload"
-                            className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center justify-center"
+                            className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center justify-center sm:pointer-events-none"
+                            aria-label="Changer la photo de profil"
                           >
                             {uploadingPhoto ? (
-                              <Loader2 className="h-6 w-6 text-white animate-spin" />
+                              <Loader2 className="h-5 w-5 text-white animate-spin" aria-hidden />
                             ) : (
-                              <ImageIcon className="h-6 w-6 text-white" />
+                              <ImageIcon className="h-5 w-5 text-white" aria-hidden />
                             )}
                           </label>
                           <input
@@ -663,11 +770,11 @@ export default function CandidateDashboard() {
                               if (!file || !profile?.id) return
 
                               if (!file.type.startsWith('image/')) {
-                                alert('Veuillez sélectionner une image (JPG, PNG)')
+                                setToast({ message: 'Veuillez sélectionner une image pour la photo de profil (JPG, PNG).', type: 'error' })
                                 return
                               }
                               if (file.size > 5 * 1024 * 1024) {
-                                alert('La photo ne doit pas dépasser 5MB')
+                                setToast({ message: 'La photo de profil ne doit pas dépasser 5 Mo.', type: 'error' })
                                 return
                               }
 
@@ -676,21 +783,13 @@ export default function CandidateDashboard() {
                                 
                                 // Utiliser l'endpoint dédié pour les photos de profil
                                 const uploadResult = await documentApi.uploadProfilePhoto(file, profile.id)
-                                console.log('Upload profile photo result:', uploadResult)
-                                
-                                // Construire l'URL complète
                                 let serveUrl = uploadResult.serve_url
                                 if (serveUrl && serveUrl.startsWith('/')) {
                                   serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
                                 } else if (uploadResult.id) {
                                   serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
                                 }
-                                
-                                console.log('Final serve URL:', serveUrl)
-
-                                // Mettre à jour le profil avec l'URL complète
                                 await candidateApi.updateProfile(profile.id, { photo_url: serveUrl })
-                                console.log('Profile updated with photo_url:', serveUrl)
                                 
                                 // Mettre à jour l'état local immédiatement
                                 setCurrentPhotoUrl(serveUrl)
@@ -698,10 +797,10 @@ export default function CandidateDashboard() {
                                 
                                 // Recharger le profil pour mettre à jour l'affichage
                                 await loadProfile()
-                                alert('Photo de profil mise à jour avec succès !')
+                                setToast({ message: 'Photo de profil mise à jour.', type: 'success' })
                               } catch (err) {
                                 console.error('Error uploading photo:', err)
-                                alert('Erreur lors du téléchargement de la photo: ' + (err.response?.data?.detail || err.message))
+                                setToast({ message: 'Erreur : ' + (err.response?.data?.detail || err.message), type: 'error' })
                               } finally {
                                 setUploadingPhoto(false)
                                 // Réinitialiser l'input
@@ -709,28 +808,33 @@ export default function CandidateDashboard() {
                               }
                             }}
                           />
+                          <label htmlFor="photo-upload" className={`sm:hidden mt-1.5 block ${uploadingPhoto ? 'pointer-events-none opacity-70' : ''}`}>
+                            <span className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2.5 py-1 text-[10px] font-medium h-7 cursor-pointer hover:bg-muted">
+                              {uploadingPhoto ? 'Chargement...' : 'Modifier'}
+                            </span>
+                          </label>
                         </div>
                         <div className="flex-1 min-w-0 w-full sm:w-auto text-center sm:text-left">
-                          <h3 className="text-base sm:text-lg font-bold text-gray-anthracite mb-1 truncate">{fullName}</h3>
+                          <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-0.5 truncate">{fullName}</h3>
                           {profile.profile_title && (
-                            <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2 truncate">{profile.profile_title}</p>
+                            <p className="text-xs font-medium text-[#226D68] mb-1.5 truncate">{profile.profile_title}</p>
                           )}
-                          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 justify-center sm:justify-start">
+                          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 justify-center sm:justify-start">
                             {profile.email && (
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground justify-center sm:justify-start">
-                                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                              <div className="flex items-center gap-1 text-[10px] text-gray-600 justify-center sm:justify-start">
+                                <Mail className="h-3 w-3 text-[#226D68] flex-shrink-0" />
                                 <span className="truncate">{profile.email}</span>
                               </div>
                             )}
                             {profile.phone && (
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground justify-center sm:justify-start">
-                                <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                              <div className="flex items-center gap-1 text-[10px] text-gray-600 justify-center sm:justify-start">
+                                <Phone className="h-3 w-3 text-[#226D68] flex-shrink-0" />
                                 <span className="truncate">{profile.phone}</span>
                               </div>
                             )}
                             {(profile.city || profile.country) && (
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground justify-center sm:justify-start">
-                                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                              <div className="flex items-center gap-1 text-[10px] text-gray-600 justify-center sm:justify-start">
+                                <MapPin className="h-3 w-3 text-[#226D68] flex-shrink-0" />
                                 <span className="truncate">{[profile.city, profile.country].filter(Boolean).join(', ')}</span>
                               </div>
                             )}
@@ -738,73 +842,88 @@ export default function CandidateDashboard() {
                         </div>
                       </div>
 
-                      {/* Informations détaillées */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t">
+                      {/* Informations détaillées - Design compact avec cartes */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                         {profile.date_of_birth && (
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Date de naissance</p>
-                              <p className="text-sm font-medium">{new Date(profile.date_of_birth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
+                            <div className="flex items-center gap-1.5">
+                              <div className="p-0.5 bg-[#226D68] rounded">
+                                <Calendar className="h-2.5 w-2.5 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Date de naissance</p>
+                                <p className="text-xs font-semibold text-gray-900 truncate">{new Date(profile.date_of_birth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                              </div>
                             </div>
-                          </div>
+                          </Card>
                         )}
                         {profile.nationality && (
-                          <div className="flex items-center gap-2">
-                            <Flag className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Nationalité</p>
-                              <p className="text-sm font-medium">{profile.nationality}</p>
+                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
+                            <div className="flex items-center gap-1.5">
+                              <div className="p-0.5 bg-[#226D68] rounded">
+                                <Flag className="h-2.5 w-2.5 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Nationalité</p>
+                                <p className="text-xs font-semibold text-gray-900 truncate">{profile.nationality}</p>
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        {profile.address && (
-                          <div className="flex items-center gap-2 md:col-span-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Adresse</p>
-                              <p className="text-sm font-medium">{profile.address}</p>
-                            </div>
-                          </div>
+                          </Card>
                         )}
                         {profile.sector && (
-                          <div className="flex items-center gap-2">
-                            <Briefcase className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Secteur d'activité</p>
-                              <p className="text-sm font-medium">{profile.sector}</p>
+                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
+                            <div className="flex items-center gap-1.5">
+                              <div className="p-0.5 bg-[#226D68] rounded">
+                                <Briefcase className="h-2.5 w-2.5 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Secteur d'activité</p>
+                                <p className="text-xs font-semibold text-gray-900 truncate">{profile.sector}</p>
+                              </div>
                             </div>
-                          </div>
+                          </Card>
                         )}
                         {profile.main_job && (
-                          <div className="flex items-center gap-2">
-                            <Briefcase className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Métier principal</p>
-                              <p className="text-sm font-medium">{profile.main_job}</p>
+                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
+                            <div className="flex items-center gap-1.5">
+                              <div className="p-0.5 bg-[#226D68] rounded">
+                                <Briefcase className="h-2.5 w-2.5 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Métier principal</p>
+                                <p className="text-xs font-semibold text-gray-900 truncate">{profile.main_job}</p>
+                              </div>
                             </div>
-                          </div>
+                          </Card>
                         )}
                         {profile.total_experience !== undefined && (
-                          <div className="flex items-center gap-2">
-                            <Briefcase className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <p className="text-xs text-muted-foreground">Années d'expérience</p>
-                              <p className="text-sm font-medium">{profile.total_experience} an{profile.total_experience > 1 ? 's' : ''}</p>
+                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
+                            <div className="flex items-center gap-1.5">
+                              <div className="p-0.5 bg-[#226D68] rounded">
+                                <TrendingUp className="h-2.5 w-2.5 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Expérience</p>
+                                <p className="text-xs font-semibold text-gray-900">{profile.total_experience} an{profile.total_experience > 1 ? 's' : ''}</p>
+                              </div>
                             </div>
-                          </div>
+                          </Card>
                         )}
                       </div>
 
                       {/* Résumé professionnel */}
                       {profile.professional_summary && (
-                        <div className="pt-3 border-t">
-                          <h4 className="text-sm font-semibold text-gray-anthracite mb-2 flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            Résumé professionnel
-                          </h4>
+                        <div className="pt-2 border-t border-[#E8F4F3]">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <div className="p-0.5 bg-[#226D68] rounded">
+                              <FileText className="h-2.5 w-2.5 text-white" />
+                            </div>
+                            <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wider">
+                              Résumé professionnel
+                            </h4>
+                          </div>
                           <div 
-                            className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed"
+                            className="text-xs text-gray-700 leading-relaxed rich-text-content"
                             dangerouslySetInnerHTML={{ __html: profile.professional_summary }}
                           />
                         </div>
@@ -814,76 +933,101 @@ export default function CandidateDashboard() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="experiences" className="mt-0">
-                <Card className="rounded-[12px] shadow-lg border-l-4 border-l-[#226D68]">
-                    <CardHeader className="bg-gradient-to-r from-[#226D68]/5 to-[#226D68]/10 border-b py-2 px-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                          <Briefcase className="h-4 w-4 text-[#226D68] flex-shrink-0" />
-                          <span className="truncate">Expériences professionnelles</span>
-                        </CardTitle>
-                        <Button 
-                          size="sm"
-                          onClick={() => {
-                            setEditingExperience(null)
-                            setShowExperienceDialog(true)
-                          }}
-                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2 text-xs w-full sm:w-auto flex items-center justify-center gap-1"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Ajouter
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-3 sm:p-4">
+              <TabsContent value="experiences" className="mt-3">
+                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
+                        <div className="p-1 bg-[#226D68] rounded">
+                          <Briefcase className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span>Expériences professionnelles</span>
+                        {experiences.length > 0 && (
+                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium bg-[#E8F4F3] text-[#226D68]">
+                            {experiences.length}
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          setEditingExperience(null)
+                          setShowExperienceDialog(true)
+                        }}
+                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Ajouter
+                      </Button>
+                    </div>
+                  </CardHeader>
+                    <CardContent className="p-3">
                       {experiences.length > 0 ? (
-                        <div className="space-y-2 sm:space-y-3">
-                          {experiences.map((exp) => {
+                        <div className="space-y-2.5">
+                          {experiences.map((exp, index) => {
                             const defaultCompanyLogo = generateCompanyLogoUrl(exp.company_name)
                             const displayCompanyLogo = exp.company_logo_url || defaultCompanyLogo
                             
                             return (
-                              <Card key={exp.id} className="rounded-lg shadow-sm hover:shadow-md transition-all border-l-2 border-l-[#226D68]/50 group">
-                                <CardContent className="pt-3 pb-3 px-3">
-                                  <div className="flex gap-2 sm:gap-3 items-start">
-                                    <img
-                                      src={displayCompanyLogo}
-                                      alt={exp.company_name}
-                                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
-                                      onError={(e) => {
-                                        if (e.target.src !== defaultCompanyLogo) {
-                                          e.target.src = defaultCompanyLogo
-                                        }
-                                      }}
-                                    />
+                              <Card key={exp.id} className="rounded-lg border border-border hover:border-[#226D68]/50 hover:shadow-md transition-all border-l-3 border-l-[#226D68] group bg-gradient-to-r from-white to-[#E8F4F3]/20">
+                                <CardContent className="p-2.5">
+                                  <div className="flex gap-2.5 items-start">
+                                    {/* Logo entreprise */}
+                                    <div className="relative shrink-0">
+                                      <img
+                                        src={displayCompanyLogo}
+                                        alt={`Logo de ${exp.company_name}`}
+                                        className="w-10 h-10 rounded-lg object-cover border-2 border-[#E8F4F3] shadow-sm"
+                                        onError={(e) => {
+                                          if (e.target.src !== defaultCompanyLogo) {
+                                            e.target.src = defaultCompanyLogo
+                                          }
+                                        }}
+                                      />
+                                      {exp.is_current && (
+                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Contenu principal */}
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                                      {/* En-tête avec titre et actions */}
+                                      <div className="flex items-start justify-between gap-2 mb-1.5">
                                         <div className="flex-1 min-w-0">
-                                          <h4 className="font-semibold text-xs sm:text-sm text-gray-anthracite truncate">{exp.position}</h4>
-                                          <p className="text-xs font-medium text-gray-700 truncate">{exp.company_name}</p>
-                                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-1">
+                                          <h4 className="font-bold text-xs text-gray-900 truncate mb-0.5 leading-tight">{exp.position}</h4>
+                                          <p className="text-xs font-semibold text-[#226D68] truncate mb-1">{exp.company_name}</p>
+                                          
+                                          {/* Métadonnées compactes */}
+                                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                            {/* Date */}
+                                            <div className="flex items-center gap-1 text-[10px] text-gray-600 bg-[#E8F4F3] px-1.5 py-0.5 rounded">
+                                              <Calendar className="w-2.5 h-2.5 text-[#226D68]" />
+                                              <span className="font-medium">
+                                                {new Date(exp.start_date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
+                                                {exp.end_date 
+                                                  ? ` - ${new Date(exp.end_date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}`
+                                                  : exp.is_current ? ' - Actuellement' : ''}
+                                              </span>
+                                            </div>
+                                            
+                                            {/* Type de contrat */}
                                             {exp.contract_type && (
-                                              <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
+                                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
                                                 {exp.contract_type}
                                               </Badge>
                                             )}
+                                            
+                                            {/* Secteur */}
                                             {exp.company_sector && (
-                                              <Badge variant="outline" className="text-xs px-1.5 py-0 h-4">
+                                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-[#226D68]/30 text-gray-700">
                                                 {exp.company_sector}
                                               </Badge>
                                             )}
                                           </div>
-                                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1 flex-wrap">
-                                            <Calendar className="w-3 h-3 flex-shrink-0" />
-                                            <span className="whitespace-nowrap">
-                                              {new Date(exp.start_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-                                              {exp.end_date 
-                                                ? ` - ${new Date(exp.end_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
-                                                : exp.is_current ? ' - Actuellement' : ''}
-                                            </span>
-                                          </p>
                                         </div>
-                                        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                        
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                           <Button
                                             variant="ghost"
                                             size="sm"
@@ -891,38 +1035,46 @@ export default function CandidateDashboard() {
                                               setEditingExperience(exp)
                                               setShowExperienceDialog(true)
                                             }}
-                                            className="h-7 w-7 p-0"
+                                            className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                            title="Modifier"
                                           >
-                                            <Edit className="h-3.5 w-3.5 text-blue-600" />
+                                            <Edit className="h-3 w-3 text-[#226D68]" />
                                           </Button>
                                           <Button
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => handleDeleteExperience(exp.id)}
-                                            className="h-7 w-7 p-0"
+                                            className="h-6 w-6 p-0 hover:bg-red-50"
+                                            title="Supprimer"
                                           >
-                                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                            <Trash2 className="h-3 w-3 text-red-500" />
                                           </Button>
                                         </div>
                                       </div>
 
                                       {/* Description */}
                                       {exp.description && (
-                                        <div className="mt-3 pt-3 border-t border-gray-100">
-                                          <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Description des missions</p>
+                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3]">
+                                          <div className="flex items-center gap-1 mb-1">
+                                            <div className="w-1 h-1 rounded-full bg-[#226D68]"></div>
+                                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Description</p>
+                                          </div>
                                           <div 
-                                            className="text-xs text-gray-700 rich-text-content"
+                                            className="text-xs text-gray-700 rich-text-content leading-relaxed"
                                             dangerouslySetInnerHTML={{ __html: exp.description }}
                                           />
                                         </div>
                                       )}
 
-                                      {/* Réalisations majeures */}
+                                      {/* Réalisations */}
                                       {exp.achievements && (
-                                        <div className="mt-3 pt-3 border-t border-gray-100">
-                                          <p className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">Réalisations majeures</p>
+                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3]">
+                                          <div className="flex items-center gap-1 mb-1">
+                                            <div className="w-1 h-1 rounded-full bg-[#226D68]"></div>
+                                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Réalisations</p>
+                                          </div>
                                           <div 
-                                            className="text-xs text-gray-700 rich-text-content"
+                                            className="text-xs text-gray-700 rich-text-content leading-relaxed"
                                             dangerouslySetInnerHTML={{ __html: exp.achievements }}
                                           />
                                         </div>
@@ -930,10 +1082,10 @@ export default function CandidateDashboard() {
 
                                       {/* Document justificatif */}
                                       {exp.has_document && exp.document_id && (
-                                        <div className="mt-3 pt-3 border-t border-gray-100">
-                                          <div className="flex items-center gap-2">
-                                            <FileText className="h-4 w-4 text-[#226D68]" />
-                                            <span className="text-xs font-medium text-gray-700">Pièce justificative disponible</span>
+                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3]">
+                                          <div className="flex items-center gap-1.5 text-[#226D68]">
+                                            <FileText className="h-3 w-3" />
+                                            <span className="text-[10px] font-medium">Pièce justificative disponible</span>
                                           </div>
                                         </div>
                                       )}
@@ -945,15 +1097,18 @@ export default function CandidateDashboard() {
                           })}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                          <Briefcase className="h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm font-semibold mb-1">Aucune expérience enregistrée</p>
+                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/30">
+                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
+                            <Briefcase className="h-5 w-5 text-[#226D68]" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune expérience enregistrée</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Ajoutez vos expériences professionnelles pour enrichir votre profil</p>
                           <Button 
                             size="sm"
-                            className="mt-3 bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 px-2 text-xs"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
                             onClick={() => setShowExperienceDialog(true)}
                           >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            <Plus className="h-3 w-3 mr-1" />
                             Ajouter une expérience
                           </Button>
                         </div>
@@ -962,164 +1117,231 @@ export default function CandidateDashboard() {
                   </Card>
               </TabsContent>
 
-              <TabsContent value="educations" className="mt-0">
-                <Card className="rounded-[12px] shadow-lg border-l-4 border-l-blue-deep">
-                    <CardHeader className="bg-gradient-to-r from-blue-deep/5 to-blue-deep/10 border-b py-2 px-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                          <GraduationCap className="h-4 w-4 text-blue-deep flex-shrink-0" />
-                          <span className="truncate">Formations & Diplômes</span>
-                        </CardTitle>
+              <TabsContent value="educations" className="mt-4">
+                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
+                        <div className="p-1 bg-[#226D68] rounded">
+                          <GraduationCap className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span>Formations & Diplômes</span>
+                        {educations.length > 0 && (
+                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium">
+                            {educations.length}
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          setEditingEducation(null)
+                          setShowEducationDialog(true)
+                        }}
+                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Ajouter
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3">
+                    {educations.length > 0 ? (
+                      <div className="space-y-2">
+                        {[...educations]
+                          .sort((a, b) => (b.graduation_year || 0) - (a.graduation_year || 0))
+                          .map((edu) => {
+                            const duration = edu.start_year && edu.graduation_year 
+                              ? edu.graduation_year - edu.start_year 
+                              : null
+                            
+                            return (
+                              <Card 
+                                key={edu.id} 
+                                className="rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-all border-l-3 border-l-[#226D68] group"
+                              >
+                                <CardContent className="p-2.5">
+                                  <div className="flex items-start justify-between gap-2.5">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start gap-2">
+                                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#226D68] to-[#1a5a55] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                          <GraduationCap className="h-3.5 w-3.5 text-white" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-semibold text-xs text-gray-900 mb-0.5 group-hover:text-[#226D68] transition-colors truncate">
+                                            {edu.diploma}
+                                          </h4>
+                                          <p className="text-xs font-medium text-gray-700 truncate mb-1">{edu.institution}</p>
+                                          
+                                          {/* Métadonnées compactes */}
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            {edu.level && (
+                                              <Badge 
+                                                variant="secondary" 
+                                                className="bg-[#E8F4F3] text-[#1a5a55] border-[#B8DDD9] text-[10px] font-medium px-1.5 py-0 h-4"
+                                              >
+                                                {edu.level}
+                                              </Badge>
+                                            )}
+                                            {edu.country && (
+                                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                <MapPin className="h-2.5 w-2.5 text-[#226D68]" />
+                                                <span>{edu.country}</span>
+                                              </div>
+                                            )}
+                                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                              <Calendar className="h-2.5 w-2.5 text-[#226D68]" />
+                                              <span>
+                                                {edu.start_year 
+                                                  ? `${edu.start_year} - ${edu.graduation_year}` 
+                                                  : edu.graduation_year}
+                                              </span>
+                                              {duration && duration > 0 && (
+                                                <span className="text-muted-foreground">• {duration} an{duration > 1 ? 's' : ''}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Actions compactes */}
+                                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingEducation(edu)
+                                          setShowEducationDialog(true)
+                                        }}
+                                        className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                      >
+                                        <Edit className="h-3 w-3 text-[#226D68]" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => handleDeleteEducation(edu.id)}
+                                        className="h-6 w-6 p-0 hover:bg-red-50" 
+                                      >
+                                        <Trash2 className="h-3 w-3 text-red-500" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-border bg-[#E8F4F3]/30">
+                        <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
+                          <GraduationCap className="h-5 w-5 text-[#226D68]" />
+                        </div>
+                        <h3 className="text-xs font-semibold text-gray-900 mb-0.5">Aucune formation enregistrée</h3>
+                        <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">
+                          Ajoutez vos formations et diplômes pour enrichir votre profil.
+                        </p>
                         <Button 
                           size="sm"
                           onClick={() => {
                             setEditingEducation(null)
                             setShowEducationDialog(true)
                           }}
-                          className="bg-blue-deep hover:bg-blue-deep/90 text-white h-7 px-2 text-xs w-full sm:w-auto flex items-center justify-center gap-1"
+                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 px-3 text-xs"
                         >
-                          <Plus className="h-3.5 w-3.5" />
-                          Ajouter
+                          <Plus className="h-3.5 w-3.5 mr-1.5" />
+                          Ajouter une formation
                         </Button>
                       </div>
-                    </CardHeader>
-                    <CardContent className="p-3 sm:p-4">
-                      {educations.length > 0 ? (
-                        <div className="space-y-2 sm:space-y-3">
-                          {educations.map((edu) => (
-                            <Card key={edu.id} className="rounded-lg shadow-sm hover:shadow-md transition-all border-l-2 border-l-blue-deep/50 group">
-                              <CardContent className="pt-3 pb-3 px-3">
-                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-xs sm:text-sm text-gray-anthracite truncate">{edu.diploma}</h4>
-                                    <p className="text-xs font-medium text-gray-700 truncate">{edu.institution}</p>
-                                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                                      {edu.level && (
-                                        <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
-                                          {edu.level}
-                                        </Badge>
-                                      )}
-                                      {edu.country && (
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                          <MapPin className="w-3 h-3" />
-                                          <span>{edu.country}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                                      <Calendar className="w-3 h-3" />
-                                      <span>
-                                        {edu.start_year ? `${edu.start_year} - ${edu.graduation_year}` : edu.graduation_year}
-                                      </span>
-                                    </div>
-                                  </div>
-                                    <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingEducation(edu)
-                                        setShowEducationDialog(true)
-                                      }}
-                                      className="h-7 w-7 p-0"
-                                    >
-                                      <Edit className="h-3.5 w-3.5 text-blue-600" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      onClick={() => handleDeleteEducation(edu.id)}
-                                      className="h-7 w-7 p-0"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                          <GraduationCap className="h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm font-semibold mb-1">Aucune formation enregistrée</p>
-                          <Button 
-                            size="sm"
-                            className="mt-3 bg-blue-deep hover:bg-blue-deep/90 text-white h-8 px-2 text-xs"
-                            onClick={() => setShowEducationDialog(true)}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
-                            Ajouter une formation
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
-              <TabsContent value="certifications" className="mt-0">
-                <Card className="rounded-[12px] shadow-lg border-l-4 border-l-[#e76f51]">
-                    <CardHeader className="bg-gradient-to-r from-[#FDF2F0] to-[#FBE5E0] border-b py-2 px-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                          <Award className="h-4 w-4 text-[#e76f51] flex-shrink-0" />
-                          <span className="truncate">Certifications</span>
-                        </CardTitle>
-                        <Button 
-                          size="sm"
-                          onClick={() => {
-                            setEditingCertification(null)
-                            setShowCertificationDialog(true)
-                          }}
-                          className="bg-[#e76f51] hover:bg-[#d45a3f] text-white h-7 px-2 text-xs w-full sm:w-auto flex items-center justify-center gap-1"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Ajouter
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-3 sm:p-4">
+              <TabsContent value="certifications" className="mt-3">
+                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
+                        <div className="p-1 bg-[#226D68] rounded">
+                          <Award className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span>Certifications</span>
+                        {certifications.length > 0 && (
+                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium bg-[#E8F4F3] text-[#226D68]">
+                            {certifications.length}
+                          </Badge>
+                        )}
+                      </CardTitle>
+                      <Button 
+                        size="sm"
+                        onClick={() => {
+                          setEditingCertification(null)
+                          setShowCertificationDialog(true)
+                        }}
+                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Ajouter
+                      </Button>
+                    </div>
+                  </CardHeader>
+                    <CardContent className="p-2.5">
                       {certifications.length > 0 ? (
-                        <div className="space-y-2 sm:space-y-3">
+                        <div className="space-y-2">
                           {certifications.map((cert) => (
-                            <Card key={cert.id} className="rounded-lg shadow-sm hover:shadow-md transition-all border-l-2 border-l-[#e76f51]/50 group">
-                              <CardContent className="pt-3 pb-3 px-3">
-                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                            <Card key={cert.id} className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all group">
+                              <CardContent className="p-2">
+                                <div className="flex items-start justify-between gap-2">
                                   <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-xs sm:text-sm text-gray-anthracite truncate">{cert.title}</h4>
-                                    <p className="text-xs font-medium text-gray-700 truncate">{cert.issuer}</p>
-                                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Calendar className="w-3 h-3" />
-                                        <span>{cert.year}</span>
+                                    <div className="flex items-start gap-2">
+                                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#226D68] to-[#1a5a55] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                        <Award className="h-3 w-3 text-white" />
                                       </div>
-                                      {cert.expiration_date && (
-                                        <div className="flex items-center gap-1 text-xs text-[#e76f51]">
-                                          <Clock className="w-3 h-3" />
-                                          <span>Expire le {new Date(cert.expiration_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-xs text-gray-900 truncate mb-0.5 group-hover:text-[#226D68] transition-colors">{cert.title}</h4>
+                                        <p className="text-[10px] font-medium text-gray-700 truncate mb-1">{cert.issuer}</p>
+                                        
+                                        {/* Métadonnées compactes */}
+                                        <div className="flex flex-wrap items-center gap-1">
+                                          <div className="flex items-center gap-0.5 text-[9px] text-gray-600 bg-[#E8F4F3] px-1 py-0.5 rounded">
+                                            <Calendar className="w-2 h-2 text-[#226D68]" />
+                                            <span className="font-medium">{cert.year}</span>
+                                          </div>
+                                          {cert.expiration_date && (
+                                            <div className="flex items-center gap-0.5 text-[9px] text-[#226D68] bg-[#E8F4F3] px-1 py-0.5 rounded">
+                                              <Clock className="w-2 h-2" />
+                                              <span className="font-medium">Expire {new Date(cert.expiration_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                            </div>
+                                          )}
+                                          {cert.certification_id && (
+                                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-[#226D68]/30 text-gray-700">
+                                              ID: {cert.certification_id}
+                                            </Badge>
+                                          )}
                                         </div>
-                                      )}
-                                      {cert.certification_id && (
-                                        <Badge variant="outline" className="text-xs px-1.5 py-0 h-4">
-                                          ID: {cert.certification_id}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {cert.verification_url && (
-                                      <div className="mt-2 pt-2 border-t border-gray-100">
-                                        <a 
-                                          href={cert.verification_url} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer" 
-                                          className="text-xs text-[#e76f51] hover:text-[#c04a2f] hover:underline inline-flex items-center gap-1.5 font-medium"
-                                        >
-                                          <Eye className="h-3.5 w-3.5" />
-                                          Lien de vérification
-                                        </a>
+                                        
+                                        {/* Lien de vérification */}
+                                        {cert.verification_url && (
+                                          <div className="mt-1.5 pt-1.5 border-t border-[#E8F4F3]">
+                                            <a 
+                                              href={cert.verification_url} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer" 
+                                              className="text-[9px] text-[#226D68] hover:underline inline-flex items-center gap-1 font-medium"
+                                            >
+                                              <Eye className="h-2.5 w-2.5" />
+                                              Lien de vérification
+                                            </a>
+                                          </div>
+                                        )}
                                       </div>
-                                    )}
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                  
+                                  {/* Actions */}
+                                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -1127,17 +1349,19 @@ export default function CandidateDashboard() {
                                         setEditingCertification(cert)
                                         setShowCertificationDialog(true)
                                       }}
-                                      className="h-7 w-7 p-0"
+                                      className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                      title="Modifier"
                                     >
-                                      <Edit className="h-3.5 w-3.5 text-blue-600" />
+                                      <Edit className="h-3 w-3 text-[#226D68]" />
                                     </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
                                       onClick={() => handleDeleteCertification(cert.id)}
-                                      className="h-7 w-7 p-0"
+                                      className="h-6 w-6 p-0 hover:bg-red-50"
+                                      title="Supprimer"
                                     >
-                                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                      <Trash2 className="h-3 w-3 text-red-500" />
                                     </Button>
                                   </div>
                                 </div>
@@ -1146,15 +1370,18 @@ export default function CandidateDashboard() {
                           ))}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                          <Award className="h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm font-semibold mb-1">Aucune certification enregistrée</p>
+                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/30">
+                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
+                            <Award className="h-5 w-5 text-[#226D68]" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune certification enregistrée</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Ajoutez vos certifications pour enrichir votre profil</p>
                           <Button 
                             size="sm"
-                            className="mt-3 bg-[#e76f51] hover:bg-[#d45a3f] text-white h-8 px-2 text-xs"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
                             onClick={() => setShowCertificationDialog(true)}
                           >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            <Plus className="h-3 w-3 mr-1" />
                             Ajouter une certification
                           </Button>
                         </div>
@@ -1163,174 +1390,237 @@ export default function CandidateDashboard() {
                   </Card>
               </TabsContent>
 
-              <TabsContent value="skills" className="mt-0 space-y-4">
-                {/* En-tête avec statistiques */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                  <div>
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-[#226D68]" />
-                      Mes Compétences
-                    </h2>
-                    <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                      {skills.length} compétence{skills.length > 1 ? 's' : ''} au total
-                    </p>
-                  </div>
+              <TabsContent value="skills" className="mt-3">
+                {/* Header compact */}
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                    <Code className="h-3.5 w-3.5 text-[#226D68]" />
+                    Mes Compétences
+                  </h2>
                   <Button 
                     size="sm"
                     onClick={() => {
                       setEditingSkill(null)
                       setShowSkillDialog(true)
                     }}
-                    className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-9 px-4 text-sm w-full sm:w-auto flex items-center justify-center gap-2 shadow-sm"
+                    className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs shrink-0"
                   >
-                    <Plus className="h-4 w-4" />
-                    Ajouter une compétence
+                    <Plus className="h-3 w-3 mr-1" />
+                    Ajouter
                   </Button>
                 </div>
 
-                {skills.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                    {/* Compétences Techniques */}
-                    {(() => {
-                      const technicalSkills = skills.filter(s => s.skill_type === 'TECHNICAL')
-                      if (technicalSkills.length === 0) return null
-                      return (
-                        <Card className="rounded-xl shadow-md border-l-4 border-l-blue-600 hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-b pb-3">
+                {/* Liste des compétences */}
+                {(() => {
+                  // Grouper par type
+                  const technicalSkills = skills.filter(s => s.skill_type === 'TECHNICAL')
+                  const softSkills = skills.filter(s => s.skill_type === 'SOFT')
+                  const toolSkills = skills.filter(s => s.skill_type === 'TOOL')
+                  
+                  const getLevelColor = (level) => {
+                    switch(level) {
+                      case 'EXPERT': return { bg: 'bg-[#226D68]', text: 'text-[#1a5a55]', border: 'border-[#226D68]' }
+                      case 'ADVANCED': return { bg: 'bg-[#226D68]/80', text: 'text-[#1a5a55]', border: 'border-[#226D68]/80' }
+                      case 'INTERMEDIATE': return { bg: 'bg-[#226D68]/60', text: 'text-[#1a5a55]', border: 'border-[#226D68]/60' }
+                      case 'BEGINNER': return { bg: 'bg-[#226D68]/40', text: 'text-[#1a5a55]', border: 'border-[#226D68]/40' }
+                      default: return { bg: 'bg-gray-400', text: 'text-gray-700', border: 'border-gray-300' }
+                    }
+                  }
+                  
+                  const getLevelProgress = (level) => {
+                    switch(level) {
+                      case 'EXPERT': return 100
+                      case 'ADVANCED': return 75
+                      case 'INTERMEDIATE': return 50
+                      case 'BEGINNER': return 25
+                      default: return 0
+                    }
+                  }
+                  
+                  const getLevelLabel = (level) => {
+                    switch(level) {
+                      case 'EXPERT': return 'Expert'
+                      case 'ADVANCED': return 'Avancé'
+                      case 'INTERMEDIATE': return 'Intermédiaire'
+                      case 'BEGINNER': return 'Débutant'
+                      default: return ''
+                    }
+                  }
+                  
+                  if (skills.length === 0) {
+                    return (
+                      <Card className="rounded-lg border-2 border-dashed border-border bg-[#E8F4F3]/30">
+                        <CardContent className="p-8">
+                          <div className="flex flex-col items-center justify-center text-center">
+                            <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
+                              <Code className="h-5 w-5 text-[#226D68]" />
+                            </div>
+                            <p className="text-xs font-semibold text-gray-900 mb-0.5">
+                              Aucune compétence enregistrée
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">
+                              Ajoutez vos compétences techniques, soft skills et outils pour enrichir votre profil
+                            </p>
+                            <Button 
+                              size="sm"
+                              onClick={() => {
+                                setEditingSkill(null)
+                                setShowSkillDialog(true)
+                              }}
+                              className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Ajouter ma première compétence
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  }
+                  
+                  return (
+                    <div className="space-y-2.5">
+                      {/* Compétences Techniques */}
+                      {technicalSkills.length > 0 && (
+                        <Card className="rounded-lg border border-border border-l-3 border-l-[#226D68] bg-card shadow-sm">
+                          <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b py-2 px-3">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="p-2 bg-blue-600 rounded-lg">
-                                  <Code className="h-4 w-4 text-white" />
+                              <div className="flex items-center gap-1.5">
+                                <div className="p-1 bg-[#226D68] rounded">
+                                  <Code className="h-3 w-3 text-white" />
                                 </div>
                                 <div>
-                                  <CardTitle className="text-sm font-bold text-blue-900">
+                                  <CardTitle className="text-xs font-semibold text-gray-900">
                                     Compétences techniques
                                   </CardTitle>
-                                  <p className="text-xs text-blue-700 mt-0.5">
+                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                                     {technicalSkills.length} compétence{technicalSkills.length > 1 ? 's' : ''}
                                   </p>
                                 </div>
                               </div>
                             </div>
                           </CardHeader>
-                          <CardContent className="p-4">
-                            <div className="flex flex-wrap gap-2">
-                              {technicalSkills.map((skill) => (
-                                <div
-                                  key={skill.id}
-                                  className="group relative bg-white border border-blue-200 rounded-lg px-3 py-2 hover:border-blue-400 hover:shadow-md transition-all duration-200 flex items-center gap-2 min-w-0"
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-semibold text-sm text-gray-900 truncate">
-                                        {skill.name}
-                                      </span>
-                                      {skill.level && (
-                                        <Badge 
-                                          variant="secondary" 
-                                          className="bg-blue-100 text-blue-800 border-blue-300 text-xs font-medium px-2 py-0.5 whitespace-nowrap"
-                                        >
-                                          {skill.level === 'BEGINNER' ? 'Débutant' :
-                                           skill.level === 'INTERMEDIATE' ? 'Intermédiaire' :
-                                           skill.level === 'ADVANCED' ? 'Avancé' : 'Expert'}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {skill.years_of_practice > 0 && (
-                                      <div className="flex items-center gap-1 mt-1">
-                                        <Calendar className="h-3 w-3 text-gray-500" />
-                                        <span className="text-xs text-gray-600">
-                                          {skill.years_of_practice} an{skill.years_of_practice > 1 ? 's' : ''} d'expérience
-                                        </span>
+                          <CardContent className="p-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {technicalSkills.map((skill) => {
+                                const levelColors = getLevelColor(skill.level || 'BEGINNER')
+                                return (
+                                  <div
+                                    key={skill.id}
+                                    className="group relative bg-card border border-border rounded-lg p-2 hover:border-[#226D68] hover:shadow-sm transition-all duration-200"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="font-medium text-xs text-gray-900 truncate mb-1">
+                                          {skill.name}
+                                        </h4>
+                                        {skill.level && (
+                                          <div className="space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className={`text-[10px] font-medium ${levelColors.text}`}>
+                                                {getLevelLabel(skill.level)}
+                                              </span>
+                                              <span className="text-[10px] text-muted-foreground">
+                                                {getLevelProgress(skill.level)}%
+                                              </span>
+                                            </div>
+                                            <div className="h-1 bg-muted rounded-full overflow-hidden">
+                                              <div 
+                                                className={`h-full ${levelColors.bg} transition-all duration-300`}
+                                                style={{ width: `${getLevelProgress(skill.level)}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+                                        {skill.years_of_practice > 0 && (
+                                          <div className="flex items-center gap-1 mt-1.5">
+                                            <Calendar className="h-2.5 w-2.5 text-muted-foreground" />
+                                            <span className="text-[10px] text-muted-foreground">
+                                              {skill.years_of_practice} an{skill.years_of_practice > 1 ? 's' : ''}
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
-                                    )}
+                                      <div className="flex items-center gap-0.5 shrink-0">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                          onClick={() => {
+                                            setEditingSkill(skill)
+                                            setShowSkillDialog(true)
+                                          }}
+                                        >
+                                          <Edit className="h-3 w-3 text-[#226D68]" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-6 w-6 p-0 hover:bg-red-50" 
+                                          onClick={() => handleDeleteSkill(skill.id)}
+                                        >
+                                          <Trash2 className="h-3 w-3 text-red-500" />
+                                        </Button>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 w-7 p-0 hover:bg-blue-50"
-                                      onClick={() => {
-                                        setEditingSkill(skill)
-                                        setShowSkillDialog(true)
-                                      }}
-                                    >
-                                      <Edit className="h-3.5 w-3.5 text-blue-600" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-7 w-7 p-0 hover:bg-red-50" 
-                                      onClick={() => handleDeleteSkill(skill.id)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </CardContent>
                         </Card>
-                      )
-                    })()}
+                      )}
 
-                    {/* Soft Skills */}
-                    {(() => {
-                      const softSkills = skills.filter(s => s.skill_type === 'SOFT')
-                      if (softSkills.length === 0) return null
-                      return (
-                        <Card className="rounded-xl shadow-md border-l-4 border-l-[#226D68] hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="bg-gradient-to-br from-[#E8F4F3] to-[#D1E9E7]/50 border-b pb-3">
+                      {/* Soft Skills */}
+                      {softSkills.length > 0 && (
+                        <Card className="rounded-lg border border-border border-l-3 border-l-[#226D68] bg-card shadow-sm">
+                          <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b py-2 px-3">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="p-2 bg-[#226D68] rounded-lg">
-                                  <Users className="h-4 w-4 text-white" />
+                              <div className="flex items-center gap-1.5">
+                                <div className="p-1 bg-[#226D68] rounded">
+                                  <Sparkles className="h-3 w-3 text-white" />
                                 </div>
                                 <div>
-                                  <CardTitle className="text-sm font-bold text-[#1a5a55]">
+                                  <CardTitle className="text-xs font-semibold text-gray-900">
                                     Soft Skills
                                   </CardTitle>
-                                  <p className="text-xs text-[#1a5a55] mt-0.5">
+                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                                     {softSkills.length} compétence{softSkills.length > 1 ? 's' : ''}
                                   </p>
                                 </div>
                               </div>
                             </div>
                           </CardHeader>
-                          <CardContent className="p-4">
-                            <div className="flex flex-wrap gap-2">
+                          <CardContent className="p-2.5">
+                            <div className="flex flex-wrap gap-1.5">
                               {softSkills.map((skill) => (
                                 <div
                                   key={skill.id}
-                                  className="group relative bg-white border border-[#B8DDD9] rounded-lg px-3 py-2.5 hover:border-[#226D68] hover:shadow-md transition-all duration-200 flex items-center gap-2 min-w-0"
+                                  className="group relative bg-gradient-to-br from-[#E8F4F3] to-white border border-[#B8DDD9] rounded-lg px-2 py-1.5 hover:border-[#226D68] hover:shadow-sm transition-all duration-200 flex items-center gap-1.5"
                                 >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <Sparkles className="h-3.5 w-3.5 text-[#226D68] flex-shrink-0" />
-                                      <span className="font-semibold text-sm text-gray-900">
-                                        {skill.name}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Sparkles className="h-3 w-3 text-[#226D68] shrink-0" />
+                                  <span className="font-medium text-xs text-gray-900">
+                                    {skill.name}
+                                  </span>
+                                  <div className="flex items-center gap-0.5 ml-1 shrink-0">
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-7 w-7 p-0 hover:bg-[#E8F4F3]"
+                                      className="h-5 w-5 p-0 hover:bg-[#E8F4F3]"
                                       onClick={() => {
                                         setEditingSkill(skill)
                                         setShowSkillDialog(true)
                                       }}
                                     >
-                                      <Edit className="h-3.5 w-3.5 text-[#226D68]" />
+                                      <Edit className="h-2.5 w-2.5 text-[#226D68]" />
                                     </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      className="h-7 w-7 p-0 hover:bg-red-50" 
+                                      className="h-5 w-5 p-0 hover:bg-red-50" 
                                       onClick={() => handleDeleteSkill(skill.id)}
                                     >
-                                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                      <Trash2 className="h-2.5 w-2.5 text-red-500" />
                                     </Button>
                                   </div>
                                 </div>
@@ -1338,151 +1628,139 @@ export default function CandidateDashboard() {
                             </div>
                           </CardContent>
                         </Card>
-                      )
-                    })()}
+                      )}
 
-                    {/* Outils & Logiciels */}
-                    {(() => {
-                      const toolSkills = skills.filter(s => s.skill_type === 'TOOL')
-                      if (toolSkills.length === 0) return null
-                      return (
-                        <Card className="rounded-xl shadow-md border-l-4 border-l-purple-600 hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-b pb-3">
+                      {/* Outils & Logiciels */}
+                      {toolSkills.length > 0 && (
+                        <Card className="rounded-lg border border-border border-l-3 border-l-[#226D68] bg-card shadow-sm">
+                          <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b py-2 px-3">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="p-2 bg-purple-600 rounded-lg">
-                                  <Wrench className="h-4 w-4 text-white" />
+                              <div className="flex items-center gap-1.5">
+                                <div className="p-1 bg-[#226D68] rounded">
+                                  <Wrench className="h-3 w-3 text-white" />
                                 </div>
                                 <div>
-                                  <CardTitle className="text-sm font-bold text-purple-900">
+                                  <CardTitle className="text-xs font-semibold text-gray-900">
                                     Outils & Logiciels
                                   </CardTitle>
-                                  <p className="text-xs text-purple-700 mt-0.5">
+                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                                     {toolSkills.length} outil{toolSkills.length > 1 ? 's' : ''}
                                   </p>
                                 </div>
                               </div>
                             </div>
                           </CardHeader>
-                          <CardContent className="p-4">
-                            <div className="flex flex-wrap gap-2">
-                              {toolSkills.map((skill) => (
-                                <div
-                                  key={skill.id}
-                                  className="group relative bg-white border border-purple-200 rounded-lg px-3 py-2 hover:border-purple-400 hover:shadow-md transition-all duration-200 flex items-center gap-2 min-w-0"
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-semibold text-sm text-gray-900 truncate">
-                                        {skill.name}
-                                      </span>
-                                      {skill.level && (
-                                        <Badge 
-                                          variant="secondary" 
-                                          className="bg-purple-100 text-purple-800 border-purple-300 text-xs font-medium px-2 py-0.5 whitespace-nowrap"
-                                        >
-                                          {skill.level === 'BEGINNER' ? 'Débutant' :
-                                           skill.level === 'INTERMEDIATE' ? 'Intermédiaire' :
-                                           skill.level === 'ADVANCED' ? 'Avancé' : 'Expert'}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {skill.years_of_practice > 0 && (
-                                      <div className="flex items-center gap-1 mt-1">
-                                        <Calendar className="h-3 w-3 text-gray-500" />
-                                        <span className="text-xs text-gray-600">
-                                          {skill.years_of_practice} an{skill.years_of_practice > 1 ? 's' : ''} d'expérience
-                                        </span>
+                          <CardContent className="p-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {toolSkills.map((skill) => {
+                                const levelColors = getLevelColor(skill.level || 'BEGINNER')
+                                return (
+                                  <div
+                                    key={skill.id}
+                                    className="group relative bg-card border border-border rounded-lg p-2 hover:border-purple-300 hover:shadow-sm transition-all duration-200"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="font-medium text-xs text-gray-900 truncate mb-1">
+                                          {skill.name}
+                                        </h4>
+                                        {skill.level && (
+                                          <div className="space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className={`text-[10px] font-medium ${levelColors.text}`}>
+                                                {getLevelLabel(skill.level)}
+                                              </span>
+                                              <span className="text-[10px] text-muted-foreground">
+                                                {getLevelProgress(skill.level)}%
+                                              </span>
+                                            </div>
+                                            <div className="h-1 bg-muted rounded-full overflow-hidden">
+                                              <div 
+                                                className={`h-full ${levelColors.bg} transition-all duration-300`}
+                                                style={{ width: `${getLevelProgress(skill.level)}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+                                        {skill.years_of_practice > 0 && (
+                                          <div className="flex items-center gap-1 mt-1.5">
+                                            <Calendar className="h-2.5 w-2.5 text-muted-foreground" />
+                                            <span className="text-[10px] text-muted-foreground">
+                                              {skill.years_of_practice} an{skill.years_of_practice > 1 ? 's' : ''}
+                                            </span>
+                                          </div>
+                                        )}
                                       </div>
-                                    )}
+                                      <div className="flex items-center gap-0.5 shrink-0">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 hover:bg-purple-50"
+                                          onClick={() => {
+                                            setEditingSkill(skill)
+                                            setShowSkillDialog(true)
+                                          }}
+                                        >
+                                          <Edit className="h-3 w-3 text-purple-600" />
+                                        </Button>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-6 w-6 p-0 hover:bg-red-50" 
+                                          onClick={() => handleDeleteSkill(skill.id)}
+                                        >
+                                          <Trash2 className="h-3 w-3 text-red-500" />
+                                        </Button>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 w-7 p-0 hover:bg-purple-50"
-                                      onClick={() => {
-                                        setEditingSkill(skill)
-                                        setShowSkillDialog(true)
-                                      }}
-                                    >
-                                      <Edit className="h-3.5 w-3.5 text-purple-600" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-7 w-7 p-0 hover:bg-red-50" 
-                                      onClick={() => handleDeleteSkill(skill.id)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </CardContent>
                         </Card>
-                      )
-                    })()}
-                  </div>
-                ) : (
-                  <Card className="rounded-xl shadow-md border-2 border-dashed border-gray-300">
-                    <CardContent className="p-12">
-                      <div className="flex flex-col items-center justify-center text-center">
-                        <div className="p-4 bg-gray-100 rounded-full mb-4">
-                          <Code className="h-10 w-10 text-gray-400" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          Aucune compétence enregistrée
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-6 max-w-sm">
-                          Commencez par ajouter vos compétences techniques, soft skills et outils pour enrichir votre profil.
-                        </p>
-                        <Button 
-                          size="default"
-                          onClick={() => setShowSkillDialog(true)}
-                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white shadow-sm"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Ajouter ma première compétence
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      )}
+                    </div>
+                  )
+                })()}
               </TabsContent>
 
-              <TabsContent value="preferences" className="mt-0">
-                <Card className="rounded-[12px] shadow-lg border-l-4 border-l-[#226D68]">
-                    <CardHeader className="bg-gradient-to-r from-[#226D68]/5 to-[#226D68]/10 border-b py-2 px-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                          <MapPin className="h-4 w-4 text-[#226D68] flex-shrink-0" />
-                          <span className="truncate">Préférences d'emploi</span>
-                        </CardTitle>
-                        <Button 
-                          size="sm"
-                          onClick={() => setShowPreferencesDialog(true)}
-                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2 text-xs w-full sm:w-auto flex items-center justify-center gap-1"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                          Modifier
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-3 sm:p-4">
+              <TabsContent value="preferences" className="mt-3">
+                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
+                        <div className="p-1 bg-[#226D68] rounded">
+                          <MapPin className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span>Préférences d'emploi</span>
+                      </CardTitle>
+                      <Button 
+                        size="sm"
+                        onClick={() => setShowPreferencesDialog(true)}
+                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
+                      >
+                        <Edit className="h-3 w-3" />
+                        Modifier
+                      </Button>
+                    </div>
+                  </CardHeader>
+                    <CardContent className="p-2.5">
                       {jobPreferences ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {/* Postes recherchés */}
                           {jobPreferences.desired_positions?.length > 0 && (
-                            <Card className="rounded-lg border-l-2 border-l-[#226D68]/50 bg-gradient-to-r from-white to-[#226D68]/5">
-                              <CardContent className="p-3">
-                                <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-                                  <Briefcase className="h-3.5 w-3.5 text-[#226D68]" />
-                                  Postes recherchés
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1.5">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <Briefcase className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Postes recherchés</p>
+                                </div>
+                                <div className="flex flex-wrap gap-0.5">
                                   {jobPreferences.desired_positions.map((pos, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0 h-5">
+                                    <Badge key={idx} variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
                                       {pos}
                                     </Badge>
                                   ))}
@@ -1490,27 +1768,46 @@ export default function CandidateDashboard() {
                               </CardContent>
                             </Card>
                           )}
-                          {jobPreferences.contract_type && (
-                            <Card className="rounded-lg border-l-2 border-l-blue-deep/50 bg-gradient-to-r from-white to-blue-deep/5">
-                              <CardContent className="p-3">
-                                <p className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                                  <FileText className="h-3.5 w-3.5 text-blue-deep" />
-                                  Type de contrat
-                                </p>
-                                <p className="font-bold text-sm text-gray-anthracite">{jobPreferences.contract_type}</p>
+                          
+                          {/* Types de contrat */}
+                          {(jobPreferences.contract_types?.length > 0 || jobPreferences.contract_type) && (
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1.5">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <FileText className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Type(s) de contrat</p>
+                                </div>
+                                <div className="flex flex-wrap gap-0.5">
+                                  {jobPreferences.contract_types?.length > 0
+                                    ? jobPreferences.contract_types.map((type, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                          {type}
+                                        </Badge>
+                                      ))
+                                    : <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                          {jobPreferences.contract_type}
+                                        </Badge>
+                                  }
+                                </div>
                               </CardContent>
                             </Card>
                           )}
+                          
+                          {/* Secteurs ciblés */}
                           {jobPreferences.target_sectors?.length > 0 && (
-                            <Card className="rounded-lg border-l-2 border-l-purple-500/50 bg-gradient-to-r from-white to-purple-500/5">
-                              <CardContent className="p-3">
-                                <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
-                                  <TrendingUp className="h-3.5 w-3.5 text-purple-600" />
-                                  Secteurs ciblés
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1.5">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <TrendingUp className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Secteurs ciblés</p>
+                                </div>
+                                <div className="flex flex-wrap gap-0.5">
                                   {jobPreferences.target_sectors.map((sector, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-xs px-1.5 py-0 h-5">
+                                    <Badge key={idx} variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
                                       {sector}
                                     </Badge>
                                   ))}
@@ -1518,47 +1815,123 @@ export default function CandidateDashboard() {
                               </CardContent>
                             </Card>
                           )}
+                          
+                          {/* Localisation souhaitée */}
                           {jobPreferences.desired_location && (
-                            <Card className="rounded-lg border-l-2 border-l-[#e76f51]/50 bg-gradient-to-r from-white to-[#e76f51]/5">
-                              <CardContent className="p-3">
-                                <p className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                                  <MapPin className="h-3.5 w-3.5 text-[#e76f51]" />
-                                  Localisation souhaitée
-                                </p>
-                                <p className="font-bold text-sm text-gray-anthracite">{jobPreferences.desired_location}</p>
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <MapPin className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Localisation</p>
+                                </div>
+                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.desired_location}</p>
                               </CardContent>
                             </Card>
                           )}
+                          
+                          {/* Mobilité */}
                           {jobPreferences.mobility && (
-                            <Card className="rounded-lg border-l-2 border-l-blue-deep/50 bg-gradient-to-r from-white to-blue-deep/5">
-                              <CardContent className="p-3">
-                                <p className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                                  <MapPin className="h-3.5 w-3.5 text-blue-deep" />
-                                  Mobilité
-                                </p>
-                                <p className="font-bold text-sm text-gray-anthracite">{jobPreferences.mobility}</p>
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <MapPin className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Mobilité</p>
+                                </div>
+                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.mobility}</p>
                               </CardContent>
                             </Card>
                           )}
+                          
+                          {/* Disponibilité */}
                           {jobPreferences.availability && (
-                            <Card className="rounded-lg border-l-2 border-l-[#226D68]/50 bg-gradient-to-r from-white to-[#226D68]/5">
-                              <CardContent className="p-3">
-                                <p className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                                  <Calendar className="h-3.5 w-3.5 text-[#226D68]" />
-                                  Disponibilité
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <Calendar className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Disponibilité</p>
+                                </div>
+                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">
+                                  {jobPreferences.availability === 'immediate' ? 'Immédiate' :
+                                   jobPreferences.availability === '1_week' ? 'Sous 1 semaine' :
+                                   jobPreferences.availability === '2_weeks' ? 'Sous 2 semaines' :
+                                   jobPreferences.availability === '1_month' ? 'Sous 1 mois' :
+                                   jobPreferences.availability === '2_months' ? 'Sous 2 mois' :
+                                   jobPreferences.availability === '3_months' ? 'Sous 3 mois' :
+                                   jobPreferences.availability === 'negotiable' ? 'À négocier' :
+                                   jobPreferences.availability}
                                 </p>
-                                <p className="font-bold text-sm text-gray-anthracite">{jobPreferences.availability}</p>
                               </CardContent>
                             </Card>
                           )}
-                          {(jobPreferences.salary_min || jobPreferences.salary_max) && (
-                            <Card className="rounded-lg border-l-2 border-l-[#e76f51]/50 bg-gradient-to-r from-white to-[#e76f51]/5 md:col-span-2">
-                              <CardContent className="p-3">
-                                <p className="text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
-                                  <TrendingUp className="h-3.5 w-3.5 text-[#e76f51]" />
-                                  Prétentions salariales
+                          
+                          {/* Télétravail */}
+                          {jobPreferences.remote_preference && (
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <MapPin className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Télétravail</p>
+                                </div>
+                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">
+                                  {jobPreferences.remote_preference === 'onsite' ? 'Sur site uniquement' :
+                                   jobPreferences.remote_preference === 'hybrid' ? 'Hybride' :
+                                   jobPreferences.remote_preference === 'remote' ? 'Télétravail complet' :
+                                   jobPreferences.remote_preference === 'flexible' ? 'Flexible' :
+                                   jobPreferences.remote_preference}
                                 </p>
-                                <p className="font-bold text-lg text-gray-anthracite">
+                              </CardContent>
+                            </Card>
+                          )}
+                          
+                          {/* Zones préférées */}
+                          {jobPreferences.preferred_locations && (
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <MapPin className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Zones préférées</p>
+                                </div>
+                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.preferred_locations}</p>
+                              </CardContent>
+                            </Card>
+                          )}
+                          
+                          {/* Prêt à déménager */}
+                          {jobPreferences.willing_to_relocate && (
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <MapPin className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Mobilité</p>
+                                </div>
+                                <p className="font-semibold text-[10px] text-[#226D68] leading-tight">Prêt(e) à déménager</p>
+                              </CardContent>
+                            </Card>
+                          )}
+                          
+                          {/* Prétentions salariales */}
+                          {(jobPreferences.salary_min || jobPreferences.salary_max) && (
+                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-[#226D68]/5 to-[#E8F4F3]/20 hover:shadow-sm transition-all sm:col-span-2 lg:col-span-3">
+                              <CardContent className="p-2">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <div className="p-0.5 bg-[#226D68] rounded">
+                                    <TrendingUp className="h-2.5 w-2.5 text-white" />
+                                  </div>
+                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Prétentions salariales</p>
+                                </div>
+                                <p className="font-bold text-xs text-[#226D68]">
                                   {jobPreferences.salary_min && jobPreferences.salary_max
                                     ? `${jobPreferences.salary_min.toLocaleString('fr-FR')} - ${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`
                                     : jobPreferences.salary_min
@@ -1570,12 +1943,15 @@ export default function CandidateDashboard() {
                           )}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                          <MapPin className="h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm font-semibold mb-1">Aucune préférence enregistrée</p>
+                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-border bg-[#E8F4F3]/30">
+                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
+                            <MapPin className="h-5 w-5 text-[#226D68]" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune préférence enregistrée</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Définissez vos préférences d'emploi pour améliorer vos chances de correspondance</p>
                           <Button 
                             size="sm"
-                            className="mt-3 bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 px-2 text-xs"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
                             onClick={() => setShowPreferencesDialog(true)}
                           >
                             <MapPin className="h-3.5 w-3.5 mr-1" />
@@ -1588,57 +1964,47 @@ export default function CandidateDashboard() {
               </TabsContent>
 
               {/* Onglet Documents */}
-              <TabsContent value="documents" className="mt-0">
-                <Card className="rounded-[12px] shadow-lg border-l-4 border-l-blue-deep">
-                  <CardHeader className="bg-gradient-to-r from-blue-deep/5 to-blue-deep/10 border-b py-2 px-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                        <FileText className="h-4 w-4 text-blue-deep flex-shrink-0" />
-                        <span className="truncate">Documents justificatifs</span>
+              <TabsContent value="documents" className="mt-3">
+                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
+                        <div className="p-1 bg-[#226D68] rounded">
+                          <FileText className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span>Documents justificatifs</span>
+                        {documents.length > 0 && (
+                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium">
+                            {documents.length}
+                          </Badge>
+                        )}
                       </CardTitle>
                       <Button
                         onClick={() => setShowDocumentDialog(true)}
                         size="sm"
-                        className="h-7 px-3 text-xs bg-blue-deep hover:bg-blue-deep/90 w-full sm:w-auto flex items-center justify-center gap-1"
+                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
                       >
-                        <Plus className="h-3.5 w-3.5" />
-                        Ajouter un document
+                        <Plus className="h-3 w-3" />
+                        Ajouter
                       </Button>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3 sm:p-4">
+                  <CardContent className="p-2.5">
                     {(() => {
                       // Filtrer les documents qui sont des photos de profil et des logos d'entreprise
                       // On les exclut de la liste des documents car ils sont déjà affichés ailleurs
                       const filteredDocuments = documents.filter((doc) => {
                         // Exclure les photos de profil (PROFILE_PHOTO)
-                        if (doc.document_type === 'PROFILE_PHOTO') {
-                          console.log('Excluding profile photo from documents:', doc.id, doc.original_filename)
-                          return false
-                        }
-                        
-                        // Exclure les logos d'entreprise (COMPANY_LOGO)
-                        if (doc.document_type === 'COMPANY_LOGO') {
-                          console.log('Excluding company logo from documents:', doc.id, doc.original_filename)
-                          return false
-                        }
-                        
-                        // Exclure aussi les images de type 'OTHER' qui sont des photos de profil
-                        // (pour rétrocompatibilité avec les anciennes photos uploadées)
+                        if (doc.document_type === 'PROFILE_PHOTO') return false
+                        if (doc.document_type === 'COMPANY_LOGO') return false
                         const isImage = doc.mime_type?.startsWith('image/')
                         const isOtherType = doc.document_type === 'OTHER'
-                        if (isImage && isOtherType) {
-                          console.log('Excluding profile photo (OTHER type) from documents:', doc.id, doc.original_filename)
-                          return false
-                        }
-                        
-                        return true // Inclure tous les autres documents
+                        if (isImage && isOtherType) return false
+                        return true
                       })
-                      
-                      console.log('Total documents:', documents.length, 'Filtered documents:', filteredDocuments.length)
-                      
+
                       return filteredDocuments.length > 0 ? (
-                        <div className="space-y-2 sm:space-y-3">
+                        <div className="space-y-2">
                           {filteredDocuments.map((doc) => {
                           const getDocumentTypeLabel = (type) => {
                             const labels = {
@@ -1652,17 +2018,7 @@ export default function CandidateDashboard() {
                             return labels[type] || type
                           }
 
-                          const getDocumentTypeColor = (type) => {
-                            const colors = {
-                              'CV': 'bg-blue-100 text-blue-800 border-blue-200',
-                              'ATTESTATION': 'bg-[#D1E9E7] text-[#1a5a55] border-[#B8DDD9]',
-                              'CERTIFICATE': 'bg-[#FBE5E0] text-[#c04a2f] border-[#F8D3CA]',
-                              'RECOMMENDATION_LETTER': 'bg-purple-100 text-purple-800 border-purple-200',
-                              'DIPLOMA': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-                              'OTHER': 'bg-gray-100 text-gray-800 border-gray-200'
-                            }
-                            return colors[type] || 'bg-gray-100 text-gray-800 border-gray-200'
-                          }
+                          const getDocumentTypeColor = () => 'bg-secondary text-secondary-foreground border-border'
 
                           const formatFileSize = (bytes) => {
                             if (bytes < 1024) return `${bytes} B`
@@ -1691,97 +2047,120 @@ export default function CandidateDashboard() {
                             document.body.removeChild(link)
                           }
 
-                          const handleDeleteDocument = async () => {
-                            if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le document "${doc.original_filename}" ? Cette action est irréversible.`)) {
-                              return
-                            }
-                            
-                            try {
-                              await documentApi.deleteDocument(doc.id)
-                              // Retirer le document de la liste
-                              setDocuments(documents.filter(d => d.id !== doc.id))
-                              alert('Document supprimé avec succès')
-                            } catch (error) {
-                              console.error('Error deleting document:', error)
-                              alert('Erreur lors de la suppression du document: ' + (error.response?.data?.detail || error.message))
-                            }
+                          const handleDeleteDocument = () => {
+                            setConfirmDialog({
+                              title: 'Supprimer ce document ?',
+                              message: `« ${doc.original_filename} » sera supprimé. Cette action est irréversible.`,
+                              variant: 'danger',
+                              onConfirm: async () => {
+                                setConfirmDialog(null)
+                                try {
+                                  await documentApi.deleteDocument(doc.id)
+                                  setDocuments(documents.filter(d => d.id !== doc.id))
+                                  setToast({ message: 'Document supprimé.', type: 'success' })
+                                } catch (error) {
+                                  console.error('Error deleting document:', error)
+                                  setToast({ message: 'Erreur lors de la suppression.', type: 'error' })
+                                }
+                              },
+                            })
                           }
 
                             return (
-                              <Card key={doc.id} className="rounded-lg shadow-sm hover:shadow-md transition-all border-l-2 border-l-blue-deep/50 group">
-                                <CardContent className="pt-3 pb-3 px-3">
-                                  <div className="flex items-start justify-between gap-3">
+                              <Card key={doc.id} className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all group">
+                                <CardContent className="p-2">
+                                  <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <FileText className="h-4 w-4 text-blue-deep flex-shrink-0" />
-                                        <h4 className="font-semibold text-sm text-gray-anthracite truncate">{doc.original_filename}</h4>
-                                        <Badge className={`text-xs px-1.5 py-0 h-4 ${getDocumentTypeColor(doc.document_type)}`}>
-                                          {getDocumentTypeLabel(doc.document_type)}
-                                        </Badge>
+                                      <div className="flex items-start gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#226D68] to-[#1a5a55] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                                          <FileText className="h-3 w-3 text-white" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                                            <h4 className="font-semibold text-xs text-gray-900 truncate group-hover:text-[#226D68] transition-colors">{doc.original_filename}</h4>
+                                            <Badge variant="secondary" className={`text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium`}>
+                                              {getDocumentTypeLabel(doc.document_type)}
+                                            </Badge>
+                                            {doc.status && (
+                                              <Badge 
+                                                variant={doc.status === 'uploaded' ? 'secondary' : 'outline'} 
+                                                className="text-[9px] px-1 py-0 h-4"
+                                              >
+                                                {doc.status === 'uploaded' ? 'Téléchargé' : doc.status}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Métadonnées compactes */}
+                                          <div className="flex flex-wrap items-center gap-1">
+                                            <div className="flex items-center gap-0.5 text-[9px] text-gray-600 bg-[#E8F4F3] px-1 py-0.5 rounded">
+                                              <span className="font-medium">{formatFileSize(doc.file_size)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 text-[9px] text-gray-600 bg-[#E8F4F3] px-1 py-0.5 rounded">
+                                              <span className="font-medium">{doc.mime_type?.split('/')[1]?.toUpperCase() || doc.mime_type}</span>
+                                            </div>
+                                            {doc.created_at && (
+                                              <div className="flex items-center gap-0.5 text-[9px] text-gray-600 bg-[#E8F4F3] px-1 py-0.5 rounded">
+                                                <Calendar className="w-2 h-2 text-[#226D68]" />
+                                                <span className="font-medium">{new Date(doc.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
                                       </div>
-                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                      <span>{formatFileSize(doc.file_size)}</span>
-                                      <span>•</span>
-                                      <span>{doc.mime_type}</span>
-                                      {doc.created_at && (
-                                        <>
-                                          <span>•</span>
-                                          <span>{new Date(doc.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                                        </>
-                                      )}
-                                      {doc.status && (
-                                        <>
-                                          <span>•</span>
-                                          <Badge 
-                                            variant={doc.status === 'uploaded' ? 'secondary' : 'outline'} 
-                                            className="text-xs px-1.5 py-0 h-4"
-                                          >
-                                            {doc.status === 'uploaded' ? 'Téléchargé' : doc.status}
-                                          </Badge>
-                                        </>
-                                      )}
+                                    </div>
+                                    
+                                    {/* Actions compactes */}
+                                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={handleViewDocument} 
+                                        className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                        title="Voir"
+                                      >
+                                        <Eye className="h-3 w-3 text-[#226D68]" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={handleDownloadDocument} 
+                                        className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                        title="Télécharger"
+                                      >
+                                        <Download className="h-3 w-3 text-[#226D68]" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={handleDeleteDocument} 
+                                        className="h-6 w-6 p-0 hover:bg-red-50"
+                                        title="Supprimer"
+                                      >
+                                        <Trash2 className="h-3 w-3 text-red-500" />
+                                      </Button>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={handleViewDocument}
-                                      className="h-7 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      <Eye className="h-3.5 w-3.5 mr-1" />
-                                      Voir
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={handleDownloadDocument}
-                                      className="h-7 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      <Download className="h-3.5 w-3.5 mr-1" />
-                                      Télécharger
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={handleDeleteDocument}
-                                      className="h-7 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 mr-1" />
-                                      Supprimer
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
+                                </CardContent>
+                              </Card>
                             )
                           })}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                          <FileText className="h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm font-semibold mb-1">Aucun document enregistré</p>
-                          <p className="text-xs text-muted-foreground mb-3">Cliquez sur "Ajouter un document" pour télécharger vos documents justificatifs</p>
+                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/30">
+                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
+                            <FileText className="h-5 w-5 text-[#226D68]" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucun document enregistré</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Ajoutez vos documents justificatifs (CV, diplômes, attestations...)</p>
+                          <Button 
+                            size="sm"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
+                            onClick={() => setShowDocumentDialog(true)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Ajouter un document
+                          </Button>
                         </div>
                       )
                     })()}
@@ -1789,9 +2168,176 @@ export default function CandidateDashboard() {
                 </Card>
               </TabsContent>
             </Tabs>
-          </div>
+
+          {/* Footer avec dates du profil */}
+          {(profile?.created_at || profile?.updated_at || profile?.submitted_at) && (
+            <footer className="mt-6 pt-4 border-t border-border">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                {profile.created_at && (
+                  <span>Inscription: {formatDateTime(profile.created_at)}</span>
+                )}
+                {profile.updated_at && (
+                  <span>Dernière modification: {formatDateTime(profile.updated_at)}</span>
+                )}
+                {profile.submitted_at && (
+                  <span>Soumission: {formatDateTime(profile.submitted_at)}</span>
+                )}
+              </div>
+            </footer>
+          )}
         </div>
       </main>
+
+      {/* Toast (succès / erreur) */}
+      {toast && (
+        <div
+          role="alert"
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-[12px] shadow-lg border text-sm font-medium text-white max-w-[90vw] ${
+            toast.type === 'success' ? 'bg-primary border-primary/80' : 'bg-red-600 border-red-700'
+          }`}
+          style={toast.type === 'success' ? { backgroundColor: '#226D68' } : {}}
+        >
+          {toast.message}
+        </div>
+      )}
+
+      {/* Modale de confirmation (suppression, déconnexion) */}
+      <Dialog open={!!confirmDialog} onOpenChange={(open) => !open && setConfirmDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{confirmDialog?.title}</DialogTitle>
+            <DialogDescription>{confirmDialog?.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Annuler</Button>
+            <Button
+              variant={confirmDialog?.variant === 'danger' ? 'destructive' : 'default'}
+              onClick={() => confirmDialog?.onConfirm?.()}
+            >
+              {confirmDialog?.variant === 'danger' && confirmDialog?.title?.includes('Déconnexion') ? 'Déconnexion' : confirmDialog?.variant === 'danger' ? 'Supprimer' : 'Confirmer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale consentement unique avant soumission du profil */}
+      <Dialog open={showSubmitConsentModal} onOpenChange={(open) => { if (!submittingProfile) { setShowSubmitConsentModal(open); setSubmitError(null); if (!open) setConsentAccepted(false); } }}>
+        <DialogContent className="max-w-md rounded-[12px] border border-border border-l-4 border-l-primary shadow-xl">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-base font-semibold text-gray-anthracite flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-primary" />
+              Accepter les conditions
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">
+              Pour soumettre votre profil à la validation, vous devez lire et accepter les conditions d'utilisation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+              <p className="font-medium text-gray-anthracite mb-2">Récapitulatif de votre profil</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: profile?.completion_percentage >= 80 ? '#22c55e' : '#eab308' }} aria-hidden />
+                  Profil complété à {Math.round(profile?.completion_percentage || 0)} %
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: documents?.some(d => d.document_type === 'CV') ? '#22c55e' : '#ef4444' }} aria-hidden />
+                  CV PDF : {documents?.some(d => d.document_type === 'CV') ? 'Oui' : 'Non'}
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: (experiences?.length || 0) > 0 ? '#22c55e' : '#ef4444' }} aria-hidden />
+                  {experiences?.length || 0} expérience(s) professionnelle(s)
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: (educations?.length || 0) > 0 ? '#22c55e' : '#ef4444' }} aria-hidden />
+                  {educations?.length || 0} formation(s)
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: (skills?.length || 0) > 0 ? '#22c55e' : '#ef4444' }} aria-hidden />
+                  {skills?.length || 0} compétence(s)
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: jobPreferences?.contract_type && jobPreferences?.desired_location ? '#22c55e' : '#eab308' }} aria-hidden />
+                  Préférences : {jobPreferences?.contract_type && jobPreferences?.desired_location ? 'Renseignées' : 'À compléter'}
+                </li>
+              </ul>
+            </div>
+
+              Consultez les documents suivants avant d’accepter&nbsp;:
+            </p>
+            <ul className="text-sm space-y-1.5">
+              <li>
+                <a
+                  href="/legal/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline hover:no-underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                  style={{ color: '#226D68' }}
+                >
+                  Conditions générales d’utilisation (CGU)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="/legal/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline hover:no-underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                  style={{ color: '#226D68' }}
+                >
+                  Politique de confidentialité (RGPD)
+                </a>
+              </li>
+            </ul>
+            <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
+              <Checkbox checked={consentAccepted} onCheckedChange={(v) => setConsentAccepted(!!v)} className="mt-0.5" />
+              <span className="text-sm text-gray-anthracite">
+                J’ai lu les conditions ci-dessus et j’accepte les <strong>CGU</strong>, la <strong>politique de confidentialité (RGPD)</strong> et j’autorise la <strong>vérification des informations</strong> de mon profil par l’équipe Yemma.
+              </span>
+            </label>
+            {submitError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+                <p className="font-medium mb-1">Impossible de soumettre le profil</p>
+                <p>{submitError}</p>
+                <p className="mt-2 text-xs text-red-700">Complétez les éléments manquants puis réessayez.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex-row gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => { setShowSubmitConsentModal(false); setConsentAccepted(false); setSubmitError(null); }} disabled={submittingProfile}>
+              Annuler
+            </Button>
+            <Button
+              className="bg-primary hover:bg-primary/90 text-white"
+              style={{ backgroundColor: '#226D68' }}
+              disabled={!consentAccepted || submittingProfile}
+              onClick={async () => {
+                if (!consentAccepted || !profile?.id) return
+                setSubmitError(null)
+                try {
+                  setSubmittingProfile(true)
+                  await candidateApi.updateProfile(profile.id, { accept_cgu: true, accept_rgpd: true, accept_verification: true })
+                  await candidateApi.submitProfile(profile.id)
+                  setShowSubmitConsentModal(false)
+                  setConsentAccepted(false)
+                  setToast({ message: 'Profil soumis avec succès. Notre équipe vous contactera pour la suite.', type: 'success' })
+                  await loadProfile()
+                } catch (error) {
+                  const detail = error.response?.data?.detail
+                  const message = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map(d => d.msg || d.message || d).join(', ') : error.message
+                  setSubmitError(message || 'Erreur lors de la soumission.')
+                  setToast({ message: 'Erreur : ' + message, type: 'error' })
+                } finally {
+                  setSubmittingProfile(false)
+                }
+              }}
+            >
+              {submittingProfile ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden /> Envoi en cours...</> : <><FileCheck className="w-4 h-4 mr-2" aria-hidden /> Accepter et soumettre</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modale pour ajouter une expérience */}
       <Dialog open={showExperienceDialog} onOpenChange={setShowExperienceDialog}>
@@ -1809,11 +2355,13 @@ export default function CandidateDashboard() {
               setShowExperienceDialog(false)
               setEditingExperience(null)
               await loadProfile()
+              setToast({ message: 'Expérience enregistrée.', type: 'success' })
             }}
             onCancel={() => {
               setShowExperienceDialog(false)
               setEditingExperience(null)
             }}
+            onError={(msg) => setToast({ message: msg, type: 'error' })}
           />
         </DialogContent>
       </Dialog>
@@ -1834,11 +2382,13 @@ export default function CandidateDashboard() {
               setShowEducationDialog(false)
               setEditingEducation(null)
               await loadProfile()
+              setToast({ message: 'Formation enregistrée.', type: 'success' })
             }}
             onCancel={() => {
               setShowEducationDialog(false)
               setEditingEducation(null)
             }}
+            onError={(msg) => setToast({ message: msg, type: 'error' })}
           />
         </DialogContent>
       </Dialog>
@@ -1859,11 +2409,13 @@ export default function CandidateDashboard() {
               setShowCertificationDialog(false)
               setEditingCertification(null)
               await loadProfile()
+              setToast({ message: 'Certification enregistrée.', type: 'success' })
             }}
             onCancel={() => {
               setShowCertificationDialog(false)
               setEditingCertification(null)
             }}
+            onError={(msg) => setToast({ message: msg, type: 'error' })}
           />
         </DialogContent>
       </Dialog>
@@ -1884,11 +2436,13 @@ export default function CandidateDashboard() {
               setShowSkillDialog(false)
               setEditingSkill(null)
               await loadProfile()
+              setToast({ message: 'Compétence enregistrée.', type: 'success' })
             }}
             onCancel={() => {
               setShowSkillDialog(false)
               setEditingSkill(null)
             }}
+            onError={(msg) => setToast({ message: msg, type: 'error' })}
           />
         </DialogContent>
       </Dialog>
@@ -1908,8 +2462,10 @@ export default function CandidateDashboard() {
             onSuccess={async () => {
               setShowPreferencesDialog(false)
               await loadProfile()
+              setToast({ message: 'Préférences enregistrées.', type: 'success' })
             }}
             onCancel={() => setShowPreferencesDialog(false)}
+            onError={(msg) => setToast({ message: msg, type: 'error' })}
           />
         </DialogContent>
       </Dialog>
@@ -1926,7 +2482,7 @@ export default function CandidateDashboard() {
           
           <div className="space-y-4 py-4">
             <div>
-              <Label htmlFor="document-type">Type de document *</Label>
+              <Label htmlFor="document-type">Type de document <span className="text-red-500">*</span></Label>
               <select
                 id="document-type"
                 value={selectedDocumentType}
@@ -1944,7 +2500,7 @@ export default function CandidateDashboard() {
             </div>
 
             <div>
-              <Label htmlFor="document-file">Fichier *</Label>
+              <Label htmlFor="document-file">Fichier <span className="text-red-500">*</span></Label>
               <Input
                 id="document-file"
                 type="file"
@@ -1953,7 +2509,7 @@ export default function CandidateDashboard() {
                   const file = e.target.files?.[0]
                   if (file) {
                     if (file.size > 10 * 1024 * 1024) {
-                      alert('Le fichier ne doit pas dépasser 10MB')
+                      setToast({ message: 'Le fichier ne doit pas dépasser 10 Mo.', type: 'error' })
                       e.target.value = ''
                       return
                     }
@@ -1990,7 +2546,7 @@ export default function CandidateDashboard() {
               type="button" 
               onClick={handleDocumentUpload}
               disabled={!selectedDocumentFile || uploadingDocument}
-              className="bg-blue-deep hover:bg-blue-deep/90"
+              className="bg-primary hover:bg-primary/90"
             >
               {uploadingDocument ? (
                 <>
@@ -2013,7 +2569,7 @@ export default function CandidateDashboard() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-deep" />
+              <FileText className="h-5 w-5 text-primary" />
               {previewDocument?.original_filename || 'Document'}
             </DialogTitle>
             <DialogDescription>
@@ -2089,7 +2645,7 @@ export default function CandidateDashboard() {
 }
 
 // Composant formulaire pour ajouter/modifier une expérience
-function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
+function ExperienceForm({ profileId, experience, onSuccess, onCancel, onError }) {
   const [formData, setFormData] = useState({
     companyName: experience?.company_name || '',
     companyLogoUrl: experience?.company_logo_url || null,
@@ -2157,12 +2713,12 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
     if (!file || !profileId) return
 
     if (!file.type.startsWith('image/')) {
-      alert('Veuillez sélectionner une image (JPG, PNG)')
+      onError?.('Veuillez sélectionner une image (JPG, PNG).')
       return
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert('Le logo ne doit pas dépasser 2MB')
+      onError?.('Le logo ne doit pas dépasser 2 Mo.')
       return
     }
 
@@ -2173,7 +2729,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
       setFormData({ ...formData, companyLogoUrl: serveUrl })
     } catch (error) {
       console.error('Erreur lors de l\'upload du logo:', error)
-      alert('Erreur lors de l\'upload du logo: ' + (error.response?.data?.detail || error.message))
+      onError?.('Erreur upload logo : ' + (error.response?.data?.detail || error.message))
     } finally {
       setUploadingLogo(false)
     }
@@ -2185,7 +2741,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
     if (!file || !profileId) return
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Le document ne doit pas dépasser 10MB')
+      onError?.('Le document ne doit pas dépasser 10 Mo.')
       return
     }
 
@@ -2203,7 +2759,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
       setFormData({ ...formData, documentId: uploadedDoc.id, hasDocument: true })
     } catch (error) {
       console.error('Erreur lors de l\'upload du document:', error)
-      alert('Erreur lors de l\'upload du document: ' + (error.response?.data?.detail || error.message))
+      onError?.('Erreur upload document : ' + (error.response?.data?.detail || error.message))
     } finally {
       setUploadingDoc(false)
     }
@@ -2214,26 +2770,27 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
     if (!profileId) return
 
     if (!formData.companyName || !formData.position || !formData.startDate || !formData.description) {
-      alert('Veuillez remplir tous les champs obligatoires (Nom de l\'entreprise, Poste, Date de début, Description)')
+      onError?.('Veuillez remplir tous les champs obligatoires (Nom de l\'entreprise, Poste, Date de début, Description).')
       return
     }
 
     try {
       setSaving(true)
-      const data = {
+      const exp = {
         company_name: formData.companyName,
         company_logo_url: formData.companyLogoUrl,
-        position: formData.position,
-        contract_type: formData.contract_type || null,
         company_sector: formData.company_sector || null,
-        start_date: new Date(formData.startDate).toISOString(),
-        end_date: formData.endDate ? new Date(formData.endDate).toISOString() : null,
+        position: formData.position,
+        start_date: formData.startDate,
+        end_date: formData.endDate || null,
         is_current: formData.isCurrent || !formData.endDate,
         description: formData.description,
         achievements: formData.achievements || null,
-        has_document: formData.hasDocument
+        has_document: formData.hasDocument,
+        document_id: formData.documentId || null,
       }
-      
+      const data = experienceToApiPayload(exp)
+
       // Si on modifie une expérience existante, supprimer l'ancienne puis créer la nouvelle
       if (experience?.id) {
         try {
@@ -2244,12 +2801,12 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
           }
         }
       }
-      
+
       await candidateApi.createExperience(profileId, data)
       onSuccess()
     } catch (error) {
       console.error('Error saving experience:', error)
-      alert('Erreur lors de la sauvegarde de l\'expérience: ' + (error.response?.data?.detail || error.message))
+      onError?.('Erreur : ' + (error.response?.data?.detail || error.message))
     } finally {
       setSaving(false)
     }
@@ -2259,12 +2816,13 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Logo d'entreprise */}
       <div className="border rounded-lg p-4 bg-muted/50">
+        <p className="text-xs font-medium text-muted-foreground mb-2">Logo de l&apos;entreprise pour cette expérience (distinct de votre photo de profil)</p>
         <div className="flex items-center gap-4">
           <div className="flex-shrink-0">
             <div className="relative">
               <img
                 src={formData.companyLogoUrl || generateCompanyAvatar(formData.companyName)}
-                alt={`Logo ${formData.companyName || 'entreprise'}`}
+                alt={`Logo de l'entreprise ${formData.companyName || ''}`}
                 className="w-16 h-16 rounded-lg object-cover border-2 border-primary"
                 onError={(e) => {
                   e.target.src = generateCompanyAvatar(formData.companyName)
@@ -2279,7 +2837,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
           </div>
           <div className="flex-1 space-y-2">
             <Label htmlFor="logo-upload" className="text-sm font-medium">
-              Logo de l'entreprise (facultatif)
+              Logo ou image de l&apos;entreprise (facultatif)
             </Label>
             <div className="flex items-center gap-2">
               <Input
@@ -2312,7 +2870,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Formats: JPG, PNG (max 2MB). Si non renseigné, un avatar sera généré.
+              JPG, PNG (max 2 Mo). Si non renseigné, un avatar basé sur le nom de l&apos;entreprise sera affiché.
             </p>
           </div>
         </div>
@@ -2320,7 +2878,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="companyName">Nom de l'entreprise *</Label>
+          <Label htmlFor="companyName">Nom de l'entreprise <span className="text-red-500">*</span></Label>
           <Input
             id="companyName"
             value={formData.companyName}
@@ -2329,7 +2887,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
           />
         </div>
         <div>
-          <Label htmlFor="position">Poste occupé *</Label>
+          <Label htmlFor="position">Poste occupé <span className="text-red-500">*</span></Label>
           <Input
             id="position"
             value={formData.position}
@@ -2338,9 +2896,20 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
           />
         </div>
       </div>
+      <div>
+        <Label htmlFor="company_sector">Secteur de l'entreprise</Label>
+        <SearchableSelect
+          id="company_sector"
+          options={SECTORS_FR}
+          value={formData.company_sector || ''}
+          onChange={(value) => setFormData({ ...formData, company_sector: value })}
+          placeholder="Choisir un secteur"
+          className="h-10 text-sm"
+        />
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="startDate">Date de début *</Label>
+          <Label htmlFor="startDate">Date de début <span className="text-red-500">*</span></Label>
           <Input
             id="startDate"
             type="date"
@@ -2373,7 +2942,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
         </div>
       </div>
       <div>
-        <Label htmlFor="description">Description des missions *</Label>
+        <Label htmlFor="description">Description des missions <span className="text-red-500">*</span></Label>
         <RichTextEditor
           value={formData.description}
           onChange={(value) => setFormData({ ...formData, description: value })}
@@ -2461,7 +3030,7 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel }) {
 }
 
 // Composant formulaire pour ajouter/modifier une formation
-function EducationForm({ profileId, education, onSuccess, onCancel }) {
+function EducationForm({ profileId, education, onSuccess, onCancel, onError }) {
   const [formData, setFormData] = useState({
     diploma: education?.diploma || '',
     institution: education?.institution || '',
@@ -2500,19 +3069,20 @@ function EducationForm({ profileId, education, onSuccess, onCancel }) {
 
     try {
       setSaving(true)
-      const data = {
+      const edu = {
         diploma: formData.diploma,
         institution: formData.institution,
         country: formData.country || null,
-        start_year: formData.startYear ? parseInt(formData.startYear) : null,
-        graduation_year: formData.graduationYear ? parseInt(formData.graduationYear) : null,
-        level: formData.level || null
+        start_year: formData.startYear || null,
+        graduation_year: formData.graduationYear,
+        level: formData.level || 'Non spécifié',
       }
+      const data = educationToApiPayload(edu)
       await candidateApi.createEducation(profileId, data)
       onSuccess()
     } catch (error) {
       console.error('Error creating education:', error)
-      alert('Erreur lors de l\'ajout de la formation: ' + (error.response?.data?.detail || error.message))
+      onError?.('Erreur : ' + (error.response?.data?.detail || error.message))
     } finally {
       setSaving(false)
     }
@@ -2522,7 +3092,7 @@ function EducationForm({ profileId, education, onSuccess, onCancel }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="diploma">Intitulé du diplôme / formation *</Label>
+          <Label htmlFor="diploma">Intitulé du diplôme / formation <span className="text-red-500">*</span></Label>
           <Input
             id="diploma"
             value={formData.diploma}
@@ -2531,7 +3101,7 @@ function EducationForm({ profileId, education, onSuccess, onCancel }) {
           />
         </div>
         <div>
-          <Label htmlFor="institution">Établissement *</Label>
+          <Label htmlFor="institution">Établissement <span className="text-red-500">*</span></Label>
           <Input
             id="institution"
             value={formData.institution}
@@ -2542,7 +3112,7 @@ function EducationForm({ profileId, education, onSuccess, onCancel }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="country">Pays</Label>
+          <Label htmlFor="country">Pays <span className="text-red-500">*</span></Label>
           <Input
             id="country"
             value={formData.country}
@@ -2563,7 +3133,7 @@ function EducationForm({ profileId, education, onSuccess, onCancel }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="graduationYear">Année d'obtention *</Label>
+          <Label htmlFor="graduationYear">Année d'obtention <span className="text-red-500">*</span></Label>
           <Input
             id="graduationYear"
             type="number"
@@ -2575,7 +3145,7 @@ function EducationForm({ profileId, education, onSuccess, onCancel }) {
           />
         </div>
         <div>
-          <Label htmlFor="level">Niveau *</Label>
+          <Label htmlFor="level">Niveau <span className="text-red-500">*</span></Label>
           <Input
             id="level"
             value={formData.level}
@@ -2598,14 +3168,14 @@ function EducationForm({ profileId, education, onSuccess, onCancel }) {
 }
 
 // Composant formulaire pour ajouter/modifier une certification
-function CertificationForm({ profileId, onSuccess, onCancel }) {
+function CertificationForm({ profileId, certification, onSuccess, onCancel, onError }) {
   const [formData, setFormData] = useState({
     title: certification?.title || '',
     issuer: certification?.issuer || '',
     year: certification?.year || new Date().getFullYear(),
     expirationDate: certification?.expiration_date ? new Date(certification.expiration_date).toISOString().split('T')[0] : '',
     verificationUrl: certification?.verification_url || '',
-    certificationId: certification?.credential_id || ''
+    certificationId: certification?.certification_id || certification?.credential_id || ''
   })
   const [saving, setSaving] = useState(false)
 
@@ -2617,7 +3187,7 @@ function CertificationForm({ profileId, onSuccess, onCancel }) {
         year: certification.year || new Date().getFullYear(),
         expirationDate: certification.expiration_date ? new Date(certification.expiration_date).toISOString().split('T')[0] : '',
         verificationUrl: certification.verification_url || '',
-        certificationId: certification.credential_id || ''
+        certificationId: certification.certification_id || certification.credential_id || ''
       })
     } else {
       setFormData({
@@ -2637,19 +3207,20 @@ function CertificationForm({ profileId, onSuccess, onCancel }) {
 
     try {
       setSaving(true)
-      const data = {
+      const cert = {
         title: formData.title,
         issuer: formData.issuer,
-        year: formData.year ? parseInt(formData.year) : null,
-        expiration_date: formData.expirationDate ? new Date(formData.expirationDate).toISOString() : null,
+        year: formData.year,
+        expiration_date: formData.expirationDate || null,
         verification_url: formData.verificationUrl || null,
-        credential_id: formData.certificationId || null
+        certification_id: formData.certificationId || null,
       }
+      const data = certificationToApiPayload(cert)
       await candidateApi.createCertification(profileId, data)
       onSuccess()
     } catch (error) {
       console.error('Error creating certification:', error)
-      alert('Erreur lors de l\'ajout de la certification: ' + (error.response?.data?.detail || error.message))
+      onError?.('Erreur : ' + (error.response?.data?.detail || error.message))
     } finally {
       setSaving(false)
     }
@@ -2659,7 +3230,7 @@ function CertificationForm({ profileId, onSuccess, onCancel }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="title">Intitulé de la certification *</Label>
+          <Label htmlFor="title">Intitulé de la certification <span className="text-red-500">*</span></Label>
           <Input
             id="title"
             value={formData.title}
@@ -2668,7 +3239,7 @@ function CertificationForm({ profileId, onSuccess, onCancel }) {
           />
         </div>
         <div>
-          <Label htmlFor="issuer">Organisme délivreur *</Label>
+          <Label htmlFor="issuer">Organisme délivreur <span className="text-red-500">*</span></Label>
           <Input
             id="issuer"
             value={formData.issuer}
@@ -2679,7 +3250,7 @@ function CertificationForm({ profileId, onSuccess, onCancel }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="year">Année d'obtention *</Label>
+          <Label htmlFor="year">Année d'obtention <span className="text-red-500">*</span></Label>
           <Input
             id="year"
             type="number"
@@ -2733,7 +3304,7 @@ function CertificationForm({ profileId, onSuccess, onCancel }) {
 }
 
 // Composant formulaire pour ajouter/modifier une compétence
-function SkillForm({ profileId, skill, onSuccess, onCancel }) {
+function SkillForm({ profileId, skill, onSuccess, onCancel, onError }) {
   const [formData, setFormData] = useState({
     name: skill?.name || '',
     skillType: skill?.skill_type || 'TECHNICAL',
@@ -2766,14 +3337,14 @@ function SkillForm({ profileId, skill, onSuccess, onCancel }) {
 
     try {
       setSaving(true)
-      const data = {
+      const skillPayload = {
         name: formData.name,
         skill_type: formData.skillType,
-        // Pour les soft skills, level et years_of_practice sont null
         level: formData.skillType === 'SOFT' ? null : formData.level,
-        years_of_practice: formData.skillType === 'SOFT' ? null : (formData.yearsOfPractice ? parseInt(formData.yearsOfPractice) : 0)
+        years_of_practice: formData.skillType === 'SOFT' ? null : formData.yearsOfPractice,
       }
-      
+      const data = skillToApiPayload(skillPayload)
+
       // Si on modifie une compétence existante, supprimer l'ancienne puis créer la nouvelle
       if (skill?.id) {
         try {
@@ -2784,12 +3355,12 @@ function SkillForm({ profileId, skill, onSuccess, onCancel }) {
           }
         }
       }
-      
+
       await candidateApi.createSkill(profileId, data)
       onSuccess()
     } catch (error) {
       console.error('Error saving skill:', error)
-      alert('Erreur lors de la sauvegarde de la compétence: ' + (error.response?.data?.detail || error.message))
+      onError?.('Erreur : ' + (error.response?.data?.detail || error.message))
     } finally {
       setSaving(false)
     }
@@ -2800,7 +3371,7 @@ function SkillForm({ profileId, skill, onSuccess, onCancel }) {
       <div className="space-y-4">
         {/* Type de compétence */}
         <div>
-          <Label htmlFor="skillType">Type de compétence *</Label>
+          <Label htmlFor="skillType">Type de compétence <span className="text-red-500">*</span></Label>
           <select
             id="skillType"
             value={formData.skillType}
@@ -2816,7 +3387,7 @@ function SkillForm({ profileId, skill, onSuccess, onCancel }) {
 
         {/* Nom de la compétence */}
         <div>
-          <Label htmlFor="name">Compétence *</Label>
+          <Label htmlFor="name">Compétence <span className="text-red-500">*</span></Label>
           <Input
             id="name"
             value={formData.name}
@@ -2830,7 +3401,7 @@ function SkillForm({ profileId, skill, onSuccess, onCancel }) {
         {formData.skillType !== 'SOFT' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="level">Niveau *</Label>
+              <Label htmlFor="level">Niveau <span className="text-red-500">*</span></Label>
               <select
                 id="level"
                 value={formData.level}
@@ -2877,14 +3448,20 @@ function SkillForm({ profileId, skill, onSuccess, onCancel }) {
 }
 
 // Composant formulaire pour modifier les préférences
-function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel }) {
+function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel, onError }) {
   const [desiredPositions, setDesiredPositions] = useState(
     currentPreferences?.desired_positions || ['']
+  )
+  const [contractTypes, setContractTypes] = useState(
+    currentPreferences?.contract_types || []
   )
   const [formData, setFormData] = useState({
     contractType: currentPreferences?.contract_type || '',
     desiredLocation: currentPreferences?.desired_location || '',
+    preferredLocations: currentPreferences?.preferred_locations || '',
     mobility: currentPreferences?.mobility || '',
+    remotePreference: currentPreferences?.remote_preference || 'hybrid',
+    willingToRelocate: currentPreferences?.willing_to_relocate || false,
     availability: currentPreferences?.availability || '',
     salaryMin: currentPreferences?.salary_min || '',
     salaryMax: currentPreferences?.salary_max || ''
@@ -2909,20 +3486,25 @@ function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel })
 
     try {
       setSaving(true)
-      const data = {
-        contract_type: formData.contractType || null,
+      const prefs = {
         desired_positions: desiredPositions.filter(p => p.trim()).map(p => p.trim()),
-        desired_location: formData.desiredLocation || null,
+        contract_type: formData.contractType || null,
+        contract_types: contractTypes,
+        desired_location: formData.desiredLocation || formData.preferredLocations || null,
+        preferred_locations: formData.preferredLocations || null,
         mobility: formData.mobility || null,
+        remote_preference: formData.remotePreference || null,
+        willing_to_relocate: formData.willingToRelocate || false,
         availability: formData.availability || null,
-        salary_min: formData.salaryMin ? parseInt(formData.salaryMin) : null,
-        salary_max: formData.salaryMax ? parseInt(formData.salaryMax) : null
+        salary_min: formData.salaryMin || null,
+        salary_max: formData.salaryMax || null,
       }
+      const data = jobPreferencesToApiPayload(prefs)
       await candidateApi.updateJobPreferences(profileId, data)
       onSuccess()
     } catch (error) {
       console.error('Error updating preferences:', error)
-      alert('Erreur lors de la mise à jour des préférences: ' + (error.response?.data?.detail || error.message))
+      onError?.('Erreur : ' + (error.response?.data?.detail || error.message))
     } finally {
       setSaving(false)
     }
@@ -2931,7 +3513,7 @@ function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel })
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label>Poste(s) recherché(s) * (max 5)</Label>
+        <Label>Poste(s) recherché(s) <span className="text-red-500">*</span> (max 5)</Label>
         {desiredPositions.map((position, index) => (
           <div key={index} className="flex gap-2">
             <Input
@@ -2963,62 +3545,98 @@ function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel })
       </div>
 
       <div>
-        <Label htmlFor="contractType">Type de contrat souhaité *</Label>
+        <Label>Type(s) de contrat souhaité(s) *</Label>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {['CDI', 'CDD', 'FREELANCE', 'STAGE', 'ALTERNANCE', 'INTERIM'].map(type => (
+            <label
+              key={type}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                contractTypes.includes(type)
+                  ? 'bg-[#226D68] text-white border-[#226D68]'
+                  : 'bg-gray-50 border-gray-200 hover:border-[#226D68]'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={contractTypes.includes(type)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setContractTypes([...contractTypes, type])
+                  } else {
+                    setContractTypes(contractTypes.filter(t => t !== type))
+                  }
+                }}
+                className="sr-only"
+              />
+              <span className="text-sm font-medium">{type}</span>
+            </label>
+          ))}
+        </div>
+        {contractTypes.length === 0 && (
+          <p className="text-xs text-orange-600 mt-1">Sélectionnez au moins un type de contrat</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="remotePreference">Préférence télétravail</Label>
         <select
-          id="contractType"
-          value={formData.contractType}
-          onChange={(e) => setFormData({ ...formData, contractType: e.target.value })}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          required
+          id="remotePreference"
+          value={formData.remotePreference}
+          onChange={(e) => setFormData({ ...formData, remotePreference: e.target.value })}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
         >
-          <option value="">Sélectionner...</option>
-          <option value="CDI">CDI</option>
-          <option value="CDD">CDD</option>
-          <option value="FREELANCE">Freelance</option>
-          <option value="STAGE">Stage</option>
-          <option value="ALTERNANCE">Alternance</option>
+          <option value="onsite">Sur site uniquement</option>
+          <option value="hybrid">Hybride (présentiel + télétravail)</option>
+          <option value="remote">Télétravail complet</option>
+          <option value="flexible">Flexible / Indifférent</option>
         </select>
       </div>
 
       <div>
-        <Label htmlFor="desiredLocation">Localisation souhaitée *</Label>
+        <Label htmlFor="preferredLocations">Zones géographiques préférées <span className="text-red-500">*</span></Label>
         <Input
-          id="desiredLocation"
-          value={formData.desiredLocation}
-          onChange={(e) => setFormData({ ...formData, desiredLocation: e.target.value })}
-          required
+          id="preferredLocations"
+          value={formData.preferredLocations}
+          onChange={(e) => setFormData({ ...formData, preferredLocations: e.target.value })}
+          placeholder="Ex: Abidjan, Bouaké, Télétravail..."
         />
       </div>
 
-      <div>
-        <Label htmlFor="mobility">Mobilité géographique</Label>
-        <Input
-          id="mobility"
-          value={formData.mobility}
-          onChange={(e) => setFormData({ ...formData, mobility: e.target.value })}
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          id="willingToRelocate"
+          checked={formData.willingToRelocate}
+          onChange={(e) => setFormData({ ...formData, willingToRelocate: e.target.checked })}
+          className="rounded"
         />
+        <Label htmlFor="willingToRelocate" className="cursor-pointer font-normal">
+          Prêt(e) à déménager pour une opportunité
+        </Label>
       </div>
 
       <div>
-        <Label htmlFor="availability">Disponibilité *</Label>
+        <Label htmlFor="availability">Disponibilité <span className="text-red-500">*</span></Label>
         <select
           id="availability"
           value={formData.availability}
           onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           required
         >
-          <option value="">Sélectionner...</option>
-          <option value="IMMEDIATE">Immédiate</option>
-          <option value="1_MONTH">1 mois</option>
-          <option value="2_MONTHS">2 mois</option>
-          <option value="3_MONTHS">3 mois</option>
-          <option value="MORE">Plus de 3 mois</option>
+          <option value="">Sélectionnez...</option>
+          <option value="immediate">Immédiate</option>
+          <option value="1_week">Sous 1 semaine</option>
+          <option value="2_weeks">Sous 2 semaines</option>
+          <option value="1_month">Sous 1 mois</option>
+          <option value="2_months">Sous 2 mois</option>
+          <option value="3_months">Sous 3 mois</option>
+          <option value="negotiable">À négocier</option>
         </select>
       </div>
 
       <div>
-        <Label>Prétentions salariales * (CFA/mois)</Label>
+        <Label>Prétentions salariales <span className="text-red-500">*</span> (CFA/mois)</Label>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="salaryMin" className="text-sm font-normal">Minimum (CFA/mois)</Label>
@@ -3061,3 +3679,5 @@ function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel })
     </form>
   )
 }
+
+export { ExperienceForm, EducationForm, CertificationForm, SkillForm, PreferencesForm }

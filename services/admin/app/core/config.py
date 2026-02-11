@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     AUDIT_SERVICE_URL: str = Field(default="http://audit:8000", description="Audit service URL")
     FRONTEND_URL: str = Field(default="http://localhost:3000", description="Frontend URL for profile links")
 
+    # HrFlow.ai - Profile Asking API (CvGPT)
+    HRFLOW_API_KEY: str = Field(default="", description="HrFlow API key for Profile Asking")
+    HRFLOW_SOURCE_KEY: str = Field(default="", description="HrFlow source key where profiles are indexed")
+    HRFLOW_API_URL: str = Field(default="https://api.hrflow.ai/v1", description="HrFlow API base URL")
+    HRFLOW_USER_EMAIL: str = Field(default="", description="HrFlow account email (required for Asking API)")
+
     # CORS (défini comme string pour éviter les problèmes de parsing)
     CORS_ORIGINS: str = Field(
         default="http://localhost:3000,http://localhost:8000",

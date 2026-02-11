@@ -267,22 +267,52 @@ FRONTEND_URL=http://localhost:3000
 
 ### Installation locale
 
+**Important : exécuter les commandes depuis le répertoire du service** `services/candidate/`, pas depuis la racine du projet.
+
 ```bash
-# Installer les dépendances
+cd services/candidate
+
+# Créer un venv et installer les dépendances (recommandé)
+python -m venv .venv
+source .venv/bin/activate   # sur Windows : .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Démarrer le service
+# Configurer la base (le service lit DB_* pas DB_CANDIDATE_*)
+# export DB_HOST=localhost DB_USER=postgres DB_PASSWORD=... DB_NAME=yemma_db
+# Ou définir DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/yemma_db
+
+# Créer la base si elle n'existe pas (PostgreSQL local)
+# createdb -U postgres yemma_db
+# ou : psql -U postgres -c "CREATE DATABASE yemma_db;"
+
+# Appliquer les migrations (alembic.ini est dans services/candidate)
+alembic upgrade head
+
+# Démarrer le service (frontend attend le port 8002)
 uvicorn app.main:app --reload --port 8002
 ```
+
+Si vous devez lancer depuis la racine du repo (avec le bon répertoire de travail) :
+```bash
+cd /chemin/vers/yemma/services/candidate && uvicorn app.main:app --reload --port 8002
+```
+
+En cas d’erreur **500** sur `POST /api/v1/profiles`, activer `DEBUG=true` dans le `.env` du service : le détail de l’erreur sera renvoyé dans la réponse (ex. table absente, connexion DB).
 
 ### Avec Docker
 
 ```bash
-# Build et démarrage
-docker-compose up candidate-service
+# Build et démarrage (nom du service : candidate)
+docker compose -f docker-compose.dev.yml up candidate
 
 # Voir les logs
-docker-compose logs -f candidate-service
+docker compose -f docker-compose.dev.yml logs -f candidate
+
+# Appliquer les migrations (depuis la racine du repo)
+docker compose -f docker-compose.dev.yml exec candidate python -m alembic.config upgrade head
+
+# Si Alembic échoue dans le conteneur, ajouter la colonne hrflow_profile_key à la main :
+docker compose -f docker-compose.dev.yml exec postgres psql -U postgres -d yemma_db -c "ALTER TABLE profiles ADD COLUMN IF NOT EXISTS hrflow_profile_key VARCHAR(255);"
 ```
 
 ## 🔄 Intégration avec autres services

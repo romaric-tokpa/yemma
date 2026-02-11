@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     
     # Document Service
     DOCUMENT_SERVICE_URL: str = "http://localhost:8003"
+
+    # Hrflow.ai - Parsing CV (https://developers.hrflow.ai/reference/parse-a-resume)
+    HRFLOW_API_URL: str = "https://api.hrflow.ai/v1"
+    HRFLOW_API_KEY: str = ""
+    HRFLOW_USER_EMAIL: str = ""
+    HRFLOW_SOURCE_KEY: str = ""  # Source Key où les CV parsés sont indexés
     # Search Service
     SEARCH_SERVICE_URL: str = "http://localhost:8004"
     # Notification Service

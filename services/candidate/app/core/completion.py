@@ -235,12 +235,17 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
         pref_points = 0
         pref_max = 0
         
-        # Champs obligatoires
-        if profile.job_preferences.contract_type:
+        # Champs obligatoires (contract_type legacy ou contract_types liste)
+        has_contract = bool(profile.job_preferences.contract_type) or (
+            profile.job_preferences.contract_types and len(profile.job_preferences.contract_types) > 0
+        )
+        if has_contract:
             pref_points += 2
         pref_max += 2
         
-        if profile.job_preferences.desired_location:
+        # desired_location ou preferred_locations (aligné dashboard / onboarding)
+        has_location = bool(profile.job_preferences.desired_location) or bool(profile.job_preferences.preferred_locations)
+        if has_location:
             pref_points += 2
         pref_max += 2
         
@@ -385,7 +390,7 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     
     Vérifie uniquement les champs obligatoires (marqués avec *) :
     - Étape 0 : Consentements (CGU, RGPD, vérification)
-    - Étape 1 : Identité complète (prénom, nom, email, date de naissance, nationalité, téléphone, adresse, titre, résumé, secteur, métier, expérience)
+    - Étape 1 : Identité complète (prénom, nom, email, date de naissance, nationalité, téléphone, ville, pays, titre, résumé, secteur, métier, expérience)
     - Étape 2 : Au moins une expérience professionnelle complète
     - Étape 6 : CV PDF obligatoire
     - Étape 7 : Préférences (type de contrat, localisation, disponibilité, prétentions salariales)
@@ -422,8 +427,8 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     if not profile.phone:
         return False, "Le téléphone est obligatoire"
     
-    if not profile.address or not profile.city or not profile.country:
-        return False, "L'adresse complète (adresse, ville, pays) est obligatoire"
+    if not profile.city or not profile.country:
+        return False, "La ville et le pays sont obligatoires"
     
     if not profile.profile_title:
         return False, "Le titre du profil est obligatoire"
@@ -478,19 +483,25 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     if len(technical_skills) == 0:
         return False, "Au moins une compétence technique est requise (Étape 5)"
     
-    # Vérifier que les compétences techniques sont complètes
+    # Vérifier que les compétences techniques ont au moins un nom (niveau optionnel)
     for skill in technical_skills:
-        if not skill.name or not skill.level:
-            return False, "Toutes les compétences techniques doivent avoir un nom et un niveau (Étape 5)"
+        if not skill.name:
+            return False, "Toutes les compétences techniques doivent avoir un nom (Étape 5)"
     
     # Vérifications obligatoires - Étape 7 (Préférences)
     if not profile.job_preferences:
         return False, "Les préférences de recherche d'emploi sont requises (Étape 7)"
     
-    if not profile.job_preferences.contract_type:
+    # Accepter contract_type (legacy) ou contract_types (dashboard / onboarding)
+    has_contract = bool(profile.job_preferences.contract_type) or (
+        profile.job_preferences.contract_types and len(profile.job_preferences.contract_types) > 0
+    )
+    if not has_contract:
         return False, "Le type de contrat souhaité est obligatoire (Étape 7)"
     
-    if not profile.job_preferences.desired_location:
+    # Accepter desired_location ou preferred_locations (aligné dashboard / onboarding)
+    has_location = bool(profile.job_preferences.desired_location) or bool(profile.job_preferences.preferred_locations)
+    if not has_location:
         return False, "La localisation souhaitée est obligatoire (Étape 7)"
     
     if not profile.job_preferences.availability:

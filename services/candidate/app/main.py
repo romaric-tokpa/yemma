@@ -53,9 +53,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
     
+    detail = f"Internal server error: {str(exc)}" if settings.DEBUG else "Internal server error"
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": f"Internal server error: {str(exc)}"},
+        content={"detail": detail},
         headers=headers
     )
 
@@ -72,9 +73,10 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
     
+    detail = str(exc) if settings.DEBUG else "Database error occurred"
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Database error occurred"},
+        content={"detail": detail},
         headers=headers
     )
 
@@ -116,11 +118,32 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint (sans dépendance DB)."""
     return {
         "status": "healthy",
         "service": "candidate-service",
         "version": "1.0.0",
+    }
+
+
+@app.get("/health/ready", tags=["Health"])
+async def readiness_check():
+    """Readiness : vérifie que le service et la base de données sont joignables."""
+    from app.infrastructure.database import check_db_connection
+    db_ok = await check_db_connection()
+    if not db_ok:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unhealthy",
+                "service": "candidate-service",
+                "database": "disconnected",
+            },
+        )
+    return {
+        "status": "healthy",
+        "service": "candidate-service",
+        "database": "connected",
     }
 
 

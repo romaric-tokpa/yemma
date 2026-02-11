@@ -88,6 +88,9 @@ class Profile(SQLModel, table=True):
     accept_rgpd: bool = Field(default=False, description="Acceptation RGPD")
     accept_verification: bool = Field(default=False, description="Autorisation vérification")
     
+    # HrFlow (Profile Asking / CvGPT)
+    hrflow_profile_key: Optional[str] = Field(default=None, max_length=255, description="Clé du profil indexé HrFlow (pour API Profile Asking)")
+
     # Métadonnées
     last_step_completed: Optional[int] = Field(default=0, description="Dernière étape complétée (0-8)")
     submitted_at: Optional[datetime] = Field(default=None, description="Date de soumission")
@@ -199,23 +202,27 @@ class JobPreference(SQLModel, table=True):
     """Modèle JobPreference - Préférences de recherche d'emploi"""
     __tablename__ = "job_preferences"
     __table_args__ = {'extend_existing': True}
-    
+
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: int = Field(foreign_key="profiles.id", unique=True, index=True, description="ID du profil")
-    
+
     desired_positions: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAYType(String)), description="Postes recherchés (max 5)")
-    contract_type: Optional[ContractType] = Field(default=None, description="Type de contrat souhaité")
+    contract_type: Optional[ContractType] = Field(default=None, description="Type de contrat souhaité (legacy)")
+    contract_types: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAYType(String)), description="Types de contrat souhaités")
     target_sectors: Optional[List[str]] = Field(default=None, sa_column=Column(ARRAYType(String)), description="Secteurs ciblés")
     desired_location: Optional[str] = Field(default=None, max_length=255, description="Localisation souhaitée")
+    preferred_locations: Optional[str] = Field(default=None, max_length=500, description="Zones géographiques préférées")
     mobility: Optional[str] = Field(default=None, max_length=100, description="Mobilité géographique")
+    remote_preference: Optional[str] = Field(default=None, max_length=50, description="Préférence télétravail (onsite, hybrid, remote, flexible)")
+    willing_to_relocate: Optional[bool] = Field(default=False, description="Prêt à déménager")
     availability: Optional[str] = Field(default=None, max_length=100, description="Disponibilité")
     salary_min: Optional[float] = Field(default=None, description="Salaire minimum (CFA/mois)")
     salary_max: Optional[float] = Field(default=None, description="Salaire maximum (CFA/mois)")
     salary_expectations: Optional[float] = Field(default=None, description="Prétentions salariales (pour compatibilité, moyenne de la fourchette)")
-    
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)
-    
+
     # Relations
     profile: Profile = Relationship(back_populates="job_preferences")
 

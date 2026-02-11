@@ -1,12 +1,13 @@
 """
 Repositories pour l'accès aux données
 """
+from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlmodel import select as sqlmodel_select
 
-from app.domain.models import User, Role, UserRoleLink, RefreshToken
+from app.domain.models import User, Role, UserRoleLink, RefreshToken, AdminInvitationToken
 from app.domain.exceptions import UserNotFoundError, UserAlreadyExistsError
 
 
@@ -127,4 +128,55 @@ class RefreshTokenRepository:
         
         await self.session.commit()
         return count
+
+
+class AdminInvitationTokenRepository:
+    """Repository pour les tokens d'invitation d'administrateur"""
+    
+    def __init__(self, session: AsyncSession):
+        self.session = session
+    
+    async def create(self, invitation_token: AdminInvitationToken) -> AdminInvitationToken:
+        """Crée un nouveau token d'invitation"""
+        self.session.add(invitation_token)
+        await self.session.commit()
+        await self.session.refresh(invitation_token)
+        return invitation_token
+    
+    async def get_by_token(self, token: str) -> Optional[AdminInvitationToken]:
+        """Récupère un token d'invitation par token"""
+        statement = select(AdminInvitationToken).where(
+            AdminInvitationToken.token == token,
+            AdminInvitationToken.is_used == False
+        )
+        result = await self.session.execute(statement)
+        return result.scalar_one_or_none()
+    
+    async def mark_as_used(self, token: str, user_id: int) -> bool:
+        """Marque un token comme utilisé"""
+        # Récupérer le token même s'il est déjà utilisé (pour pouvoir le marquer)
+        statement = select(AdminInvitationToken).where(
+            AdminInvitationToken.token == token
+        )
+        result = await self.session.execute(statement)
+        invitation_token = result.scalar_one_or_none()
+        
+        if invitation_token:
+            invitation_token.is_used = True
+            invitation_token.used_at = datetime.utcnow()
+            invitation_token.used_by_user_id = user_id
+            await self.session.commit()
+            return True
+        return False
+    
+    async def get_all(self, skip: int = 0, limit: int = 100) -> List[AdminInvitationToken]:
+        """Récupère tous les tokens d'invitation"""
+        statement = (
+            select(AdminInvitationToken)
+            .order_by(AdminInvitationToken.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(statement)
+        return list(result.scalars().all())
 

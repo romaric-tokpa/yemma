@@ -1,7 +1,7 @@
 /**
  * Liste des secteurs d'activité en français (ordre alphabétique).
- * Inspirée de la NAF et des nomenclatures internationales.
- * Utilisée pour le champ Secteur d'activité dans l'onboarding candidat.
+ * Inspirée de la NAF, ISIC et nomenclatures internationales.
+ * Utilisée pour le champ Secteur d'activité (liste déroulante).
  */
 export const SECTORS_FR = [
   'Activités extra-territoriales',
@@ -19,10 +19,13 @@ export const SECTORS_FR = [
   'Automobile',
   'Banque et services financiers',
   'Bâtiment et construction',
+  'Bien-être et spa',
+  'Biotechnologie',
   'Chimie et parachimie',
   'Commerce de détail',
   'Commerce de gros',
   'Commerce et réparation d\'automobiles',
+  'Commerce électronique (e-commerce)',
   'Communication et relations publiques',
   'Conseil et études',
   'Conseil en management',
@@ -30,6 +33,7 @@ export const SECTORS_FR = [
   'Construction aéronautique et spatiale',
   'Construction navale',
   'Cosmétique et parfumerie',
+  'Cryptomonnaies et blockchain',
   'Culture et médias',
   'Défense',
   'Distribution d\'eau et assainissement',
@@ -53,6 +57,7 @@ export const SECTORS_FR = [
   'Fabrication d\'équipements électriques',
   'Fabrication d\'instruments et fournitures médicaux',
   'Finance',
+  'Fintech',
   'Formation professionnelle',
   'Gestion de projet',
   'Hébergement et restauration',
@@ -69,6 +74,7 @@ export const SECTORS_FR = [
   'Information et communication',
   'Ingénierie et services techniques',
   'Intérim et recrutement',
+  'Jeu vidéo et loisirs numériques',
   'Justice et sécurité',
   'Logistique et transport',
   'Luxe et mode',

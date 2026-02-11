@@ -18,7 +18,7 @@ async def seed_admin_user():
         
         # Email et mot de passe par défaut pour l'admin
         admin_email = "admin@yemma.com"
-        admin_password = "admin123456"
+        admin_password = "12345678"
         admin_first_name = "Admin"
         admin_last_name = "Yemma"
         admin_role = "ROLE_SUPER_ADMIN"

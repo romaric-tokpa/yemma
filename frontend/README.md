@@ -118,6 +118,13 @@ npm run dev
 
 L'application sera accessible sur http://localhost:3000
 
+**Connexion (login)** : en dev, les appels API sont envoyés vers le proxy Vite (`/api` → gateway nginx). Démarrez le backend pour que le login fonctionne :
+```bash
+# À la racine du projet
+docker-compose -f docker-compose.dev.yml up nginx auth candidate
+```
+(Sans backend, vous aurez une erreur 404 ou « Impossible de contacter le serveur » sur la page de connexion.)
+
 ### Build pour production
 
 ```bash

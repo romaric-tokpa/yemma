@@ -1,12 +1,13 @@
 """
 Configuration de la base de données
 """
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlmodel import SQLModel
 
 from app.core.config import settings
 
-# Engine async
+# Engine async avec résilience : pool_pre_ping vérifie les connexions avant usage, timeout pour éviter blocages
 db_url = settings.DATABASE_URL
 if not db_url.startswith("postgresql+asyncpg://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
@@ -15,6 +16,10 @@ engine = create_async_engine(
     db_url,
     echo=settings.DEBUG,
     future=True,
+    pool_pre_ping=True,
+    connect_args={"timeout": 10},
+    pool_size=5,
+    max_overflow=10,
 )
 
 # Session factory

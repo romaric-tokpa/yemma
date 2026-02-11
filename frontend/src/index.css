@@ -98,6 +98,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 16px; /* Évite le zoom automatique sur iOS lors du focus input */
     color: #2C2C2C; /* Gris anthracite */
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -239,17 +240,89 @@
     font-size: 1rem;
   }
   
-  /* Responsive typography */
-  @media (max-width: 768px) {
-    h1 {
-      font-size: 2.25rem;  /* 36px */
+  /* Responsive typography (mobile-first) */
+@media (max-width: 640px) {
+    h1 { font-size: 1.75rem; line-height: 1.2; margin-bottom: 1rem; }
+    h2 { font-size: 1.5rem; margin-bottom: 1rem; }
+    h3 { font-size: 1.25rem; margin-bottom: 0.75rem; }
+    h4 { font-size: 1.125rem; margin-bottom: 0.5rem; }
+    h5, h6 { font-size: 1rem; margin-bottom: 0.5rem; }
+    /* Évite le zoom sur focus (iOS) */
+    input, select, textarea, [contenteditable] {
+      font-size: 16px !important;
     }
-    h2 {
-      font-size: 1.875rem; /* 30px */
-    }
-    h3 {
-      font-size: 1.5rem;   /* 24px */
-    }
+  }
+  @media (min-width: 641px) and (max-width: 768px) {
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.75rem; }
+    h3 { font-size: 1.5rem; }
+  }
+  @media (min-width: 769px) {
+    h1 { font-size: 2.25rem; }
+    h2 { font-size: 2rem; }
+    h3 { font-size: 1.875rem; }
+  }
+}
+
+/* Safe area insets (notched devices, PWA) */
+.safe-top { padding-top: env(safe-area-inset-top, 0); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+.safe-left { padding-left: env(safe-area-inset-left, 0); }
+.safe-right { padding-right: env(safe-area-inset-right, 0); }
+.safe-x { padding-left: env(safe-area-inset-left, 0); padding-right: env(safe-area-inset-right, 0); }
+.safe-y { padding-top: env(safe-area-inset-top, 0); padding-bottom: env(safe-area-inset-bottom, 0); }
+.safe-area { padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0); }
+
+/* Touch targets minimum 44x44px sur mobile (WCAG / UX) */
+@media (max-width: 768px) {
+  .touch-target-min {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  button:not(.no-touch-target),
+  a[role="button"],
+  [role="tab"],
+  .clickable-area {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Prevent horizontal scroll on mobile */
+html, body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 1023px) {
+  body { touch-action: pan-y pinch-zoom; }
+}
+
+/* Contenu lisible (longueur de ligne 45–75 caractères) */
+.content-readable {
+  max-width: 65ch;
+}
+
+/* Scroll horizontal fluide pour tabs / pills (mobile) */
+.scroll-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+.scroll-tabs::-webkit-scrollbar {
+  display: none;
+}
+.scroll-tabs > * {
+  scroll-snap-align: start;
+}
+
+/* Modales pleine hauteur sur mobile (éviter overflow) */
+@media (max-width: 640px) {
+  [data-state="open"] [data-radix-dialog-content] {
+    max-height: 100dvh;
+    max-height: 100vh;
   }
 }
 

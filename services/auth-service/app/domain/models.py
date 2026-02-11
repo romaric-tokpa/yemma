@@ -89,3 +89,27 @@ class RefreshToken(SQLModel, table=True):
     # Relations
     user: User = Relationship(back_populates="refresh_tokens")
 
+
+class AdminInvitationToken(SQLModel, table=True):
+    """Modèle pour les tokens d'invitation d'administrateur"""
+    __tablename__ = "admin_invitation_tokens"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True, max_length=255)
+    email: str = Field(index=True, max_length=255)
+    role: str = Field(default="ROLE_ADMIN", max_length=50)  # ROLE_ADMIN ou ROLE_SUPER_ADMIN
+    created_by_user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    expires_at: datetime = Field(index=True)
+    is_used: bool = Field(default=False, index=True)
+    used_at: Optional[datetime] = Field(default=None)
+    used_by_user_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relations optionnelles
+    created_by: Optional[User] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[AdminInvitationToken.created_by_user_id]"}
+    )
+    used_by: Optional[User] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[AdminInvitationToken.used_by_user_id]"}
+    )
+

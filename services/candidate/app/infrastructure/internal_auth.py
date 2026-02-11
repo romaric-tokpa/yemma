@@ -5,15 +5,21 @@ from fastapi import Depends, HTTPException, status, Header
 from typing import Optional
 import sys
 import os
-
-# Le module shared est monté dans /shared via docker-compose
-shared_path = "/shared"
-if os.path.exists(shared_path) and shared_path not in sys.path:
-    sys.path.insert(0, shared_path)
-
-# Importer depuis shared
 import importlib.util
-internal_auth_path = os.path.join(shared_path, "internal_auth.py")
+
+# En Docker : /shared est monté. En local : services/shared (relatif à ce fichier)
+# Ce fichier est dans services/candidate/app/infrastructure/ -> 3 niveaux = services/
+_this_dir = os.path.dirname(os.path.abspath(__file__))
+_services_dir = os.path.abspath(os.path.join(_this_dir, "..", "..", ".."))
+_shared_dir_local = os.path.join(_services_dir, "shared")
+# En Docker : /shared. En local : services/shared (doit exister)
+shared_path = "/shared" if os.path.exists("/shared") else _shared_dir_local
+_path_to_add = os.path.dirname(shared_path) if os.path.exists(shared_path) else _services_dir
+if _path_to_add and _path_to_add not in sys.path:
+    sys.path.insert(0, _path_to_add)
+
+# Charger internal_auth depuis le fichier si possible (évite "import shared" quand le chemin est bon)
+internal_auth_path = os.path.join(shared_path, "internal_auth.py") if os.path.exists(shared_path) else os.path.join(_services_dir, "shared", "internal_auth.py")
 if os.path.exists(internal_auth_path):
     spec = importlib.util.spec_from_file_location("shared.internal_auth", internal_auth_path)
     if spec and spec.loader:

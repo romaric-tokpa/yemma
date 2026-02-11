@@ -9,7 +9,7 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 # Import des modèles pour qu'Alembic les détecte
-from app.domain.models import User, Role, UserRoleLink, RefreshToken
+from app.domain.models import User, Role, UserRoleLink, RefreshToken, AdminInvitationToken
 from sqlmodel import SQLModel
 from app.core.config import settings
 

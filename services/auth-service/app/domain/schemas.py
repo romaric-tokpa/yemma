@@ -140,3 +140,45 @@ class RoleResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ============================================
+# Admin Invitation Schemas
+# ============================================
+
+class AdminInvitationCreate(BaseModel):
+    """Schéma pour créer un token d'invitation admin"""
+    email: EmailStr
+    role: str = Field(default="ROLE_ADMIN", description="ROLE_ADMIN ou ROLE_SUPER_ADMIN")
+    expires_in_hours: int = Field(default=72, ge=1, le=720, description="Durée de validité en heures (1-720)")
+
+
+class AdminInvitationResponse(BaseModel):
+    """Schéma de réponse pour un token d'invitation"""
+    id: int
+    token: str
+    email: str
+    role: str
+    expires_at: datetime
+    created_at: datetime
+    is_used: bool
+    invitation_url: str
+
+    class Config:
+        from_attributes = True
+
+
+class AdminRegisterViaToken(BaseModel):
+    """Schéma pour créer un admin via token d'invitation"""
+    token: str
+    email: EmailStr  # Email doit correspondre à celui du token
+    password: str = Field(..., min_length=8)
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
