@@ -107,6 +107,10 @@
 }
 
 @layer base {
+  html {
+    font-size: 18px; /* Base augmentée pour meilleure lisibilité sur toutes les pages */
+  }
+  
   * {
     @apply border-border;
   }
@@ -114,7 +118,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 16px; /* Évite le zoom automatique sur iOS lors du focus input */
+    font-size: 1rem; /* Hérite de html (18px) */
     color: #2C2C2C; /* Gris anthracite */
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -272,9 +276,9 @@
     h3 { font-size: 1.25rem; margin-bottom: 0.75rem; }
     h4 { font-size: 1.125rem; margin-bottom: 0.5rem; }
     h5, h6 { font-size: 1rem; margin-bottom: 0.5rem; }
-    /* Évite le zoom sur focus (iOS) */
+    /* Évite le zoom sur focus (iOS) - min 16px */
     input, select, textarea, [contenteditable] {
-      font-size: 16px !important;
+      font-size: 18px !important;
     }
   }
   @media (min-width: 641px) and (max-width: 768px) {
