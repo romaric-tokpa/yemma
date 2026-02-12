@@ -234,28 +234,28 @@ export function AdvancedSearchFilters({
   }) => {
     const isExpanded = expandedSections[id] ?? defaultExpanded
     return (
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <button
           onClick={() => toggleSection(id)}
-          className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+          className="flex items-center justify-between w-full p-2 rounded-md hover:bg-[#F4F6F8] transition-colors group"
         >
           <div className="flex items-center gap-2">
-            {Icon && <Icon className="h-4 w-4 text-gray-500 group-hover:text-[#226D68] transition-colors" />}
-            <Label className="font-semibold text-sm cursor-pointer">{title}</Label>
-            {badge && (
-              <Badge variant="secondary" className="ml-1 text-xs">
+            {Icon && <Icon className="h-3.5 w-3.5 text-[#9ca3af] group-hover:text-[#226D68]" />}
+            <Label className="font-medium text-xs cursor-pointer text-[#2C2C2C]">{title}</Label>
+            {badge > 0 && (
+              <Badge className="ml-1 h-5 px-1.5 text-[10px] bg-[#226D68] text-white">
                 {badge}
               </Badge>
             )}
           </div>
           {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
+            <ChevronUp className="h-3.5 w-3.5 text-[#9ca3af]" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-3.5 w-3.5 text-[#9ca3af]" />
           )}
         </button>
         {isExpanded && (
-          <div className="pl-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
+          <div className="pl-5 space-y-2">
             {children}
           </div>
         )}
@@ -265,13 +265,13 @@ export function AdvancedSearchFilters({
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="p-3 sm:p-4 border-b bg-gradient-to-r from-blue-deep/5 to-[#226D68]/5 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
+      {/* Header compact */}
+      <div className="px-3 py-2.5 border-b border-[#e5e7eb] bg-[#F4F6F8]/50 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2 min-w-0">
-          <SlidersHorizontal className="h-4 w-4 sm:h-5 sm:w-5 text-[#226D68] flex-shrink-0" />
-          <h2 className="font-bold text-sm sm:text-base md:text-lg text-gray-900 truncate">Filtres avancés</h2>
+          <SlidersHorizontal className="h-4 w-4 text-[#226D68] flex-shrink-0" />
+          <h2 className="font-semibold text-sm text-[#2C2C2C] truncate">Filtres</h2>
           {activeFiltersCount > 0 && (
-            <Badge className="bg-[#226D68] text-white flex-shrink-0">
+            <Badge className="h-5 px-1.5 text-[10px] bg-[#226D68] text-white flex-shrink-0">
               {activeFiltersCount}
             </Badge>
           )}
@@ -283,34 +283,25 @@ export function AdvancedSearchFilters({
 
       {/* Filtres actifs - Tags */}
       {activeFiltersCount > 0 && (
-        <div className="p-2 sm:p-3 border-b bg-gray-50">
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+        <div className="p-2 border-b border-[#e5e7eb] bg-[#F4F6F8]/30">
+          <div className="flex flex-wrap gap-1">
             {filters.skills?.map((skill, idx) => (
-              <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+              <Badge key={idx} variant="secondary" className="h-5 text-[10px] px-1.5 flex items-center gap-0.5 bg-[#E8F4F3] text-[#226D68] border-0">
                 {skill}
-                <XCircle 
-                  className="h-3 w-3 cursor-pointer hover:text-red-500" 
-                  onClick={() => handleRemoveSkill(skill)}
-                />
+                <XCircle className="h-2.5 w-2.5 cursor-pointer hover:text-red-500" onClick={() => handleRemoveSkill(skill)} />
               </Badge>
             ))}
             {filters.location && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
+              <Badge variant="secondary" className="h-5 text-[10px] px-1.5 flex items-center gap-0.5 bg-[#E8F4F3] text-[#226D68] border-0">
+                <MapPin className="h-2.5 w-2.5" />
                 {filters.location}
-                <XCircle 
-                  className="h-3 w-3 cursor-pointer hover:text-red-500" 
-                  onClick={() => onFilterChange({ ...filters, location: '' })}
-                />
+                <XCircle className="h-2.5 w-2.5 cursor-pointer hover:text-red-500" onClick={() => onFilterChange({ ...filters, location: '' })} />
               </Badge>
             )}
             {filters.job_title && (
-              <Badge variant="secondary" className="flex items-center gap-1">
+              <Badge variant="secondary" className="h-5 text-[10px] px-1.5 flex items-center gap-0.5 bg-[#E8F4F3] text-[#226D68] border-0">
                 {filters.job_title}
-                <XCircle 
-                  className="h-3 w-3 cursor-pointer hover:text-red-500" 
-                  onClick={() => onFilterChange({ ...filters, job_title: '' })}
-                />
+                <XCircle className="h-2.5 w-2.5 cursor-pointer hover:text-red-500" onClick={() => onFilterChange({ ...filters, job_title: '' })} />
               </Badge>
             )}
           </div>
@@ -318,11 +309,11 @@ export function AdvancedSearchFilters({
       )}
 
       <ScrollArea className="flex-1">
-        <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+        <div className="p-3 space-y-3">
           {/* Recherche de poste */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold flex items-center gap-2">
-              <Search className="h-4 w-4 text-gray-500" />
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-[#2C2C2C] flex items-center gap-1.5">
+              <Search className="h-3.5 w-3.5 text-[#9ca3af]" />
               Poste recherché
             </Label>
             <Input
@@ -330,11 +321,11 @@ export function AdvancedSearchFilters({
               placeholder="Ex: Développeur Full Stack..."
               value={filters.job_title || ''}
               onChange={(e) => onFilterChange({ ...filters, job_title: e.target.value })}
-              className="h-9"
+              className="h-8 text-sm border-[#e5e7eb]"
             />
           </div>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
           {/* Expérience */}
           <FilterSection
@@ -383,7 +374,7 @@ export function AdvancedSearchFilters({
             </div>
           </FilterSection>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
           {/* Disponibilité */}
           <FilterSection
@@ -413,7 +404,7 @@ export function AdvancedSearchFilters({
             </div>
           </FilterSection>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
           {/* Niveau d'éducation */}
           <FilterSection
@@ -443,7 +434,7 @@ export function AdvancedSearchFilters({
             </div>
           </FilterSection>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
           {/* Type de contrat */}
           <FilterSection
@@ -478,7 +469,7 @@ export function AdvancedSearchFilters({
             </div>
           </FilterSection>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
           {/* Compétences */}
           <FilterSection
@@ -494,7 +485,7 @@ export function AdvancedSearchFilters({
                   placeholder="Rechercher une compétence..."
                   value={skillSearch}
                   onChange={(e) => setSkillSearch(e.target.value)}
-                  className="h-9"
+                  className="h-8 text-sm border-[#e5e7eb]"
                 />
                 {skillSuggestions.length > 0 && (
                   <Card className="absolute z-50 w-full mt-1 shadow-lg border">
@@ -551,7 +542,7 @@ export function AdvancedSearchFilters({
             </div>
           </FilterSection>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
           {/* Localisation */}
           <FilterSection
@@ -562,14 +553,14 @@ export function AdvancedSearchFilters({
           >
             <Input
               type="text"
-              placeholder="Ex: Abidjan, Paris, Côte d'Ivoire..."
+              placeholder="Ex: Abidjan, Paris..."
               value={filters.location || ''}
               onChange={(e) => onFilterChange({ ...filters, location: e.target.value })}
-              className="h-9"
+              className="h-8 text-sm border-[#e5e7eb]"
             />
           </FilterSection>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
           {/* Prétentions salariales */}
           <FilterSection
@@ -595,15 +586,16 @@ export function AdvancedSearchFilters({
             </div>
           </FilterSection>
 
-          <Separator />
+          <Separator className="bg-[#e5e7eb]" />
 
-          {/* Score expert */}
+          {/* Score expert - attribué lors de l'évaluation admin */}
           <FilterSection
             id="score"
-            title="Score expert minimum"
+            title="Score d'évaluation minimum"
             icon={Star}
             badge={filters.min_admin_score ? 1 : 0}
           >
+            <p className="text-[10px] text-[#9ca3af] mb-2">Note donnée par l'expert lors de la validation du profil</p>
             <div className="space-y-3">
               <div>
                 <div className="flex justify-between text-xs text-gray-600 mb-2">
@@ -636,15 +628,16 @@ export function AdvancedSearchFilters({
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-3 sm:p-4 border-t bg-gray-50 space-y-2">
+      <div className="p-3 border-t border-[#e5e7eb] bg-[#F4F6F8]/30 space-y-1.5">
         <div className="flex gap-2">
           <Button
             variant="outline"
-            className="flex-1 text-xs sm:text-sm"
+            size="sm"
+            className="flex-1 h-8 text-xs border-[#d1d5db] text-[#2C2C2C]"
             onClick={clearAllFilters}
             disabled={activeFiltersCount === 0}
           >
-            <XCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <XCircle className="h-3 w-3 mr-1.5" />
             Réinitialiser
           </Button>
           {onSavePreset && (
@@ -660,7 +653,7 @@ export function AdvancedSearchFilters({
           )}
         </div>
         {activeFiltersCount > 0 && (
-          <div className="text-xs text-center text-gray-500">
+          <div className="text-[10px] text-center text-[#9ca3af]">
             {activeFiltersCount} filtre{activeFiltersCount > 1 ? 's' : ''} actif{activeFiltersCount > 1 ? 's' : ''}
           </div>
         )}

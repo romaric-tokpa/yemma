@@ -1,14 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { generateAvatarUrl, buildPhotoUrl } from '@/utils/photoUtils'
 import { useNavigate } from 'react-router-dom'
-import { Search, ChevronDown, Download, Mail, Star, MapPin, Briefcase, GraduationCap, Calendar, X, Filter, SlidersHorizontal, RefreshCw } from 'lucide-react'
+import { Search, Download, Mail, MapPin, Briefcase, Calendar, Filter, RefreshCw } from 'lucide-react'
 import { searchApiService, documentApi } from '../../services/api'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Card } from '../ui/card'
 import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { Separator } from '../ui/separator'
 import { CandidateSkeleton } from '../search/CandidateSkeleton'
 import { ExpertReviewDialog } from '../search/ExpertReviewDialog'
 import { AdvancedSearchFilters } from '../search/AdvancedSearchFilters'
@@ -317,10 +315,9 @@ export function SearchTab() {
   }
 
   return (
-    <div className="h-full bg-gray-light flex flex-1 relative">
-      {/* Sidebar des filtres - Desktop: fixe, Mobile/Tablette: drawer */}
-      {/* Desktop: Sidebar fixe */}
-      <div className={`hidden lg:block ${sidebarOpen ? 'w-96' : 'w-0'} transition-all duration-300 overflow-hidden border-r border-gray-200`}>
+    <div className="h-full bg-[#F4F6F8] flex flex-1 relative">
+      {/* Sidebar des filtres */}
+      <div className={`hidden lg:block ${sidebarOpen ? 'w-72' : 'w-0'} transition-all duration-200 overflow-hidden border-r border-[#e5e7eb] shrink-0`}>
         {sidebarOpen && (
           <AdvancedSearchFilters
             filters={filters}
@@ -331,14 +328,14 @@ export function SearchTab() {
         )}
       </div>
 
-      {/* Mobile/Tablette: Drawer overlay */}
       {sidebarOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden animate-in fade-in duration-200"
+            className="fixed inset-0 bg-black/40 z-40 lg:hidden"
             onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-80 max-w-[90vw] sm:max-w-[85vw] bg-white shadow-xl lg:hidden transform transition-transform duration-300 ease-in-out overflow-hidden flex flex-col animate-in slide-in-from-left">
+          <div className="fixed inset-y-0 left-0 z-50 w-72 max-w-[90vw] bg-white shadow-xl lg:hidden overflow-hidden flex flex-col border-r border-[#e5e7eb]">
             <AdvancedSearchFilters
               filters={filters}
               facets={{}}
@@ -351,71 +348,76 @@ export function SearchTab() {
 
       {/* Contenu principal */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Header - Responsive */}
-        <div className="bg-white border-b shadow-sm">
-          <div className="px-3 sm:px-4 md:px-6 py-3 md:py-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-              <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                {!sidebarOpen && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSidebarOpen(true)}
-                    className="flex items-center gap-2 flex-shrink-0"
-                  >
-                    <Filter className="h-4 w-4" />
-                    <span className="hidden sm:inline">Filtres</span>
-                    {getActiveFiltersCount() > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {getActiveFiltersCount()}
-                      </Badge>
-                    )}
-                  </Button>
-                )}
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-anthracite font-heading truncate">
-                  CVthèque
-                </h1>
+        {/* Header compact */}
+        <div className="bg-white border-b border-[#e5e7eb] shrink-0">
+          <div className="px-4 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSidebarOpen(true)}
+                  className={`h-8 text-xs flex items-center gap-1.5 shrink-0 ${
+                    sidebarOpen
+                      ? 'bg-[#E8F4F3] text-[#226D68] border-[#226D68]/30 hover:bg-[#E8F4F3]'
+                      : 'border-[#e5e7eb] text-[#2C2C2C] hover:bg-[#F4F6F8]'
+                  }`}
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  Filtres
+                  {getActiveFiltersCount() > 0 && (
+                    <Badge className="h-5 px-1.5 text-[10px] bg-[#226D68] text-white ml-0.5">
+                      {getActiveFiltersCount()}
+                    </Badge>
+                  )}
+                </Button>
+                <div className="flex-1 min-w-0 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9ca3af]" />
+                  <Input
+                    type="text"
+                    placeholder="Rechercher par nom, poste, compétences..."
+                    value={query}
+                    onChange={(e) => handleQueryChange(e.target.value)}
+                    className="h-8 pl-9 text-sm border-[#e5e7eb] bg-[#F4F6F8]/50 focus:bg-white"
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => performSearch()}
                   disabled={loading}
-                  className="flex items-center gap-2"
+                  className="h-8 text-xs text-[#2C2C2C] hover:bg-[#F4F6F8]"
                 >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">Actualiser</span>
+                  <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+                  Actualiser
                 </Button>
-                <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
-                  {total > 0 && (
-                    <span className="hidden sm:inline">
-                      {total} candidat{total > 1 ? 's' : ''} trouvé{total > 1 ? 's' : ''}
-                    </span>
-                  )}
-                  <span className="sm:hidden">{total}</span>
-                </div>
+                <span className="text-xs text-[#9ca3af] whitespace-nowrap">
+                  {total} résultat{total !== 1 ? 's' : ''}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Zone de résultats */}
-        <div className="flex-1 overflow-y-auto bg-gray-light">
-          <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 py-4">
             {loading ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {[...Array(5)].map((_, index) => (
                   <CandidateSkeleton key={index} />
                 ))}
               </div>
-          ) : results.length === 0 ? (
-            <Card className="p-8 sm:p-12 text-center">
-              <p className="text-sm sm:text-base text-gray-600">Aucun candidat trouvé</p>
-            </Card>
-          ) : (
-            <>
-              <div className="space-y-4 mb-6">
+            ) : results.length === 0 ? (
+              <Card className="border-[#e5e7eb] shadow-none p-10 text-center">
+                <p className="text-sm text-[#2C2C2C] font-medium">Aucun candidat trouvé</p>
+                <p className="text-xs text-[#9ca3af] mt-1">Modifiez vos critères ou réinitialisez les filtres</p>
+              </Card>
+            ) : (
+              <>
+                <div className="space-y-3">
                 {results.map((candidate) => (
                   <CandidateCard
                     key={candidate.candidate_id}
@@ -426,29 +428,26 @@ export function SearchTab() {
                 ))}
               </div>
 
-              {/* Pagination - Responsive */}
               {total > size && (
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-6 sm:mt-8">
+                <div className="flex items-center justify-center gap-3 mt-4 pt-4 border-t border-[#e5e7eb]">
                   <Button
                     variant="outline"
+                    size="sm"
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
-                    className="border-blue-deep text-blue-deep hover:bg-blue-deep/10 w-full sm:w-auto"
+                    className="h-8 text-xs border-[#d1d5db] text-[#2C2C2C] hover:bg-[#F4F6F8]"
                   >
                     Précédent
                   </Button>
-                  
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm text-gray-700">
-                      Page {page} de {Math.ceil(total / size)}
-                    </span>
-                  </div>
-                  
+                  <span className="text-xs text-[#9ca3af]">
+                    Page {page} / {Math.ceil(total / size)}
+                  </span>
                   <Button
                     variant="outline"
+                    size="sm"
                     disabled={page >= Math.ceil(total / size)}
                     onClick={() => setPage(page + 1)}
-                    className="border-blue-deep text-blue-deep hover:bg-blue-deep/10 w-full sm:w-auto"
+                    className="h-8 text-xs border-[#d1d5db] text-[#2C2C2C] hover:bg-[#F4F6F8]"
                   >
                     Suivant
                   </Button>
@@ -564,132 +563,99 @@ function CandidateCard({ candidate, onCandidateClick, profilePhotos = {} }) {
   
   return (
     <>
-      <Card className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-        <div className="p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+      <Card className="bg-white border border-[#e5e7eb] rounded-lg shadow-none hover:border-[#226D68]/30 transition-colors">
+        <div className="p-3">
+          <div className="flex items-center gap-3">
             {/* Photo et badge */}
-            <div className="relative flex-shrink-0 flex items-center gap-3 sm:block">
+            <div className="relative flex-shrink-0">
               <img
                 src={displayPhoto}
                 alt={fullName}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-gray-200"
+                className="w-12 h-12 rounded-lg object-cover border border-[#e5e7eb]"
                 key={`${candidate.candidate_id}-${photoUrl || 'default'}`}
                 onError={(e) => {
-                  // Si l'image échoue, utiliser l'avatar par défaut
                   if (e.target.src !== defaultAvatar) {
-                    console.warn('SearchTab: Photo failed to load for candidate', candidate.candidate_id, 'URL was:', e.target.src)
                     setPhotoError(true)
                     e.target.src = defaultAvatar
                   }
                 }}
-                onLoad={() => {
-                  // Si l'image se charge avec succès, réinitialiser l'erreur
-                  if (photoError) {
-                    setPhotoError(false)
-                  }
-                }}
+                onLoad={() => setPhotoError(false)}
               />
-              <div className={`absolute -top-1 -right-1 sm:-top-1 sm:-right-1 ${status.color} text-white text-xs font-semibold px-1.5 py-0.5 rounded-full shadow-md`}>
+              <div 
+                className={`absolute -top-0.5 -right-0.5 ${status.color} text-white text-[10px] font-semibold px-1.5 py-0.5 rounded cursor-help`}
+                title="Score d'évaluation expert (0–5)"
+              >
                 {status.label}
               </div>
             </div>
-            
-            {/* Informations principales */}
+
+            {/* Infos */}
             <div className="flex-1 min-w-0">
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 lg:gap-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-sm sm:text-base text-gray-900 mb-1 truncate">{fullName}</h3>
-                  <p className="text-xs sm:text-sm text-gray-600 font-medium mb-2 line-clamp-2">
-                    {candidate.profile_title || candidate.title || candidate.main_job || 'Non spécifié'}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-600 mb-2">
-                    {experience > 0 && (
-                      <div className="flex items-center gap-1">
-                        <Briefcase className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-                        <span className="whitespace-nowrap">{experience} an{experience > 1 ? 's' : ''}</span>
-                      </div>
-                    )}
-                    {candidate.location && (
-                      <div className="flex items-center gap-1 min-w-0">
-                        <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-                        <span className="truncate">{candidate.location}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-                      <span className="whitespace-nowrap">{getAvailabilityText()}</span>
-                    </div>
-                  </div>
-                  {topSkills.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2">
-                      {topSkills.map((skill, index) => (
-                        <Badge
-                          key={index}
-                          className="bg-blue-50 text-blue-700 border-blue-200 text-xs px-1.5 sm:px-2 py-0.5"
-                        >
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                {/* Actions - Responsive */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-shrink-0 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onCandidateClick(candidate.candidate_id)}
-                      className="flex-1 sm:flex-none text-xs sm:text-sm font-medium transition-colors px-3 py-2 sm:py-1.5 border rounded whitespace-nowrap"
-                      style={{ color: '#226D68', borderColor: '#226D68' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = '#1a5a55' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = '#226D68' }}
-                    >
-                      Voir Profil
-                    </button>
-                    {((candidate.admin_report && Object.keys(candidate.admin_report).length > 0) || 
-                      (candidate.admin_score !== null && candidate.admin_score !== undefined)) && (
-                      <button
-                        onClick={() => setShowExpertReview(true)}
-                        className="hidden md:flex text-xs sm:text-sm font-medium text-blue-deep hover:text-blue-deep/80 transition-colors border border-blue-deep rounded px-3 py-2 sm:py-1.5 whitespace-nowrap"
-                      >
-                        Avis expert
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 sm:gap-2 justify-between sm:justify-start">
-                    {((candidate.admin_report && Object.keys(candidate.admin_report).length > 0) || 
-                      (candidate.admin_score !== null && candidate.admin_score !== undefined)) && (
-                      <button
-                        onClick={() => setShowExpertReview(true)}
-                        className="md:hidden flex-1 text-xs font-medium text-blue-deep hover:text-blue-deep/80 transition-colors border border-blue-deep rounded px-2 py-1.5 whitespace-nowrap"
-                      >
-                        Avis expert
-                      </button>
-                    )}
-                    <button
-                      className="p-2 text-gray-600 hover:text-blue-deep hover:bg-gray-50 rounded transition-colors"
-                      title="Télécharger CV"
-                      aria-label="Télécharger CV"
-                    >
-                      <Download className="h-4 w-4" />
-                    </button>
-                    <button
-                      className="p-2 text-gray-600 hover:text-blue-deep hover:bg-gray-50 rounded transition-colors"
-                      title="Envoyer un email"
-                      aria-label="Envoyer un email"
-                    >
-                      <Mail className="h-4 w-4" />
-                    </button>
-                    <button
-                      className="p-2 text-gray-600 hover:text-yellow-500 hover:bg-gray-50 rounded transition-colors"
-                      title="Ajouter aux favoris"
-                      aria-label="Ajouter aux favoris"
-                    >
-                      <Star className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
+              <h3 className="font-semibold text-sm text-[#2C2C2C] truncate">{fullName}</h3>
+              <p className="text-xs text-[#9ca3af] truncate mt-0.5">
+                {candidate.profile_title || candidate.title || candidate.main_job || 'Non spécifié'}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5 text-[10px] text-[#9ca3af]">
+                {experience > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="h-3 w-3" />
+                    {experience} an{experience > 1 ? 's' : ''}
+                  </span>
+                )}
+                {candidate.location && (
+                  <span className="flex items-center gap-1 truncate max-w-[120px]">
+                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                    {candidate.location}
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {getAvailabilityText()}
+                </span>
               </div>
+              {topSkills.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {topSkills.map((skill, index) => (
+                    <span
+                      key={index}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-[#E8F4F3] text-[#226D68]"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={() => onCandidateClick(candidate.candidate_id)}
+                className="h-8 px-3 text-xs font-medium bg-[#226D68] text-white rounded-md hover:bg-[#1a5a55] transition-colors"
+              >
+                Voir
+              </button>
+              {((candidate.admin_report && Object.keys(candidate.admin_report).length > 0) ||
+                (candidate.admin_score != null)) && (
+                <button
+                  onClick={() => setShowExpertReview(true)}
+                  className="h-8 px-2 text-xs font-medium text-[#2C2C2C] border border-[#e5e7eb] rounded-md hover:bg-[#F4F6F8]"
+                >
+                  Avis
+                </button>
+              )}
+              <button
+                className="h-8 w-8 flex items-center justify-center text-[#9ca3af] hover:text-[#226D68] hover:bg-[#E8F4F3] rounded-md transition-colors"
+                title="Télécharger CV"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+              <button
+                className="h-8 w-8 flex items-center justify-center text-[#9ca3af] hover:text-[#226D68] hover:bg-[#E8F4F3] rounded-md transition-colors"
+                title="Contact"
+              >
+                <Mail className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         </div>

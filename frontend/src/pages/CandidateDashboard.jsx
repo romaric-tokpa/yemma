@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { 
   User, Edit, FileText, CheckCircle2, Clock, XCircle, 
@@ -97,6 +97,15 @@ export default function CandidateDashboard() {
   const [skillSearchQuery, setSkillSearchQuery] = useState('')
   const [skillFilterType, setSkillFilterType] = useState('ALL')
   const [skillFilterLevel, setSkillFilterLevel] = useState('ALL')
+  // Guide de complétion du profil (visible quand < 100%)
+  const [showCompletionGuide, setShowCompletionGuide] = useState(false)
+  const completionGuideRef = useRef(null)
+
+  useEffect(() => {
+    if (showCompletionGuide && completionGuideRef.current) {
+      completionGuideRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [showCompletionGuide])
 
   useEffect(() => {
     if (!toast) return
@@ -413,7 +422,8 @@ export default function CandidateDashboard() {
   }
 
   const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Candidat'
-  const completionPercentage = profile.completion_percentage || 0
+  const completionPercentage = Number(profile.completion_percentage) || 0
+  const canSubmit = Math.round(completionPercentage) >= 80
   const defaultAvatar = generateAvatarUrl(profile.first_name, profile.last_name)
   
   // Déterminer quelle photo afficher - utiliser currentPhotoUrl seulement si elle existe et n'est pas l'avatar
@@ -423,12 +433,12 @@ export default function CandidateDashboard() {
 
   // Navigation principale : 7 sections (sidebar = menu compte)
   const navItems = [
-    { id: 'profile', label: 'Profil', icon: User },
+    { id: 'profile', label: 'Identité', icon: User },
     { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
     { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
     { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
     { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
-    { id: 'preferences', label: 'Préférences', icon: MapPin },
+    { id: 'preferences', label: 'Recherche', icon: MapPin },
     { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
   ]
 
@@ -630,7 +640,7 @@ export default function CandidateDashboard() {
                         size="sm"
                         className="text-white h-8 px-3 text-xs flex items-center gap-1.5 bg-[#226D68] hover:bg-[#1a5a55] shadow-sm"
                         onClick={() => setShowSubmitConsentModal(true)}
-                        disabled={completionPercentage < 80}
+                        disabled={!canSubmit}
                       >
                         <FileCheck className="w-3.5 h-3.5" />
                         <span>Soumettre</span>
@@ -639,7 +649,13 @@ export default function CandidateDashboard() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => navigate('/profile/edit')}
+                      onClick={() => {
+                        if (completionPercentage < 100 && profile.status === 'DRAFT') {
+                          setShowCompletionGuide(true)
+                        } else {
+                          navigate('/profile/edit')
+                        }
+                      }}
                       className="h-8 px-3 text-xs border hover:bg-muted"
                     >
                       <Edit className="w-3.5 h-3.5 mr-1" />
@@ -657,7 +673,7 @@ export default function CandidateDashboard() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
-                      {completionPercentage >= 80 && (
+                      {canSubmit && (
                         <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                       )}
                     </div>
@@ -666,11 +682,58 @@ export default function CandidateDashboard() {
                     value={completionPercentage} 
                     className="h-2 rounded-full bg-muted"
                   />
-                  {completionPercentage < 80 && profile.status === 'DRAFT' && (
+                  {!canSubmit && profile.status === 'DRAFT' && (
                     <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
                       <Clock className="h-2.5 w-2.5" />
                       <span>Complétez à 80% minimum pour soumettre</span>
                     </p>
+                  )}
+                  {/* Guide de complétion (affiché quand < 100%, au clic sur Modifier) */}
+                  {completionPercentage < 100 && profile.status === 'DRAFT' && (
+                    <div ref={completionGuideRef} className="mt-2.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-between h-7 text-[10px] text-muted-foreground hover:text-[#226D68] hover:bg-[#E8F4F3]/50"
+                        onClick={() => setShowCompletionGuide(!showCompletionGuide)}
+                      >
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          Comment compléter mon profil à 100 % ?
+                        </span>
+                        <span className="text-muted-foreground">{showCompletionGuide ? '−' : '+'}</span>
+                      </Button>
+                      {showCompletionGuide && (
+                        <div className="mt-1.5 p-2.5 rounded-lg bg-[#E8F4F3]/40 border border-[#226D68]/20 text-[11px] space-y-2">
+                          <p className="font-semibold text-[#226D68]">Pour soumettre :</p>
+                          <ul className="list-disc list-inside space-y-0.5 text-gray-700">
+                            <li>Profil ≥ 80 %, CV uploadé, cases CGU/RGPD cochées</li>
+                            <li>Au moins 1 expérience, 1 formation, 1 compétence technique</li>
+                          </ul>
+                          <p className="font-semibold text-[#226D68] pt-1">Où remplir :</p>
+                          <ul className="list-disc list-inside space-y-0.5 text-gray-700">
+                            <li>Identité : nom, email, téléphone, adresse</li>
+                            <li>Profil pro : titre, résumé (≥ 300 caractères), secteur, métier</li>
+                            <li>Expériences, Formations, Compétences</li>
+                            <li>Documents : CV · Recherche : type de contrat, disponibilité</li>
+                          </ul>
+                          <p className="text-[10px] text-muted-foreground pt-1">
+                            Soumis → un admin Yemma vous contactera pour un entretien.
+                          </p>
+                          <Button
+                            size="sm"
+                            className="mt-1.5 h-7 text-xs bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                            onClick={() => {
+                              setShowCompletionGuide(false)
+                              navigate('/profile/edit')
+                            }}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Modifier mon profil
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -712,12 +775,18 @@ export default function CandidateDashboard() {
                         <div className="p-1 bg-[#226D68] rounded">
                           <User className="h-3.5 w-3.5 text-white" />
                         </div>
-                        <span>Informations Générales</span>
+                        <span>Identité</span>
                       </CardTitle>
                       <Button 
                         size="sm"
                         variant="ghost"
-                        onClick={() => navigate('/profile/edit')}
+                        onClick={() => {
+                          if (completionPercentage < 100 && profile.status === 'DRAFT') {
+                            setShowCompletionGuide(true)
+                          } else {
+                            navigate('/profile/edit')
+                          }
+                        }}
                         className="h-7 px-2.5 text-xs hover:bg-[#E8F4F3] hover:text-[#226D68]"
                       >
                         <Edit className="h-3 w-3 mr-1" />
@@ -941,7 +1010,7 @@ export default function CandidateDashboard() {
                         <div className="p-1 bg-[#226D68] rounded">
                           <Briefcase className="h-3.5 w-3.5 text-white" />
                         </div>
-                        <span>Expériences professionnelles</span>
+                        <span>Expériences</span>
                         {experiences.length > 0 && (
                           <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium bg-[#E8F4F3] text-[#226D68]">
                             {experiences.length}
@@ -1101,8 +1170,8 @@ export default function CandidateDashboard() {
                           <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
                             <Briefcase className="h-5 w-5 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune expérience enregistrée</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Ajoutez vos expériences professionnelles pour enrichir votre profil</p>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune expérience</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Au moins une expérience requise pour soumettre</p>
                           <Button 
                             size="sm"
                             className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
@@ -1238,9 +1307,9 @@ export default function CandidateDashboard() {
                         <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
                           <GraduationCap className="h-5 w-5 text-[#226D68]" />
                         </div>
-                        <h3 className="text-xs font-semibold text-gray-900 mb-0.5">Aucune formation enregistrée</h3>
+                        <h3 className="text-xs font-semibold text-gray-900 mb-0.5">Aucune formation</h3>
                         <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">
-                          Ajoutez vos formations et diplômes pour enrichir votre profil.
+                          Au moins une formation requise pour soumettre
                         </p>
                         <Button 
                           size="sm"
@@ -1374,8 +1443,8 @@ export default function CandidateDashboard() {
                           <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
                             <Award className="h-5 w-5 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune certification enregistrée</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Ajoutez vos certifications pour enrichir votre profil</p>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune certification</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Optionnel</p>
                           <Button 
                             size="sm"
                             className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
@@ -1456,10 +1525,10 @@ export default function CandidateDashboard() {
                               <Code className="h-5 w-5 text-[#226D68]" />
                             </div>
                             <p className="text-xs font-semibold text-gray-900 mb-0.5">
-                              Aucune compétence enregistrée
+                              Aucune compétence
                             </p>
                             <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">
-                              Ajoutez vos compétences techniques, soft skills et outils pour enrichir votre profil
+                              Au moins une compétence technique requise pour soumettre
                             </p>
                             <Button 
                               size="sm"
@@ -1733,7 +1802,7 @@ export default function CandidateDashboard() {
                         <div className="p-1 bg-[#226D68] rounded">
                           <MapPin className="h-3.5 w-3.5 text-white" />
                         </div>
-                        <span>Préférences d'emploi</span>
+                        <span>Recherche d'emploi</span>
                       </CardTitle>
                       <Button 
                         size="sm"
@@ -1947,15 +2016,15 @@ export default function CandidateDashboard() {
                           <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
                             <MapPin className="h-5 w-5 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune préférence enregistrée</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Définissez vos préférences d'emploi pour améliorer vos chances de correspondance</p>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Recherche non renseignée</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Poste souhaité, type de contrat, disponibilité</p>
                           <Button 
                             size="sm"
                             className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
                             onClick={() => setShowPreferencesDialog(true)}
                           >
                             <MapPin className="h-3.5 w-3.5 mr-1" />
-                            Définir mes préférences
+                            Remplir la recherche
                           </Button>
                         </div>
                       )}
@@ -1972,7 +2041,7 @@ export default function CandidateDashboard() {
                         <div className="p-1 bg-[#226D68] rounded">
                           <FileText className="h-3.5 w-3.5 text-white" />
                         </div>
-                        <span>Documents justificatifs</span>
+                        <span>Documents</span>
                         {documents.length > 0 && (
                           <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium">
                             {documents.length}
@@ -2151,8 +2220,8 @@ export default function CandidateDashboard() {
                           <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
                             <FileText className="h-5 w-5 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucun document enregistré</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Ajoutez vos documents justificatifs (CV, diplômes, attestations...)</p>
+                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucun document</p>
+                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">CV obligatoire pour soumettre · PDF ou DOCX</p>
                           <Button 
                             size="sm"
                             className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
@@ -2238,7 +2307,7 @@ export default function CandidateDashboard() {
               <p className="font-medium text-gray-anthracite mb-2">Récapitulatif de votre profil</p>
               <ul className="space-y-1 text-muted-foreground">
                 <li className="flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: profile?.completion_percentage >= 80 ? '#22c55e' : '#eab308' }} aria-hidden />
+                  <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: canSubmit ? '#22c55e' : '#eab308' }} aria-hidden />
                   Profil complété à {Math.round(profile?.completion_percentage || 0)} %
                 </li>
                 <li className="flex items-center gap-2">
@@ -2259,7 +2328,7 @@ export default function CandidateDashboard() {
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: jobPreferences?.contract_type && jobPreferences?.desired_location ? '#22c55e' : '#eab308' }} aria-hidden />
-                  Préférences : {jobPreferences?.contract_type && jobPreferences?.desired_location ? 'Renseignées' : 'À compléter'}
+                  Recherche : {jobPreferences?.contract_type && jobPreferences?.desired_location ? 'Renseignées' : 'À compléter'}
                 </li>
               </ul>
             </div>

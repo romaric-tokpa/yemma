@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { FileText, Download } from 'lucide-react'
-import { Card } from '../ui/card'
+import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { paymentApi } from '../../services/api'
@@ -10,9 +10,7 @@ export function HistoryTab({ companyId }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (companyId) {
-      loadInvoices()
-    }
+    if (companyId) loadInvoices()
   }, [companyId])
 
   const loadInvoices = async () => {
@@ -30,103 +28,98 @@ export function HistoryTab({ companyId }) {
     if (invoice.pdf_url) {
       window.open(invoice.pdf_url, '_blank')
     } else {
-      alert('Le PDF de la facture n\'est pas encore disponible')
+      alert('Le PDF n\'est pas encore disponible')
     }
   }
 
   if (loading) {
-    return <div className="text-center py-8 text-gray-500">Chargement...</div>
+    return (
+      <div className="text-center py-8">
+        <span className="text-xs text-[#9ca3af]">Chargement...</span>
+      </div>
+    )
+  }
+
+  if (invoices.length === 0) {
+    return (
+      <Card className="border-[#e5e7eb] border-dashed shadow-none">
+        <CardContent className="p-8 text-center">
+          <div className="w-12 h-12 rounded-lg bg-[#F4F6F8] flex items-center justify-center mx-auto mb-3">
+            <FileText className="w-6 h-6 text-[#9ca3af]" />
+          </div>
+          <p className="text-sm font-medium text-[#2C2C2C]">Aucune facture</p>
+          <p className="text-xs text-[#9ca3af] mt-1">Vos factures apparaîtront ici</p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold">Historique des factures</h2>
-        <p className="text-gray-600 mt-1">
-          Consultez et téléchargez vos factures
-        </p>
+    <Card className="border-[#e5e7eb] shadow-none overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-[#e5e7eb] bg-[#F4F6F8]/50">
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-[#9ca3af] uppercase tracking-wider">
+                N° Facture
+              </th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-[#9ca3af] uppercase tracking-wider">
+                Date
+              </th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-[#9ca3af] uppercase tracking-wider">
+                Montant
+              </th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-[#9ca3af] uppercase tracking-wider">
+                Statut
+              </th>
+              <th className="px-4 py-2.5 text-right text-[10px] font-semibold text-[#9ca3af] uppercase tracking-wider">
+                Action
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((invoice) => (
+              <tr key={invoice.id} className="border-b border-[#e5e7eb] last:border-0 hover:bg-[#F4F6F8]/30 transition-colors">
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-[#9ca3af] flex-shrink-0" />
+                    <span className="text-xs font-medium text-[#2C2C2C]">{invoice.invoice_number}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-2.5 text-xs text-[#9ca3af]">
+                  {new Date(invoice.invoice_date).toLocaleDateString('fr-FR', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </td>
+                <td className="px-4 py-2.5">
+                  <span className="text-xs font-semibold text-[#2C2C2C]">{invoice.total_amount.toFixed(2)}€</span>
+                  {invoice.tax_amount > 0 && (
+                    <span className="text-[10px] text-[#9ca3af] ml-1">dont TVA {invoice.tax_amount.toFixed(2)}€</span>
+                  )}
+                </td>
+                <td className="px-4 py-2.5">
+                  <Badge className="h-5 text-[10px] px-1.5 bg-[#E8F4F3] text-[#226D68] border-0">
+                    Payée
+                  </Badge>
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownloadInvoice(invoice)}
+                    className="h-7 text-xs text-[#226D68] hover:bg-[#E8F4F3]"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1" />
+                    PDF
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {invoices.length === 0 ? (
-        <Card className="p-8 text-center">
-          <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600">Aucune facture disponible</p>
-        </Card>
-      ) : (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Numéro
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Montant
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Statut
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <FileText className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm font-medium text-gray-900">
-                          {invoice.invoice_number}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {new Date(invoice.invoice_date).toLocaleDateString('fr-FR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {invoice.total_amount.toFixed(2)}€
-                      </div>
-                      {invoice.tax_amount > 0 && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          dont TVA: {invoice.tax_amount.toFixed(2)}€
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant="default" className="bg-[#D1E9E7] text-[#1a5a55] border-[#B8DDD9]">
-                        Payée
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadInvoice(invoice)}
-                        className="hover:bg-gray-100"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Télécharger
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
-    </div>
+    </Card>
   )
 }
-

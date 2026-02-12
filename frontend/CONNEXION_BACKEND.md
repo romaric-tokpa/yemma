@@ -353,6 +353,28 @@ npm run dev
 
 Le frontend sera accessible sur `http://localhost:3000`.
 
+### Page Reset Password (mot de passe oublié)
+
+Pour que la page `/reset-password` fonctionne :
+
+**Option A – Stack complète (nginx + auth + postgres + notification)** :
+```bash
+docker-compose -f docker-compose.dev.yml up nginx auth postgres notification
+```
+Le frontend (port 3000) proxy vers nginx (8080). `.env` à la racine du projet, sans `VITE_AUTH_API_URL`.
+
+**Option B – Auth seul (sans nginx)** :
+```bash
+docker-compose -f docker-compose.dev.yml up auth postgres notification
+```
+Dans `.env` à la racine :
+```env
+VITE_PROXY_TARGET=http://localhost:8001
+# ou
+VITE_AUTH_API_URL=http://localhost:8001
+```
+En mode dev, le lien de réinitialisation s’affiche directement sur la page (sans email).
+
 ### Hot Reload
 
 Vite supporte le hot reload automatique. Les modifications dans le code sont reflétées immédiatement dans le navigateur.

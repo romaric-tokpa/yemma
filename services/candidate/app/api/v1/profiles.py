@@ -316,6 +316,36 @@ async def get_my_profile(
         )
 
 
+@router.post("/me/notify-profile-created", status_code=http_status.HTTP_202_ACCEPTED)
+async def notify_profile_created(
+    session: AsyncSession = Depends(get_session),
+    current_user: Optional[TokenData] = Depends(get_current_user)
+):
+    """
+    Déclenche l'envoi de l'email de confirmation de création de profil.
+    Appelé par le frontend après complétion de l'onboarding (parsing CV).
+    """
+    current_user = require_current_user(current_user)
+    profile = await ProfileRepository.get_by_user_id_with_relations(session, current_user.user_id)
+    if not profile:
+        raise ProfileNotFoundError(str(current_user.user_id))
+    try:
+        from app.infrastructure.notification_client import send_candidate_profile_created_notification
+        from app.core.config import settings
+        candidate_name = f"{profile.first_name or ''} {profile.last_name or ''}".strip()
+        if not candidate_name:
+            candidate_name = (profile.email or current_user.email or "").split("@")[0] or "Candidat"
+        await send_candidate_profile_created_notification(
+            candidate_email=profile.email or current_user.email,
+            candidate_name=candidate_name,
+            dashboard_url=f"{settings.FRONTEND_URL}/candidate/dashboard"
+        )
+        return {"message": "Profil créé – notification envoyée"}
+    except Exception as e:
+        logger.warning(f"Failed to send profile created email: {str(e)}")
+        return {"message": "Profil créé – notification en attente"}
+
+
 @router.get("", response_model=PaginatedProfilesResponse)
 async def list_profiles(
     status: Optional[str] = None,
@@ -328,14 +358,20 @@ async def list_profiles(
     Liste les profils (réservé aux administrateurs).
     Retourne une réponse paginée (items + total) pour afficher la pagination côté admin.
     """
-    # Vérifier que l'utilisateur est admin
-    if not current_user or not current_user.roles:
+    # 401 si pas de token ou token invalide
+    if not current_user:
         raise HTTPException(
-            status_code=http_status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
             detail="Authentification requise"
         )
     
-    if "ROLE_ADMIN" not in current_user.roles and "ROLE_SUPER_ADMIN" not in current_user.roles:
+    # Rôles : accepter list ou str (cas où le payload est mal formé)
+    roles = current_user.roles if isinstance(current_user.roles, list) else []
+    if not roles and isinstance(current_user.roles, str):
+        roles = [current_user.roles]
+    
+    # 403 si l'utilisateur n'a pas le rôle admin
+    if "ROLE_ADMIN" not in roles and "ROLE_SUPER_ADMIN" not in roles:
         raise HTTPException(
             status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Réservé aux administrateurs"

@@ -4,6 +4,8 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  // Charger .env depuis la racine du projet (pour VITE_* depuis env.example)
+  envDir: path.resolve(__dirname, '..'),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -27,9 +29,61 @@ export default defineConfig({
       protocol: 'ws',
       overlay: true, // Afficher l'overlay pour les erreurs réelles, mais ignorer les warnings HMR
     },
-    // Proxy /api vers la gateway (nginx) en dev pour éviter 404 sur login/auth
-    // Démarrer avec : docker-compose -f docker-compose.dev.yml up nginx auth candidate ...
+    // Proxy /api vers les services ou nginx en dev
+    // Routes directes pour éviter 502/404 via nginx
     proxy: {
+      '/api/v1/auth': {
+        target: process.env.VITE_AUTH_PROXY_TARGET || 'http://localhost:8001',
+        changeOrigin: true,
+      },
+      '/api/v1/users': {
+        target: process.env.VITE_AUTH_PROXY_TARGET || 'http://localhost:8001',
+        changeOrigin: true,
+      },
+      '/api/v1/profiles': {
+        target: process.env.VITE_CANDIDATE_PROXY_TARGET || 'http://localhost:8002',
+        changeOrigin: true,
+      },
+      '/api/v1/parse': {
+        target: process.env.VITE_PARSING_PROXY_TARGET || 'http://localhost:8010',
+        changeOrigin: true,
+      },
+      '/api/v1/documents': {
+        target: process.env.VITE_DOCUMENT_PROXY_TARGET || 'http://localhost:8003',
+        changeOrigin: true,
+      },
+      '/api/v1/admin': {
+        target: process.env.VITE_ADMIN_PROXY_TARGET || 'http://localhost:8009',
+        changeOrigin: true,
+      },
+      '/api/v1/search': {
+        target: process.env.VITE_SEARCH_PROXY_TARGET || 'http://localhost:8004',
+        changeOrigin: true,
+      },
+      '/api/v1/candidates': {
+        target: process.env.VITE_SEARCH_PROXY_TARGET || 'http://localhost:8004',
+        changeOrigin: true,
+      },
+      '/api/v1/plans': {
+        target: process.env.VITE_PAYMENT_PROXY_TARGET || 'http://localhost:8006',
+        changeOrigin: true,
+      },
+      '/api/v1/subscriptions': {
+        target: process.env.VITE_PAYMENT_PROXY_TARGET || 'http://localhost:8006',
+        changeOrigin: true,
+      },
+      '/api/v1/payments': {
+        target: process.env.VITE_PAYMENT_PROXY_TARGET || 'http://localhost:8006',
+        changeOrigin: true,
+      },
+      '/api/v1/invoices': {
+        target: process.env.VITE_PAYMENT_PROXY_TARGET || 'http://localhost:8006',
+        changeOrigin: true,
+      },
+      '/api/v1/quotas': {
+        target: process.env.VITE_PAYMENT_PROXY_TARGET || 'http://localhost:8006',
+        changeOrigin: true,
+      },
       '/api': {
         target: process.env.VITE_PROXY_TARGET || 'http://localhost:8080',
         changeOrigin: true,

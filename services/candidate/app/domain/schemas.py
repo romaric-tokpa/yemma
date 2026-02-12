@@ -16,6 +16,15 @@ class ProfileBase(BaseModel):
     last_name: Optional[str] = None
     profile_title: Optional[str] = None
     professional_summary: Optional[str] = None
+    sector: Optional[str] = None
+    main_job: Optional[str] = None
+    total_experience: Optional[int] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    date_of_birth: Optional[datetime] = None
+    nationality: Optional[str] = None
 
 
 class ProfileCreate(ProfileBase):
@@ -24,6 +33,8 @@ class ProfileCreate(ProfileBase):
     email: EmailStr
     # user_id est optionnel car il est rempli automatiquement
     user_id: Optional[int] = None
+    # Clé HrFlow pour Profile Asking (CvGPT) - fournie par le parsing service
+    hrflow_profile_key: Optional[str] = None
 
 
 class ProfileUpdate(BaseModel):
@@ -50,6 +61,7 @@ class ProfileUpdate(BaseModel):
     admin_score: Optional[float] = None
     admin_report: Optional[dict] = None
     rejection_reason: Optional[str] = None
+    hrflow_profile_key: Optional[str] = None
 
 
 class ProfileResponse(ProfileBase):

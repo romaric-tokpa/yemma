@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { adminApi, candidateApi } from '@/services/api'
-import { useState, useEffect } from 'react'
-import { Loader2, CheckCircle2, XCircle, History, MessageSquare, FileText, Scale, Sparkles, Copy, Bot } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Loader2, CheckCircle2, XCircle, History, MessageSquare, FileText, Scale, Sparkles, Copy, Bot, Upload } from 'lucide-react'
 import { formatDateTime } from '@/utils/dateUtils'
+import { getApiErrorDetail } from '@/utils/apiError'
 import { z } from 'zod'
 
 const evaluationSchema = z.object({
@@ -41,6 +42,11 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
   const [aiAnswer, setAiAnswer] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState(null)
+  // Indexer un CV pour profils sans hrflow_profile_key
+  const [indexCvLoading, setIndexCvLoading] = useState(false)
+  const [indexCvError, setIndexCvError] = useState(null)
+  const [indexCvSuccess, setIndexCvSuccess] = useState(false)
+  const indexCvInputRef = useRef(null)
 
   const hasAiProfile = Boolean(candidateData?.hrflow_profile_key)
 
@@ -73,7 +79,7 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
       const data = await adminApi.askProfileQuestion(candidateId, q)
       setAiAnswer(data?.answer ?? '')
     } catch (err) {
-      setAiError(err?.response?.data?.detail || err?.message || 'Erreur lors de l\'analyse IA.')
+      setAiError(getApiErrorDetail(err, "Erreur lors de l'analyse IA."))
       setAiAnswer('')
     } finally {
       setAiLoading(false)
@@ -338,9 +344,48 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
                 <span>Analyse par IA (CvGPT)</span>
               </div>
               {!hasAiProfile ? (
-                <p className="text-xs text-muted-foreground">
-                  L&apos;analyse IA n&apos;est pas disponible pour ce profil (créé sans CV ou sans indexation HrFlow).
-                </p>
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    L&apos;analyse IA n&apos;est pas disponible pour ce profil (créé sans CV ou sans indexation HrFlow).
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={indexCvInputRef}
+                      type="file"
+                      accept=".pdf,.docx"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0]
+                        if (!f) return
+                        setIndexCvError(null)
+                        setIndexCvSuccess(false)
+                        setIndexCvLoading(true)
+                        try {
+                          await adminApi.indexCvForCandidate(candidateId, f)
+                          setIndexCvSuccess(true)
+                          onSuccess?.()
+                        } catch (err) {
+                          setIndexCvError(err?.response?.data?.detail || err?.message || 'Erreur lors de l\'indexation.')
+                        } finally {
+                          setIndexCvLoading(false)
+                          e.target.value = ''
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={indexCvLoading}
+                      onClick={() => indexCvInputRef.current?.click()}
+                    >
+                      {indexCvLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                      {indexCvLoading ? 'Indexation…' : 'Indexer un CV (PDF/DOCX)'}
+                    </Button>
+                  </div>
+                  {indexCvSuccess && <p className="text-xs text-emerald-600">CV indexé. L&apos;analyse IA est maintenant disponible.</p>}
+                  {indexCvError && <p className="text-xs text-destructive">{indexCvError}</p>}
+                </div>
               ) : (
                 <>
                   <div className="flex flex-wrap gap-1.5">

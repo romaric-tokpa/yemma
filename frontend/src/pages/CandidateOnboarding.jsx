@@ -30,9 +30,9 @@ const MAX_SIZE_MB = 10
 // Stepper compact et professionnel - Charte Yemma
 function OnboardingStepper({ currentStep }) {
   const steps = [
-    { key: 'upload', label: 'Déposez votre CV', number: 1 },
-    { key: 'review', label: 'Vérifiez', number: 2 },
-    { key: 'success', label: 'Validez', number: 3 },
+    { key: 'upload', label: 'CV', number: 1 },
+    { key: 'review', label: 'Vérifier', number: 2 },
+    { key: 'success', label: 'Terminé', number: 3 },
   ]
   const currentIndex = steps.findIndex(s => s.key === currentStep)
   return (
@@ -117,14 +117,14 @@ export default function CandidateOnboarding() {
   })
   const [newPositionInput, setNewPositionInput] = useState('') // Input pour ajouter un nouveau poste
 
-  // États pour les sections ouvertes/fermées
+  // États pour les sections ouvertes/fermées (toutes ouvertes pour faciliter le remplissage)
   const [openSections, setOpenSections] = useState({
     profile: true,
-    experiences: false,
-    educations: false,
-    skills: false,
-    certifications: false,
-    preferences: true, // Ouvrir par défaut car obligatoire
+    experiences: true,
+    educations: true,
+    skills: true,
+    certifications: true,
+    preferences: true,
   })
 
   const handleFile = useCallback((f) => {
@@ -207,7 +207,7 @@ export default function CandidateOnboarding() {
   const onSubmitProfile = async () => {
     // Validation des préférences obligatoires
     if (!isPreferencesValid()) {
-      setError('Veuillez remplir les préférences d\'emploi obligatoires (poste souhaité, type de contrat, disponibilité).')
+      setError('Remplissez : poste souhaité, type de contrat, disponibilité.')
       setOpenSections(prev => ({ ...prev, preferences: true }))
       setTimeout(() => preferencesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
       return
@@ -284,11 +284,20 @@ export default function CandidateOnboarding() {
           console.warn('Failed to save job preferences:', e)
         }
 
-        // Uploader le CV comme document
+        // Uploader le CV comme document (visible dans l'onglet Documents du dashboard)
         try {
           await documentApi.uploadDocument(file, createdProfile.id, 'CV')
         } catch (e) {
-          console.warn('Failed to upload CV:', e)
+          console.warn('Failed to upload CV to documents:', e)
+          // L'upload échoue silencieusement pour ne pas bloquer la création du profil
+          // (ex: formats DOCX exigent que le service document accepte docx)
+        }
+
+        // Envoyer l'email de confirmation de création de profil (profil créé)
+        try {
+          await candidateApi.notifyProfileCreated()
+        } catch (e) {
+          console.warn('Failed to send profile created notification:', e)
         }
       }
 
@@ -436,8 +445,8 @@ export default function CandidateOnboarding() {
           </div>
           <Card className="border border-border shadow-sm rounded-lg overflow-hidden bg-card">
             <div className="bg-gradient-to-r from-[#226D68] to-[#1a5a55] text-white px-4 py-3">
-              <h1 className="text-base font-bold">Un CV, un profil</h1>
-              <p className="text-white/90 text-[10px] mt-0.5">Analyse automatique et pré-remplissage de votre profil.</p>
+              <h1 className="text-base font-bold">1. Déposez votre CV</h1>
+              <p className="text-white/90 text-[10px] mt-0.5">On l’analyse pour remplir votre profil automatiquement.</p>
             </div>
             <CardContent className="p-3 space-y-3">
               <div
@@ -472,11 +481,11 @@ export default function CandidateOnboarding() {
                   <>
                     {dragOver ? <Cloud className="w-10 h-10 text-primary mb-2" /> : <Upload className="w-10 h-10 text-muted-foreground mb-2" />}
                     <p className="font-medium text-sm text-gray-anthracite">Glissez votre CV ici</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">ou cliquez pour parcourir</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">ou cliquez pour choisir · PDF ou DOCX</p>
                   </>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground text-center">PDF ou DOCX, max {MAX_SIZE_MB} Mo</p>
+              <p className="text-xs text-muted-foreground text-center">Max {MAX_SIZE_MB} Mo</p>
               {error && (
                 <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive" role="alert">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -510,8 +519,8 @@ export default function CandidateOnboarding() {
             <div className="w-12 h-12 rounded-full bg-[#226D68] text-white flex items-center justify-center mx-auto mb-3 shadow-md">
               <Check className="w-6 h-6" strokeWidth={2.5} />
             </div>
-            <h1 className="text-lg font-bold text-gray-900">Votre profil a été créé</h1>
-            <p className="text-xs text-muted-foreground mt-1">Complétez votre profil et postulez aux offres.</p>
+            <h1 className="text-lg font-bold text-gray-900">Profil créé</h1>
+            <p className="text-xs text-muted-foreground mt-1">Complétez les zones manquantes si besoin, puis soumettez depuis votre tableau de bord.</p>
             <Button
               onClick={() => navigate('/candidate/dashboard#profile', { replace: true })}
               className="mt-5 w-full h-9 text-xs bg-[#226D68] hover:bg-[#1a5a55] text-white rounded-lg focus-visible:ring-2 focus-visible:ring-[#226D68] focus-visible:ring-offset-2 shadow-sm"
@@ -529,16 +538,21 @@ export default function CandidateOnboarding() {
     <div className="min-h-screen min-h-[100dvh] bg-gray-light py-3 sm:py-4 px-4 sm:px-5 safe-x safe-y safe-bottom overflow-x-hidden">
       <div className="max-w-3xl mx-auto space-y-2.5 min-w-0">
         <OnboardingStepper currentStep="review" />
-        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center justify-between gap-2 mb-2">
           <Button variant="ghost" size="sm" onClick={() => setStep('upload')} className="text-muted-foreground hover:text-gray-900 shrink-0 h-7 text-[10px] px-2 focus-visible:ring-2 focus-visible:ring-[#226D68]">
             <ArrowLeft className="w-3 h-3 mr-1" />
             Retour
           </Button>
           <div className="text-center min-w-0 flex-1">
-            <h1 className="text-base sm:text-lg font-bold text-gray-900">Vérifiez et complétez vos informations</h1>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Extraites de votre CV. Corrigez si besoin et complétez les champs obligatoires.</p>
+            <h1 className="text-base sm:text-lg font-bold text-gray-900">2. Vérifiez et complétez</h1>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Données extraites de votre CV. Corrigez si besoin, puis validez.</p>
           </div>
           <div className="w-14 sm:w-16 shrink-0" />
+        </div>
+        <div className="mb-2.5 p-2.5 rounded-lg bg-[#E8F4F3]/50 border border-[#226D68]/20">
+          <p className="text-[10px] text-gray-700">
+            <strong>Conseil :</strong> Déroulez chaque bloc, vérifiez les champs pré-remplis (* obligatoires) et ajoutez ce qui manque. Vous pourrez modifier plus tard depuis votre tableau de bord.
+          </p>
         </div>
         {error && (
           <div className="flex items-start gap-1.5 p-2 rounded-lg bg-red-50 border border-red-200 text-red-600" role="alert">
@@ -555,18 +569,15 @@ export default function CandidateOnboarding() {
                 <User className="w-3.5 h-3.5 text-[#226D68]" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-semibold text-xs text-gray-900">Informations personnelles</h3>
-                  <Badge variant="secondary" className="text-[9px] font-normal px-1 py-0 h-4 bg-[#E8F4F3] text-[#226D68]">Extrait CV</Badge>
-                </div>
-                <p className="text-[10px] text-muted-foreground">{profile.first_name || profile.last_name ? `${profile.first_name} ${profile.last_name}`.trim() : 'À compléter'}</p>
+                <h3 className="font-semibold text-xs text-gray-900">Identité</h3>
+                <p className="text-[10px] text-muted-foreground">{profile.first_name || profile.last_name ? `${profile.first_name} ${profile.last_name}`.trim() : 'Nom, email, téléphone…'}</p>
               </div>
             </div>
             {openSections.profile ? <ChevronUp className="w-3.5 h-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
           </div>
             {openSections.profile && (
             <CardContent className="pt-0 pb-3 px-2.5 space-y-2.5">
-              <p className="text-[9px] text-muted-foreground mb-0.5">* Obligatoire</p>
+              <p className="text-[9px] text-muted-foreground mb-0.5">* champs obligatoires</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <Label htmlFor="first_name" className="text-[10px]">Prénom <span className="text-red-500">*</span></Label>
@@ -686,8 +697,8 @@ export default function CandidateOnboarding() {
                 <Briefcase className="w-3.5 h-3.5 text-[#226D68]" />
               </div>
               <div>
-                <h3 className="font-semibold text-xs text-gray-900">Expériences professionnelles</h3>
-                <p className="text-[10px] text-muted-foreground">{experiences.length ? `${experiences.length} expérience(s)` : 'À compléter'}</p>
+                <h3 className="font-semibold text-xs text-gray-900">Expériences</h3>
+                <p className="text-[10px] text-muted-foreground">{experiences.length ? `${experiences.length} ajoutée(s)` : 'Au moins une requise'}</p>
               </div>
               {!openSections.experiences && experiences.length > 0 && <Badge variant="secondary" className="shrink-0 text-[9px] h-4 bg-[#E8F4F3] text-[#226D68]">{experiences.length}</Badge>}
             </div>
@@ -793,7 +804,7 @@ export default function CandidateOnboarding() {
               </div>
               <div>
                 <h3 className="font-semibold text-xs text-gray-900">Formations</h3>
-                <p className="text-[10px] text-muted-foreground">{educations.length ? `${educations.length} formation(s)` : 'À compléter'}</p>
+                <p className="text-[10px] text-muted-foreground">{educations.length ? `${educations.length} ajoutée(s)` : 'Au moins une requise'}</p>
               </div>
               {!openSections.educations && educations.length > 0 && <Badge variant="secondary" className="shrink-0 text-[9px] h-4 bg-[#E8F4F3] text-[#226D68]">{educations.length}</Badge>}
             </div>
@@ -878,7 +889,7 @@ export default function CandidateOnboarding() {
               </div>
               <div>
                 <h3 className="font-semibold text-xs text-gray-900">Compétences</h3>
-                <p className="text-[10px] text-muted-foreground">{skills.length ? `${skills.length} compétence(s)` : 'À compléter'}</p>
+                <p className="text-[10px] text-muted-foreground">{skills.length ? `${skills.length} ajoutée(s)` : 'Au moins une technique requise'}</p>
               </div>
               {!openSections.skills && skills.length > 0 && <Badge variant="secondary" className="shrink-0 text-[9px] h-4 bg-[#E8F4F3] text-[#226D68]">{skills.length}</Badge>}
             </div>
@@ -933,7 +944,7 @@ export default function CandidateOnboarding() {
               </div>
               <div>
                 <h3 className="font-semibold text-xs text-gray-900">Certifications</h3>
-                <p className="text-[10px] text-muted-foreground">{certifications.length ? `${certifications.length} certification(s)` : 'À compléter'}</p>
+                <p className="text-[10px] text-muted-foreground">{certifications.length ? `${certifications.length} ajoutée(s)` : 'Optionnel'}</p>
               </div>
               {!openSections.certifications && certifications.length > 0 && <Badge variant="secondary" className="shrink-0 text-[9px] h-4 bg-[#E8F4F3] text-[#226D68]">{certifications.length}</Badge>}
             </div>
@@ -1013,11 +1024,8 @@ export default function CandidateOnboarding() {
                 <Settings className={`w-3.5 h-3.5 ${!isPreferencesValid() ? 'text-amber-600' : 'text-[#226D68]'}`} />
               </div>
               <div>
-                <h3 className="font-semibold text-xs text-gray-900 flex items-center gap-1.5 flex-wrap">
-                  Préférences d'emploi
-                  <Badge variant="destructive" className="text-[9px] font-normal px-1 py-0 h-4">Obligatoire</Badge>
-                </h3>
-                <p className="text-[10px] text-muted-foreground">{isPreferencesValid() ? 'Complétées' : 'À remplir'}</p>
+                <h3 className="font-semibold text-xs text-gray-900">Recherche d'emploi</h3>
+                <p className="text-[10px] text-muted-foreground">{isPreferencesValid() ? 'Poste, contrat, lieu…' : 'Poste souhaité, type de contrat, disponibilité'}</p>
               </div>
             </div>
             {openSections.preferences ? <ChevronUp className="w-3.5 h-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
@@ -1206,7 +1214,7 @@ export default function CandidateOnboarding() {
           {!isPreferencesValid() && (
             <p className="text-[10px] text-amber-600 flex items-center gap-1">
               <AlertCircle className="w-3 h-3" />
-              Complétez les préférences d'emploi pour continuer
+              Remplissez : poste souhaité, type de contrat, disponibilité
             </p>
           )}
           <Button
@@ -1214,7 +1222,7 @@ export default function CandidateOnboarding() {
             disabled={loading || !profile.email || !isPreferencesValid()}
             className="w-full sm:max-w-xs h-9 text-xs bg-[#226D68] hover:bg-[#1a5a55] text-white rounded-lg disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-[#226D68] focus-visible:ring-offset-2 shadow-sm"
           >
-            {loading ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Création en cours...</> : <><Save className="w-3.5 h-3.5 mr-1.5" />Valider et créer mon profil</>}
+            {loading ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Création…</> : <><Save className="w-3.5 h-3.5 mr-1.5" />Créer mon profil</>}
           </Button>
         </div>
       </div>

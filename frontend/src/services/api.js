@@ -5,8 +5,21 @@ import axios from 'axios'
 // Production : chemins relatifs '' → /api/* routé par nginx/Traefik
 // Développement local (port 3000 + localhost) : URLs directes
 const getBaseUrl = (envVar, defaultPort) => {
-  const envValue = import.meta.env[envVar]
+  let envValue = import.meta.env[envVar]
 
+  // Ne jamais utiliser une URL contenant un chemin (évite /api/v1/auth/api/v1/auth/...)
+  if (envValue && typeof envValue === 'string' && envValue.includes('/api')) {
+    envValue = ''
+  }
+  // Ignorer les URLs localhost sans port ou port 80 → utiliser chemins relatifs
+  if (envValue && typeof envValue === 'string') {
+    try {
+      const u = new URL(envValue)
+      if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+        if (!u.port || u.port === '80' || u.port === '443') envValue = ''
+      }
+    } catch { /* keep envValue */ }
+  }
   if (envValue !== undefined && envValue !== null && envValue !== '') {
     return envValue
   }
@@ -25,10 +38,11 @@ const getBaseUrl = (envVar, defaultPort) => {
       return ''
     }
 
-    // Développement local (localhost:3000 avec Vite) : utiliser chemins relatifs
-    // pour que le proxy Vite (/api → nginx:8080) soit utilisé (évite 404 sur login)
+    // Développement local : utiliser chemins relatifs pour passer par la gateway
+    // - localhost:3000 (Vite) → proxy vers nginx:8080
+    // - localhost:8080 (nginx) → requêtes /api/* sur même origine
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      if (port === '3000') {
+      if (port === '3000' || port === '8080') {
         return ''
       }
       const protocol = window.location.protocol || 'http:'
@@ -76,6 +90,7 @@ const createApiClient = (baseURL) => {
       '/api/v1/auth/login', 
       '/api/v1/auth/refresh', 
       '/api/v1/auth/password-reset',
+      '/api/v1/auth/password-reset/confirm',
       '/api/v1/admin-invitations/validate',
       '/api/v1/admin-invitations/register'
     ]
@@ -94,11 +109,13 @@ const createApiClient = (baseURL) => {
     (response) => response,
     (error) => {
       if (error.response?.status === 401) {
-        console.warn('401 Unauthorized - Token may be invalid or expired:', error.config?.url)
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('user')
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        const path = typeof window !== 'undefined' ? window.location.pathname : ''
+        const isPublicAuthPage = path.startsWith('/login') || path.startsWith('/reset-password') || path.startsWith('/register')
+        if (!isPublicAuthPage) {
+          console.warn('401 Unauthorized - Token may be invalid or expired:', error.config?.url)
+          localStorage.removeItem('auth_token')
+          localStorage.removeItem('refresh_token')
+          localStorage.removeItem('user')
           window.location.href = '/login'
         }
       }
@@ -275,6 +292,22 @@ export const authApiService = {
     return response.data
   },
 
+  /** Redirige vers OAuth Google pour inscription/connexion candidat */
+  redirectToGoogleOAuth: () => {
+    const base = AUTH_API_URL || ''
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/register/candidat/oauth-callback` : ''
+    const url = `${base}/api/v1/auth/oauth/google?role=ROLE_CANDIDAT&redirect_uri=${encodeURIComponent(redirectUri)}`
+    if (typeof window !== 'undefined') window.location.href = url
+  },
+
+  /** Redirige vers OAuth LinkedIn pour inscription/connexion candidat */
+  redirectToLinkedInOAuth: () => {
+    const base = AUTH_API_URL || ''
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/register/candidat/oauth-callback` : ''
+    const url = `${base}/api/v1/auth/oauth/linkedin?role=ROLE_CANDIDAT&redirect_uri=${encodeURIComponent(redirectUri)}`
+    if (typeof window !== 'undefined') window.location.href = url
+  },
+
   // Créer un compte admin via token d'invitation (publique)
   registerAdminViaToken: async (data) => {
     const response = await authApi.post('/api/v1/admin-invitations/register', data)
@@ -349,6 +382,10 @@ export const candidateApi = {
   // Récupérer mon profil (inclut experiences, educations, certifications, skills, job_preferences)
   getMyProfile: async () => {
     const response = await api.get('/api/v1/profiles/me')
+    return response.data
+  },
+  notifyProfileCreated: async () => {
+    const response = await api.post('/api/v1/profiles/me/notify-profile-created')
     return response.data
   },
 
@@ -666,6 +703,18 @@ export const adminApi = {
    */
   askProfileQuestion: async (candidateId, question) => {
     const response = await adminApiClient.post(`/api/v1/admin/profile-ask/${candidateId}`, { question })
+    return response.data
+  },
+
+  /**
+   * Indexe un CV pour un profil existant afin d'activer l'analyse IA (CvGPT).
+   */
+  indexCvForCandidate: async (candidateId, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await adminApiClient.post(`/api/v1/admin/index-cv/${candidateId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return response.data
   },
 }

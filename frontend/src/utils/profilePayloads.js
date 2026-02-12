@@ -42,7 +42,8 @@ export function parsedToOnboardingState(parsedData, emailOverride = '') {
     main_job: p.main_job ?? '',
     total_experience: p.total_experience ?? null,
     nationality: p.nationality ?? '',
-    date_of_birth: p.date_of_birth ? (typeof p.date_of_birth === 'string' ? p.date_of_birth.split('T')[0] : null) : null
+    date_of_birth: p.date_of_birth ? (typeof p.date_of_birth === 'string' ? p.date_of_birth.split('T')[0] : null) : null,
+    hrflow_profile_key: parsedData.hrflow_profile_key ?? null
   }
 
   const experiences = (parsedData.experiences || []).map((exp, idx) => ({

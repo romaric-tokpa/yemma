@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     HRFLOW_SOURCE_KEY: str = ""  # Source Key où les CV parsés sont indexés
     # Search Service
     SEARCH_SERVICE_URL: str = "http://localhost:8004"
-    # Notification Service
-    NOTIFICATION_SERVICE_URL: str = "http://localhost:8005"
+    # Notification Service (port 8007 en local, cf. docker-compose NOTIFICATION_PORT)
+    NOTIFICATION_SERVICE_URL: str = "http://localhost:8007"
     # Frontend URL
     FRONTEND_URL: str = "http://localhost:3000"
     INTERNAL_SERVICE_TOKEN: Optional[str] = None

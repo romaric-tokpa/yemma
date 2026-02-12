@@ -119,6 +119,15 @@ def get_email_provider():
     provider_name = settings.EMAIL_PROVIDER.lower()
     logger.info(f"Getting email provider: {provider_name} (from EMAIL_PROVIDER={settings.EMAIL_PROVIDER})")
     
+    # Si fastapi_mail mais SMTP non configuré → fallback sur mock
+    if provider_name == "fastapi_mail" and (not settings.SMTP_USER or not settings.SMTP_PASSWORD):
+        logger.warning(
+            "SMTP_USER ou SMTP_PASSWORD vide : fallback sur provider mock. "
+            "Les emails seront sauvegardés dans /tmp/yemma_emails/ (ou YEMMA_EMAILS_DIR). "
+            "Pour envoyer de vrais emails, configurez SMTP_USER et SMTP_PASSWORD dans .env"
+        )
+        provider_name = "mock"
+    
     if provider_name == "fastapi_mail":
         logger.info("Using FastAPIMailProvider")
         return FastAPIMailProvider()

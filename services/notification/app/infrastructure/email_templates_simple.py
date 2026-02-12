@@ -88,6 +88,79 @@ def get_base_template(title: str, content: str, button_text: str = None, button_
     """
 
 
+def get_password_reset_template(data: Dict[str, Any]) -> tuple[str, str, str]:
+    """
+    Email envoyé à l'utilisateur pour réinitialiser son mot de passe.
+    Contient un lien avec token valide 24h.
+    """
+    recipient_name = data.get("recipient_name", "Utilisateur")
+    reset_url = data.get("reset_url", f"{settings.FRONTEND_URL}/reset-password")
+    primary_color = "#226D68"
+
+    subject = "Réinitialisation de votre mot de passe – Yemma Solutions"
+
+    content = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    Vous avez demandé une réinitialisation de votre mot de passe. Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                Ce lien expire dans 24 heures. Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 12px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
+    """
+
+    html = get_base_template(
+        title="Réinitialisation de mot de passe",
+        content=content,
+        button_text="Réinitialiser mon mot de passe",
+        button_url=reset_url,
+        header_color=primary_color,
+    )
+
+    text = f"""
+    Bonjour {recipient_name},
+
+    Vous avez demandé une réinitialisation de votre mot de passe. Cliquez sur le lien ci-dessous pour définir un nouveau mot de passe.
+    Ce lien expire dans 24 heures.
+
+    Réinitialiser mon mot de passe : {reset_url}
+
+    Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.
+    L'équipe Yemma Solutions
+    """
+
+    return subject, html, text
+
+
 def get_profile_validated_template(data: Dict[str, Any]) -> tuple[str, str, str]:
     """
     Email envoyé au candidat quand l'administrateur a validé son profil et terminé l'évaluation.
@@ -438,8 +511,8 @@ def get_recruiter_invitation_template(data: Dict[str, Any]) -> tuple[str, str, s
 
 def get_candidate_account_created_template(data: Dict[str, Any]) -> tuple[str, str, str]:
     """
-    Email candidat après création de compte : compact, pro et responsive.
-    Charte Yemma : #226D68, #e76f51, #0B3C5D.
+    Email candidat après création de compte (inscription manuelle, Google ou LinkedIn).
+    Instructions : parsing du CV, vérification et modification des données.
     """
     recipient_name = data.get("recipient_name", "Cher candidat")
     candidate_name = data.get("candidate_name", recipient_name)
@@ -447,7 +520,6 @@ def get_candidate_account_created_template(data: Dict[str, Any]) -> tuple[str, s
 
     primary_color = "#226D68"
     secondary_color = "#e76f51"
-    blue_deep = "#0B3C5D"
 
     subject = "Votre compte candidat a été créé – Complétez votre onboarding"
 
@@ -463,7 +535,7 @@ def get_candidate_account_created_template(data: Dict[str, Any]) -> tuple[str, s
         <tr>
             <td style="padding: 0 0 16px 0;">
                 <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
-                    Votre compte sur <strong style="color: {primary_color};">Yemma Solutions</strong> est créé. Pour être visible des recruteurs, complétez votre <strong>onboarding</strong> : profil, expériences et préférences.
+                    Votre compte sur <strong style="color: {primary_color};">Yemma Solutions</strong> est créé. Pour finaliser votre inscription, vous devez <strong>compléter votre onboarding</strong> en suivant ces étapes :
                 </p>
             </td>
         </tr>
@@ -476,9 +548,12 @@ def get_candidate_account_created_template(data: Dict[str, Any]) -> tuple[str, s
                                 Prochaines étapes
                             </p>
                             <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
-                                1. Complétez votre profil &amp; photo<br>
-                                2. Ajoutez expériences et compétences<br>
-                                3. Soumettez pour validation
+                                1. <strong>Uploadez et parsez votre CV</strong> – Notre outil extraira automatiquement vos informations<br>
+                                2. <strong>Vérifiez et corrigez</strong> toutes les données pré-remplies (profil, expériences, formations, compétences)<br>
+                                3. Sauvegardez et <strong>soumettez votre profil</strong> pour validation par nos experts
+                            </p>
+                            <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                                Un administrateur Yemma rentrera en contact avec vous pour un entretien de validation après soumission.
                             </p>
                         </td>
                     </tr>
@@ -519,18 +594,17 @@ def get_candidate_account_created_template(data: Dict[str, Any]) -> tuple[str, s
 
     Votre compte candidat sur Yemma Solutions a bien été créé.
 
-    Pour finaliser votre inscription et être visible par les recruteurs, vous devez suivre le processus d'onboarding : compléter votre profil, vos expériences et vos préférences.
+    Pour finaliser votre inscription et être visible par les recruteurs, vous devez :
 
-    Prochaines étapes :
-    1. Complétez votre profil (informations personnelles, photo)
-    2. Ajoutez vos expériences et compétences
-    3. Soumettez votre profil pour validation par nos experts
+    1. UPLOADER ET PARSER VOTRE CV – Notre outil extraira automatiquement vos informations
+    2. VÉRIFIER ET CORRIGER toutes les données pré-remplies (profil, expériences, formations, compétences)
+    3. Sauvegarder et SOUMETTRE votre profil pour validation par nos experts
+
+    Un administrateur Yemma rentrera en contact avec vous pour un entretien de validation après soumission.
 
     Important : Sans complétion de l'onboarding, votre profil ne sera pas visible par les recruteurs.
 
     Commencer l'onboarding : {onboarding_url}
-
-    Nous avons hâte de vous accompagner dans votre recherche d'opportunités.
 
     L'équipe Yemma Solutions
     """
@@ -538,11 +612,9 @@ def get_candidate_account_created_template(data: Dict[str, Any]) -> tuple[str, s
     return subject, html, text
 
 
-def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]:
+def get_candidate_profile_created_template(data: Dict[str, Any]) -> tuple[str, str, str]:
     """
-    Email envoyé au candidat après complétion de l'onboarding (soumission du profil).
-    Félicitations, rappel qu'un administrateur prendra contact pour validation, lien dashboard.
-    Compact, pro et responsive. Charte Yemma : #226D68, #e76f51.
+    Email envoyé au candidat après création de son profil (onboarding complété avec parsing CV).
     """
     recipient_name = data.get("recipient_name", "Cher candidat")
     candidate_name = data.get("candidate_name", recipient_name)
@@ -550,7 +622,7 @@ def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]
     primary_color = "#226D68"
     secondary_color = "#e76f51"
 
-    subject = "Félicitations – Vous avez complété votre onboarding"
+    subject = "Votre profil a été créé – Complétez-le à 100 % avant soumission"
 
     content = f"""
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -564,7 +636,7 @@ def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]
         <tr>
             <td style="padding: 0 0 16px 0;">
                 <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
-                    <strong style="color: {primary_color};">Félicitations !</strong> Vous avez complété avec succès votre onboarding sur <strong style="color: {primary_color};">Yemma Solutions</strong>. Votre profil a bien été enregistré.
+                    <strong style="color: {primary_color};">Félicitations !</strong> Votre profil a bien été créé sur <strong style="color: {primary_color};">Yemma Solutions</strong>.
                 </p>
             </td>
         </tr>
@@ -574,10 +646,15 @@ def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]
                     <tr>
                         <td style="padding: 14px 16px;">
                             <p style="margin: 0 0 8px 0; color: {primary_color}; font-size: 13px; font-weight: 600;">
-                                Prochaine étape
+                                Prochaines étapes
                             </p>
                             <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
-                                Un administrateur Yemma rentrera en contact avec vous pour finaliser la <strong>validation de votre profil</strong>. Vous serez ensuite visible par les recruteurs et pourrez recevoir des offres adaptées.
+                                1. Vérifiez votre <strong>état d'avancement</strong> dans le tableau de bord (cliquez sur « Modifier »)<br>
+                                2. Complétez votre profil à <strong>100 %</strong> en suivant le guide affiché<br>
+                                3. <strong>Soumettez</strong> votre profil lorsque toutes les conditions sont remplies (voir règles de soumission ci-dessous)
+                            </p>
+                            <p style="margin: 8px 0 0 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                                <strong>Règles de soumission :</strong> profil complet (≥ 80%), CV uploadé, cases CGU/RGPD cochées. Une fois soumis, un administrateur Yemma rentrera en contact pour un entretien de validation.
                             </p>
                         </td>
                     </tr>
@@ -587,7 +664,7 @@ def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]
         <tr>
             <td style="padding: 8px 0 0 0;">
                 <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
-                    En attendant, vous pouvez accéder à votre tableau de bord candidat via le bouton ci-dessous.
+                    Accédez à votre tableau de bord pour voir votre progression et compléter votre profil.
                 </p>
             </td>
         </tr>
@@ -602,7 +679,7 @@ def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]
     """
 
     html = get_base_template(
-        title="Onboarding complété – Félicitations",
+        title="Profil créé – Complétez-le à 100 %",
         content=content,
         button_text="Accéder à mon tableau de bord",
         button_url=dashboard_url,
@@ -612,12 +689,101 @@ def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]
     text = f"""
     Bonjour {recipient_name},
 
-    Félicitations ! Vous avez complété avec succès votre onboarding sur Yemma Solutions. Votre profil a bien été enregistré.
+    Félicitations ! Votre profil a bien été créé sur Yemma Solutions.
 
-    Prochaine étape : Un administrateur Yemma rentrera en contact avec vous pour finaliser la validation de votre profil. Vous serez ensuite visible par les recruteurs et pourrez recevoir des offres adaptées.
+    Prochaines étapes :
+    1. Vérifiez votre état d'avancement dans le tableau de bord (cliquez sur « Modifier »)
+    2. Complétez votre profil à 100 % en suivant le guide affiché
+    3. Soumettez votre profil lorsque toutes les conditions sont remplies
 
-    En attendant, vous pouvez accéder à votre tableau de bord candidat :
-    {dashboard_url}
+    Règles de soumission : profil complet (≥ 80%), CV uploadé, cases CGU/RGPD cochées. Une fois soumis, un administrateur Yemma rentrera en contact pour un entretien de validation.
+
+    Accéder au tableau de bord : {dashboard_url}
+
+    L'équipe Yemma Solutions
+    """
+
+    return subject, html, text
+
+
+def get_candidate_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]:
+    """
+    Email envoyé au candidat après soumission de son profil pour validation.
+    Prochainement : entretien de validation avec un administrateur Yemma.
+    """
+    recipient_name = data.get("recipient_name", "Cher candidat")
+    candidate_name = data.get("candidate_name", recipient_name)
+    dashboard_url = data.get("dashboard_url", f"{settings.FRONTEND_URL}/candidate/dashboard")
+    primary_color = "#226D68"
+    secondary_color = "#e76f51"
+
+    subject = "Votre profil a été soumis – Un administrateur Yemma vous contactera"
+
+    content = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">{recipient_name}</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    Votre profil a bien été <strong>soumis</strong> sur <strong style="color: {primary_color};">Yemma Solutions</strong>.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0 0 8px 0; color: {primary_color}; font-size: 13px; font-weight: 600;">
+                                Prochaine étape
+                            </p>
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                Un administrateur <strong style="color: {primary_color};">Yemma</strong> rentrera en contact avec vous pour un <strong>entretien de validation</strong>. Vous serez ensuite visible par les recruteurs et pourrez recevoir des offres adaptées.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                En attendant, vous pouvez accéder à votre tableau de bord candidat via le bouton ci-dessous.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 12px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
+    """
+
+    html = get_base_template(
+        title="Profil soumis – En attente de validation",
+        content=content,
+        button_text="Accéder à mon tableau de bord",
+        button_url=dashboard_url,
+        header_color=primary_color,
+    )
+
+    text = f"""
+    Bonjour {recipient_name},
+
+    Votre profil a bien été soumis sur Yemma Solutions.
+
+    Un administrateur Yemma rentrera en contact avec vous pour un entretien de validation. Vous serez ensuite visible par les recruteurs et pourrez recevoir des offres adaptées.
+
+    Accéder à votre tableau de bord : {dashboard_url}
 
     L'équipe Yemma Solutions
     """
@@ -923,10 +1089,12 @@ def get_email_template_simple(notification_type: str, data: Dict[str, Any]) -> t
     Récupère le template d'email selon le type (utilise les templates simples)
     """
     templates = {
+        "password_reset": get_password_reset_template,
         "profile_validated": get_profile_validated_template,
         "profile_rejected": get_profile_rejected_template,
         "recruiter_invitation": get_recruiter_invitation_template,
         "candidate_account_created": get_candidate_account_created_template,
+        "candidate_profile_created": get_candidate_profile_created_template,
         "candidate_welcome": get_candidate_welcome_template,
         "company_account_created": get_company_account_created_template,
         "company_onboarding_completed": get_company_onboarding_completed_template,

@@ -19,6 +19,8 @@ class FileValidator:
         b'\xFF\xD8\xFF': 'image/jpeg',
         # PNG
         b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A': 'image/png',  # PNG signature
+        # DOCX (Office Open XML = ZIP)
+        b'PK\x03\x04': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     }
     
     # Extensions autorisées (utiliser la propriété pour convertir la string en liste)
@@ -114,6 +116,9 @@ class FileValidator:
             # Accepter aussi les variantes (ex: image/jpg au lieu de image/jpeg)
             if detected == 'image/jpg' and 'image/jpeg' in cls.ALLOWED_MIME_TYPES:
                 return 'image/jpeg'
+            # DOCX détecté par python-magic
+            if 'wordprocessingml' in str(detected) and 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' in cls.ALLOWED_MIME_TYPES:
+                return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         except (ImportError, Exception) as e:
             logger.warning(f"python-magic not available or error: {e}")
         
@@ -124,6 +129,8 @@ class FileValidator:
             return 'image/jpeg'
         elif content.startswith(b'\x89\x50\x4E\x47'):
             return 'image/png'
+        elif content.startswith(b'PK\x03\x04'):
+            return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         else:
             logger.error(f"Could not detect MIME type. First bytes: {content[:20]}")
             raise InvalidFileTypeError(cls.get_allowed_extensions())
@@ -136,6 +143,7 @@ class FileValidator:
             'jpg': 'image/jpeg',
             'jpeg': 'image/jpeg',
             'png': 'image/png',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         }
         return mapping.get(extension.lower(), 'application/octet-stream')
 

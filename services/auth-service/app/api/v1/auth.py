@@ -149,6 +149,13 @@ async def login(
     if not user:
         raise InvalidCredentialsError()
     
+    # Utilisateur OAuth uniquement : ne peut pas se connecter avec mot de passe
+    if user.hashed_password is None or user.oauth_provider:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ce compte utilise une connexion Google ou LinkedIn. Utilisez le bouton correspondant pour vous connecter."
+        )
+    
     # Vérifier le mot de passe
     if not verify_password(request.password, user.hashed_password):
         raise InvalidCredentialsError()
@@ -268,11 +275,17 @@ async def password_reset(
     session: AsyncSession = Depends(get_session)
 ):
     """Demande de réinitialisation de mot de passe"""
+    import asyncio
+    import logging
     from app.infrastructure.security import generate_password_reset_token
-    
+    from app.infrastructure.notification_client import send_password_reset_notification
+    from app.core.config import settings
+
+    _log = logging.getLogger(__name__)
     user_repo = UserRepository(session)
     user = await user_repo.get_by_email(request.email)
     
+    response_data = {"message": "If the email exists, a password reset link has been sent"}
     if user:
         # Générer un token de réinitialisation
         reset_token = generate_password_reset_token()
@@ -280,12 +293,16 @@ async def password_reset(
         user.password_reset_expires = datetime.utcnow() + timedelta(hours=24)  # Token valide 24h
         await user_repo.update(user)
         
-        # TODO: Implémenter l'envoi d'email avec le token
-        # Pour l'instant, on retourne juste le token (en production, envoyer par email uniquement)
-        pass
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+        recipient_name = f"{user.first_name} {user.last_name}".strip() if (user.first_name or user.last_name) else None
+        # Fire-and-forget : ne pas bloquer la réponse, l'email est envoyé en arrière-plan
+        asyncio.create_task(send_password_reset_notification(
+            recipient_email=user.email,
+            reset_url=reset_url,
+            recipient_name=recipient_name,
+        ))
     
-    # Toujours retourner succès pour ne pas révéler si l'email existe
-    return {"message": "If the email exists, a password reset link has been sent"}
+    return response_data
 
 
 @router.post("/password-reset/confirm")

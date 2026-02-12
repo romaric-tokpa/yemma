@@ -12,7 +12,7 @@ from app.domain.schemas import (
     AdminRegisterViaToken,
     Token,
 )
-from app.domain.models import User, UserRoleLink, AdminInvitationToken, UserStatus, RefreshToken
+from app.domain.models import User, UserRoleLink, AdminInvitationToken, UserStatus
 from app.domain.exceptions import InvalidCredentialsError
 from app.infrastructure.database import get_session
 from app.infrastructure.security import (

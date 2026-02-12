@@ -9,6 +9,7 @@ from app.domain.schemas import (
     CheckoutSessionResponse,
     PaymentResponse,
 )
+from app.core.config import settings
 from app.core.exceptions import PlanNotFoundError
 from app.infrastructure.database import get_session
 from app.infrastructure.repositories import PlanRepository
@@ -55,13 +56,14 @@ async def create_checkout_session(
                 detail="Monthly pricing not configured for this plan"
             )
     
-    # Créer la session Stripe
+    # Créer la session Stripe (avec essai gratuit si configuré)
     stripe_client = StripeClient()
     checkout_session = stripe_client.create_checkout_session(
         company_id=checkout_data.company_id,
         plan_id=checkout_data.plan_id,
         price_id=price_id,
-        billing_period=checkout_data.billing_period
+        billing_period=checkout_data.billing_period,
+        trial_days=settings.TRIAL_DAYS,
     )
     
     return CheckoutSessionResponse(

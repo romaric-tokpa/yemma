@@ -37,17 +37,19 @@ class EmailSender:
         logger = logging.getLogger(__name__)
         
         provider_name = settings.EMAIL_PROVIDER.lower()
-        logger.info(f"EmailSender.send_email called with provider: {provider_name} (EMAIL_PROVIDER={settings.EMAIL_PROVIDER})")
+        logger.debug("EmailSender.send_email provider=%s", provider_name)
         
         # Utiliser les nouveaux providers (FastAPI-Mail, Mock)
         if provider_name in ["fastapi_mail", "mock"]:
-            logger.info(f"Using new provider system for: {provider_name}")
             provider = get_email_provider()
             return await provider.send_email(to_email, subject, html_body, text_body, to_name)
         
         # Utiliser les anciens providers (SMTP, SendGrid, Mailgun)
         if provider_name == "smtp":
-            return await EmailSender._send_via_smtp(to_email, subject, html_body, text_body, to_name)
+            import asyncio
+            return await asyncio.to_thread(
+                EmailSender._send_via_smtp_sync, to_email, subject, html_body, text_body, to_name
+            )
         elif provider_name == "sendgrid":
             return await EmailSender._send_via_sendgrid(to_email, subject, html_body, text_body, to_name)
         elif provider_name == "mailgun":
@@ -56,36 +58,30 @@ class EmailSender:
             raise EmailError(f"Unsupported email provider: {settings.EMAIL_PROVIDER}")
     
     @staticmethod
-    async def _send_via_smtp(
+    def _send_via_smtp_sync(
         to_email: str,
         subject: str,
         html_body: str,
         text_body: Optional[str] = None,
         to_name: Optional[str] = None
     ) -> bool:
-        """Envoie un email via SMTP"""
+        """Envoie un email via SMTP (synchrone, pour asyncio.to_thread)"""
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
             msg["To"] = to_email
-            
-            # Ajouter le corps texte et HTML
             if text_body:
-                part1 = MIMEText(text_body, "plain")
-                msg.attach(part1)
-            
-            part2 = MIMEText(html_body, "html")
-            msg.attach(part2)
-            
-            # Envoyer l'email
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+                msg.attach(MIMEText(text_body, "plain"))
+            msg.attach(MIMEText(html_body, "html"))
+            # Timeout 15s pour éviter les blocages (connexion TLS + envoi)
+            timeout = getattr(settings, "SMTP_TIMEOUT", 15)
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=timeout) as server:
                 if settings.SMTP_USE_TLS:
                     server.starttls()
                 if settings.SMTP_USER and settings.SMTP_PASSWORD:
                     server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                 server.send_message(msg)
-            
             return True
         except Exception as e:
             raise EmailError(f"Failed to send email via SMTP: {str(e)}")

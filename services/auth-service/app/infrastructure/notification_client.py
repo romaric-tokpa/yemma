@@ -156,3 +156,62 @@ async def send_company_registration_notification(
             e,
             exc_info=True,
         )
+
+
+async def send_password_reset_notification(
+    recipient_email: str,
+    reset_url: str,
+    recipient_name: Optional[str] = None,
+) -> None:
+    """
+    Envoie un email de réinitialisation de mot de passe à l'utilisateur.
+
+    Appelé par le Auth Service après génération du token de réinitialisation.
+    Le lien est envoyé par email uniquement (jamais retourné dans la réponse API).
+
+    Args:
+        recipient_email: Email de l'utilisateur
+        reset_url: URL complète du lien de réinitialisation (avec token)
+        recipient_name: Nom de l'utilisateur (optionnel)
+    """
+    if get_service_token_header is None:
+        logger.error(
+            "Notification client: get_service_token_header non disponible. "
+            "Email de réinitialisation non envoyé."
+        )
+        return
+
+    try:
+        headers = get_service_token_header("auth-service")
+        payload = {
+            "recipient_email": recipient_email,
+            "recipient_name": recipient_name or recipient_email.split("@")[0],
+            "reset_url": reset_url,
+        }
+
+        logger.info("Sending password reset notification to %s", recipient_email)
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{settings.NOTIFICATION_SERVICE_URL}/api/v1/triggers/notify_password_reset",
+                json=payload,
+                headers=headers,
+            )
+
+            if response.status_code != 202:
+                logger.warning(
+                    "Notification service returned %s: %s",
+                    response.status_code,
+                    response.text,
+                )
+
+            response.raise_for_status()
+            logger.info("Password reset email queued for %s", recipient_email)
+
+    except Exception as e:
+        logger.error(
+            "Failed to send password reset email to %s: %s",
+            recipient_email,
+            e,
+            exc_info=True,
+        )

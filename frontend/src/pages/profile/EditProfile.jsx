@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { candidateApi, documentApi } from '@/services/api'
+import { getApiErrorDetail } from '@/utils/apiError'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { COUNTRIES_FR } from '@/data/countries'
 import { SECTORS_FR } from '@/data/sectors'
@@ -144,8 +145,8 @@ export default function EditProfile() {
           setDocuments([])
         }
       }
-    } catch {
-      setToast({ message: 'Erreur lors du chargement du profil.', type: 'error' })
+    } catch (err) {
+      setToast({ message: getApiErrorDetail(err, 'Erreur lors du chargement du profil.'), type: 'error' })
       navigate('/candidate/dashboard')
     } finally {
       setLoading(false)
@@ -203,7 +204,7 @@ export default function EditProfile() {
       setToast({ message: 'Profil enregistré.', type: 'success' })
       navigate('/candidate/dashboard')
     } catch (err) {
-      setToast({ message: err.response?.data?.detail || 'Erreur lors de l’enregistrement.', type: 'error' })
+      setToast({ message: getApiErrorDetail(err, "Erreur lors de l'enregistrement."), type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -1046,7 +1047,7 @@ export default function EditProfile() {
           }`}
           style={toast.type === 'success' ? { backgroundColor: '#226D68' } : {}}
         >
-          {toast.message}
+          {typeof toast.message === 'string' ? toast.message : getApiErrorDetail({ response: { data: { detail: toast.message } } }, 'Erreur')}
         </div>
       )}
     </div>

@@ -1,8 +1,13 @@
 """
 Configuration de l'application via Pydantic BaseSettings
 """
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# .env à la racine du projet (config.py -> core -> app -> auth-service -> services -> yemma)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+_ENV_FILE = _PROJECT_ROOT / ".env"
 from pydantic import Field, model_validator
 
 
@@ -19,9 +24,9 @@ class Settings(BaseSettings):
     # Database
     DB_HOST: str = Field(default="localhost", description="Database host")
     DB_PORT: int = Field(default=5432, description="Database port")
-    DB_USER: str = Field(default="auth_user", description="Database user")
-    DB_PASSWORD: str = Field(default="", description="Database password")
-    DB_NAME: str = Field(default="auth_db", description="Database name")
+    DB_USER: str = Field(default="postgres", description="Database user")
+    DB_PASSWORD: str = Field(default="postgres", description="Database password")
+    DB_NAME: str = Field(default="yemma_db", description="Database name")
     DATABASE_URL: str = Field(default="", description="Full database URL")
 
     # JWT
@@ -42,9 +47,11 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = Field(
         default=[
             "http://localhost:3000",
+            "http://localhost:8080",
             "http://localhost:8000",
             "http://localhost",
             "http://127.0.0.1:3000",
+            "http://127.0.0.1:8080",
             "http://127.0.0.1:8000",
             "http://127.0.0.1",
         ],
@@ -66,11 +73,11 @@ class Settings(BaseSettings):
         if isinstance(data, dict):
             # Construire DATABASE_URL si non fournie
             if not data.get("DATABASE_URL"):
-                db_user = data.get("DB_USER", "auth_user")
-                db_password = data.get("DB_PASSWORD", "")
+                db_user = data.get("DB_USER", "postgres")
+                db_password = data.get("DB_PASSWORD", "postgres")
                 db_host = data.get("DB_HOST", "localhost")
-                db_port = data.get("DB_PORT", 5432)
-                db_name = data.get("DB_NAME", "auth_db")
+                db_port = data.get("DB_PORT", 5433)
+                db_name = data.get("DB_NAME", "yemma_db")
                 data["DATABASE_URL"] = (
                     f"postgresql+asyncpg://{db_user}:{db_password}"
                     f"@{db_host}:{db_port}/{db_name}"
@@ -98,6 +105,14 @@ class Settings(BaseSettings):
                     data["CORS_ORIGINS"] = [origin.strip() for origin in data["CORS_ORIGINS"].split(",")]
         return data
 
+    # OAuth (Google, LinkedIn) - optionnel, vide = désactivé
+    GOOGLE_CLIENT_ID: str = Field(default="", description="Google OAuth client ID")
+    GOOGLE_CLIENT_SECRET: str = Field(default="", description="Google OAuth client secret")
+    LINKEDIN_CLIENT_ID: str = Field(default="", description="LinkedIn OAuth client ID")
+    LINKEDIN_CLIENT_SECRET: str = Field(default="", description="LinkedIn OAuth client secret")
+    # URL publique du service auth (pour redirect_uri OAuth). Ex: http://localhost:8001 ou https://api.yemma.com
+    AUTH_SERVICE_EXTERNAL_URL: str = Field(default="", description="Base URL for OAuth redirect_uri")
+
     # External Services
     DOCUMENT_SERVICE_URL: str = Field(default="http://localhost:8003", description="Document Service URL")
     NOTIFICATION_SERVICE_URL: str = Field(default="http://localhost:8007", description="Notification service URL")
@@ -108,7 +123,7 @@ class Settings(BaseSettings):
     ALLOWED_HOSTS: List[str] = Field(default=["*"], description="Allowed hosts")
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE if _ENV_FILE.exists() else ".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",

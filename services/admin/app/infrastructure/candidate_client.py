@@ -58,6 +58,12 @@ async def get_candidate_profile(candidate_id: int) -> Dict[str, Any]:
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
             raise CandidateNotFoundError(str(candidate_id))
+        # Propager 401/403 du service candidat pour faciliter le diagnostic
+        if e.response.status_code in (401, 403):
+            raise Exception(
+                f"Candidate service auth failed ({e.response.status_code}): "
+                f"Vérifiez INTERNAL_SERVICE_TOKEN_SECRET. {e.response.text}"
+            )
         raise
     except httpx.HTTPError as e:
         raise Exception(f"Failed to fetch candidate profile: {str(e)}")
@@ -147,4 +153,33 @@ async def update_candidate_status(candidate_id: int, status: str, report_data: O
             return response.json()
     except httpx.HTTPError as e:
         raise Exception(f"Failed to update candidate status: {str(e)}")
+
+
+async def update_candidate_hrflow_key(candidate_id: int, hrflow_profile_key: str) -> Dict[str, Any]:
+    """
+    Met à jour la clé HrFlow d'un profil candidat (pour activer l'analyse IA).
+
+    Args:
+        candidate_id: ID du profil candidat
+        hrflow_profile_key: Clé du profil indexé dans HrFlow
+
+    Returns:
+        Données du profil mis à jour
+    """
+    try:
+        headers = get_service_token_header("admin-service")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.put(
+                f"{settings.CANDIDATE_SERVICE_URL}/api/v1/profiles/{candidate_id}",
+                json={"hrflow_profile_key": hrflow_profile_key},
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise CandidateNotFoundError(str(candidate_id))
+        raise
+    except httpx.HTTPError as e:
+        raise Exception(f"Failed to update candidate hrflow key: {str(e)}")
 

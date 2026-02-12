@@ -37,11 +37,11 @@ class Settings(BaseSettings):
     # File Upload
     MAX_FILE_SIZE: int = Field(default=10485760, description="Max file size in bytes (10MB)")
     ALLOWED_EXTENSIONS: str = Field(
-        default="pdf,jpg,jpeg,png",
+        default="pdf,jpg,jpeg,png,docx",
         description="Allowed file extensions (comma-separated string)"
     )
     ALLOWED_MIME_TYPES: List[str] = Field(
-        default=["application/pdf", "image/jpeg", "image/png"],
+        default=["application/pdf", "image/jpeg", "image/png", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
         description="Allowed MIME types"
     )
 

@@ -1,17 +1,21 @@
 """
 Endpoints de validation des profils candidats
 """
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status, File, UploadFile
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
-from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status
+from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status, update_candidate_hrflow_key
+from app.infrastructure.hrflow_parse_client import parse_cv_and_get_key
 from app.infrastructure.hrflow_asking_client import ask_profile, HrFlowAskingError
 from app.infrastructure.search_client import index_candidate_in_search, remove_candidate_from_search
 from app.infrastructure.notification_client import send_profile_validated_notification
 from app.infrastructure.audit_client import log_incident
 from app.core.exceptions import CandidateNotFoundError
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -33,6 +37,11 @@ class RejectionReport(BaseModel):
     rejectionReason: str = Field(min_length=10, description="Motif de rejet")
     overallScore: Optional[float] = Field(None, ge=0, le=5, description="Note globale")
     interview_notes: Optional[str] = Field(default="", description="Notes d'entretien")
+
+
+class ProfileAskRequest(BaseModel):
+    """Schéma pour une question en langage naturel sur un profil (CvGPT)"""
+    question: str = Field(min_length=1, description="Question en langage naturel")
 
 
 async def update_candidate_status_task(
@@ -167,10 +176,16 @@ async def validate_candidate(
         # ============================================
         # ACTIONS : Indexation (synchrone pour garantir l'indexation immédiate) et notification (asynchrone)
         # ============================================
+        # Fusionner le rapport dans profile_data pour l'indexation (admin_score, admin_report)
+        profile_data_for_index = {**profile_data}
+        if report_data:
+            profile_data_for_index["admin_score"] = report_data.get("overall_score")
+            profile_data_for_index["admin_report"] = report_data
+        
         # Action 1 : Indexer dans ElasticSearch de manière synchrone pour garantir l'indexation immédiate
         # Cela permet au profil d'être visible dans la CVthèque immédiatement après validation
         try:
-            await index_candidate_in_search(candidate_id, profile_data)
+            await index_candidate_in_search(candidate_id, profile_data_for_index)
             indexation_status = "completed"
             indexation_error = None
         except Exception as index_error:
@@ -181,7 +196,7 @@ async def validate_candidate(
             background_tasks.add_task(
                 index_candidate_task,
                 candidate_id=candidate_id,
-                profile_data=profile_data
+                profile_data=profile_data_for_index
             )
         
         # Action 2 : Envoyer la notification au candidat
@@ -313,27 +328,22 @@ async def archive_candidate(
 @router.get("/evaluation/{candidate_id}", status_code=status.HTTP_200_OK)
 async def get_candidate_evaluation(candidate_id: int):
     """
-    Récupère le rapport d'évaluation d'un candidat validé
+    Récupère le rapport d'évaluation d'un candidat.
     
     Retourne le compte-rendu rédigé par l'Admin lors de la validation.
-    Ce rapport est stocké dans le Candidate Service dans le champ `admin_report`.
+    Si le candidat n'a pas encore été évalué, retourne 200 avec des valeurs vides
+    (pour permettre au formulaire d'évaluation de s'afficher sans erreur 404).
     
-    **Usage** : Appelé par le frontend pour afficher l'avis de l'expert aux recruteurs.
+    **Usage** : Appelé par le frontend pour charger le formulaire d'évaluation.
     """
     try:
         # Récupérer le profil complet depuis le Candidate Service
         profile_data = await get_candidate_profile(candidate_id)
         
-        # Extraire le rapport d'évaluation
-        admin_report = profile_data.get("admin_report")
+        # Extraire le rapport d'évaluation (peut être absent si pas encore validé)
+        admin_report = profile_data.get("admin_report") or {}
         
-        if not admin_report:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No evaluation report found for candidate {candidate_id}. The candidate may not have been validated yet."
-            )
-        
-        # Retourner le rapport formaté
+        # Retourner le rapport formaté (valeurs vides si pas encore évalué)
         return {
             "candidate_id": candidate_id,
             "candidate_name": f"{profile_data.get('first_name', '')} {profile_data.get('last_name', '')}".strip(),
@@ -364,6 +374,39 @@ async def get_candidate_evaluation(candidate_id: int):
         )
 
 
+@router.post("/index-cv/{candidate_id}", status_code=status.HTTP_200_OK)
+async def index_cv_for_candidate(candidate_id: int, file: UploadFile = File(..., description="Fichier CV (PDF ou DOCX)")):
+    """
+    Indexe un CV pour un profil existant afin d'activer l'analyse IA (CvGPT).
+
+    Pour les profils créés sans CV ou sans indexation HrFlow, l'admin peut uploader
+    un CV pour activer l'analyse par IA dans la section Synthèse.
+    """
+    if not file.filename or not file.filename.lower().endswith((".pdf", ".docx")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Format de fichier non supporté. Utilisez un PDF ou DOCX.",
+        )
+    try:
+        content = await file.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fichier trop volumineux (max 10 Mo).")
+        profile_key = await parse_cv_and_get_key(content, file.filename or "cv.pdf")
+        if not profile_key:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Le parsing HrFlow n'a pas retourné de clé. Vérifiez HRFLOW_API_KEY et HRFLOW_SOURCE_KEY.",
+            )
+        await update_candidate_hrflow_key(candidate_id, profile_key)
+        return {"message": "CV indexé avec succès. L'analyse IA est maintenant disponible.", "hrflow_profile_key": profile_key}
+    except CandidateNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Candidat {candidate_id} non trouvé")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 @router.post("/profile-ask/{candidate_id}", status_code=status.HTTP_200_OK)
 async def profile_ask(candidate_id: int, body: ProfileAskRequest):
     """
@@ -389,5 +432,13 @@ async def profile_ask(candidate_id: int, body: ProfileAskRequest):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Candidate with id {candidate_id} not found",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("profile_ask unexpected error: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur interne: {e}",
         )
 

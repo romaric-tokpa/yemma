@@ -1,8 +1,8 @@
 """
-Script de seed pour créer un utilisateur administrateur par défaut
+Script de seed pour créer un utilisateur super administrateur par défaut
 """
 import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
+import os
 
 from app.infrastructure.database import AsyncSessionLocal
 from app.infrastructure.repositories import UserRepository, RoleRepository
@@ -11,16 +11,16 @@ from app.infrastructure.security import hash_password
 
 
 async def seed_admin_user():
-    """Crée un utilisateur administrateur par défaut s'il n'existe pas"""
+    """Crée un utilisateur super administrateur par défaut s'il n'existe pas"""
     async with AsyncSessionLocal() as session:
         user_repo = UserRepository(session)
         role_repo = RoleRepository(session)
         
-        # Email et mot de passe par défaut pour l'admin
-        admin_email = "admin@yemma.com"
-        admin_password = "12345678"
-        admin_first_name = "Admin"
-        admin_last_name = "Yemma"
+        # Email et mot de passe : variables d'environnement ou valeurs par défaut
+        admin_email = os.getenv("SUPER_ADMIN_EMAIL", "admin@yemma.com")
+        admin_password = os.getenv("SUPER_ADMIN_PASSWORD", "12345678")
+        admin_first_name = os.getenv("SUPER_ADMIN_FIRST_NAME", "Admin")
+        admin_last_name = os.getenv("SUPER_ADMIN_LAST_NAME", "Yemma")
         admin_role = "ROLE_SUPER_ADMIN"
         
         # Vérifier si l'admin existe déjà

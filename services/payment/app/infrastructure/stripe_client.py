@@ -19,18 +19,32 @@ class StripeClient:
         company_id: int,
         plan_id: int,
         price_id: str,
-        billing_period: str = "month"
+        billing_period: str = "month",
+        trial_days: int = 0
     ) -> Dict[str, Any]:
         """
         Crée une session de checkout Stripe
+        
+        L'utilisateur renseigne ses coordonnées bancaires pour la facturation automatique.
+        En cas d'essai gratuit, aucun prélèvement n'est effectué avant la fin de la période d'essai.
         
         Args:
             company_id: ID de l'entreprise
             plan_id: ID du plan
             price_id: Stripe Price ID
             billing_period: monthly ou yearly
+            trial_days: Nombre de jours d'essai gratuit (0 = pas d'essai)
         """
         try:
+            subscription_data = {
+                "metadata": {
+                    "company_id": str(company_id),
+                    "plan_id": str(plan_id),
+                }
+            }
+            if trial_days and trial_days > 0:
+                subscription_data["trial_period_days"] = trial_days
+            
             session = stripe.checkout.Session.create(
                 payment_method_types=["card"],
                 line_items=[{
@@ -45,12 +59,7 @@ class StripeClient:
                     "plan_id": str(plan_id),
                     "billing_period": billing_period,
                 },
-                subscription_data={
-                    "metadata": {
-                        "company_id": str(company_id),
-                        "plan_id": str(plan_id),
-                    }
-                }
+                subscription_data=subscription_data,
             )
             return session
         except stripe.error.StripeError as e:

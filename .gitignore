@@ -82,3 +82,6 @@ secrets/
 temp/
 tmp/
 
+# Emails mock (dev)
+yemma_emails/
+

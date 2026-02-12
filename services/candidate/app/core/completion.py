@@ -388,9 +388,11 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     """
     Vérifie si un profil peut être soumis pour validation
     
-    Vérifie uniquement les champs obligatoires (marqués avec *) :
+    Règle principale : Complétez à 80% minimum pour soumettre.
+    
+    Vérifie également les champs obligatoires :
     - Étape 0 : Consentements (CGU, RGPD, vérification)
-    - Étape 1 : Identité complète (prénom, nom, email, date de naissance, nationalité, téléphone, ville, pays, titre, résumé, secteur, métier, expérience)
+    - Étape 1 : Identité complète
     - Étape 2 : Au moins une expérience professionnelle complète
     - Étape 6 : CV PDF obligatoire
     - Étape 7 : Préférences (type de contrat, localisation, disponibilité, prétentions salariales)
@@ -398,11 +400,16 @@ def can_submit_profile(profile: Profile, has_cv: bool = False, min_completion: f
     Args:
         profile: Le profil à vérifier
         has_cv: True si un CV PDF a été uploadé (vérifié via service Document)
-        min_completion: Paramètre ignoré (conservé pour compatibilité)
+        min_completion: Pourcentage minimum de complétion requis (défaut 80)
     
     Returns:
         Tuple (can_submit: bool, reason: str)
     """
+    # Règle : Complétez à 80% minimum pour soumettre (arrondi pour cohérence avec l'affichage)
+    completion = getattr(profile, 'completion_percentage', None)
+    if completion is None or round(float(completion)) < min_completion:
+        return False, "Complétez à 80% minimum pour soumettre"
+    
     # Vérification obligatoire : CV PDF doit être présent
     if not has_cv:
         return False, "Un CV PDF est obligatoire pour soumettre le profil"

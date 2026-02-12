@@ -27,13 +27,23 @@ class UserRepository:
         statement = select(User).where(User.email == email, User.deleted_at.is_(None))
         result = await self.session.execute(statement)
         return result.scalar_one_or_none()
+
+    async def get_by_oauth(self, provider: str, oauth_id: str) -> Optional[User]:
+        """Récupère un utilisateur par provider OAuth et ID externe"""
+        statement = select(User).where(
+            User.oauth_provider == provider,
+            User.oauth_id == oauth_id,
+            User.deleted_at.is_(None)
+        )
+        result = await self.session.execute(statement)
+        return result.scalar_one_or_none()
     
-    async def create(self, user: User) -> User:
+    async def create(self, user: User, skip_email_check: bool = False) -> User:
         """Crée un nouvel utilisateur"""
-        # Vérifier si l'email existe déjà
-        existing = await self.get_by_email(user.email)
-        if existing:
-            raise UserAlreadyExistsError(user.email)
+        if not skip_email_check:
+            existing = await self.get_by_email(user.email)
+            if existing:
+                raise UserAlreadyExistsError(user.email)
         
         self.session.add(user)
         await self.session.commit()

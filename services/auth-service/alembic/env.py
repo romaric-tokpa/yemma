@@ -5,8 +5,6 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-import asyncio
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 # Import des modèles pour qu'Alembic les détecte
 from app.domain.models import User, Role, UserRoleLink, RefreshToken, AdminInvitationToken
@@ -36,6 +34,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table="alembic_version_auth",
     )
 
     with context.begin_transaction():
@@ -43,31 +42,31 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        # Table de version séparée pour éviter conflit avec candidate/company sur DB partagée
+        version_table="alembic_version_auth",
+    )
 
     with context.begin_transaction():
         context.run_migrations()
 
 
-async def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    connectable = AsyncEngine(
-        engine_from_config(
-            config.get_section(config.config_ini_section, {}),
-            prefix="sqlalchemy.",
-            poolclass=pool.NullPool,
-            future=True,
-        )
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode (sync - Alembic utilise psycopg2)."""
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    run_migrations_online()
 

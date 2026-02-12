@@ -98,12 +98,23 @@ async def handle_checkout_completed(session_data: dict, session):
     stripe_client = StripeClient()
     stripe_subscription = stripe_client.get_subscription(stripe_subscription_id)
     
+    # Déterminer le statut depuis Stripe (trialing ou active)
+    status_map = {
+        "active": SubscriptionStatus.ACTIVE,
+        "trialing": SubscriptionStatus.TRIALING,
+        "past_due": SubscriptionStatus.PAST_DUE,
+        "unpaid": SubscriptionStatus.UNPAID,
+        "canceled": SubscriptionStatus.CANCELLED,
+    }
+    stripe_status = stripe_subscription.get("status", "active")
+    subscription_status = status_map.get(stripe_status, SubscriptionStatus.ACTIVE)
+    
     # Vérifier si l'abonnement existe déjà
     existing = await subscription_repo.get_by_stripe_subscription_id(stripe_subscription_id)
     
     if existing:
         # Mettre à jour l'abonnement existant
-        existing.status = SubscriptionStatus.ACTIVE
+        existing.status = subscription_status
         existing.current_period_start = datetime.fromtimestamp(
             stripe_subscription["current_period_start"]
         )
@@ -113,11 +124,11 @@ async def handle_checkout_completed(session_data: dict, session):
         await subscription_repo.update(existing)
         subscription_id_to_notify = existing.id
     else:
-        # Créer un nouvel abonnement
+        # Créer un nouvel abonnement (trialing ou active selon Stripe)
         subscription = Subscription(
             company_id=company_id,
             plan_id=plan_id,
-            status=SubscriptionStatus.ACTIVE,
+            status=subscription_status,
             stripe_subscription_id=stripe_subscription_id,
             stripe_customer_id=stripe_subscription.get("customer"),
             current_period_start=datetime.fromtimestamp(

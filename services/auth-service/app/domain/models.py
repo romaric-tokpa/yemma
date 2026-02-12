@@ -57,7 +57,7 @@ class User(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True, max_length=255)
-    hashed_password: str = Field(max_length=255)
+    hashed_password: Optional[str] = Field(default=None, max_length=255)  # Null pour OAuth
     first_name: Optional[str] = Field(default=None, max_length=100)
     last_name: Optional[str] = Field(default=None, max_length=100)
     status: UserStatus = Field(default=UserStatus.PENDING_VERIFICATION)
@@ -66,6 +66,8 @@ class User(SQLModel, table=True):
     password_reset_token: Optional[str] = Field(default=None, max_length=255)
     password_reset_expires: Optional[datetime] = Field(default=None)
     last_login: Optional[datetime] = Field(default=None)
+    oauth_provider: Optional[str] = Field(default=None, max_length=50)  # google, linkedin
+    oauth_id: Optional[str] = Field(default=None, max_length=255)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)
     deleted_at: Optional[datetime] = Field(default=None)  # Soft delete

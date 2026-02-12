@@ -80,48 +80,44 @@ export function InviteMemberDialog({ open, onOpenChange, companyId, onSuccess })
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="rounded-[12px] shadow-xl max-w-md">
-        <DialogHeader className="pb-4 border-b">
+      <DialogContent className="rounded-lg shadow-xl max-w-md p-5">
+        <DialogHeader className="pb-3 border-b border-[#e5e7eb]">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#226D68]/10 rounded-lg">
-              <UserPlus className="h-6 w-6 text-[#226D68]" />
+            <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center">
+              <UserPlus className="h-5 w-5 text-[#226D68]" />
             </div>
             <div>
-              <DialogTitle className="text-2xl font-bold text-gray-anthracite font-heading">
+              <DialogTitle className="text-lg font-semibold text-[#2C2C2C] font-[Poppins]">
                 Inviter un collaborateur
               </DialogTitle>
-              <DialogDescription className="mt-1 text-muted-foreground">
-                Créez un compte recruteur pour un nouveau membre de l'équipe. Un email lui sera envoyé pour définir son mot de passe.
+              <DialogDescription className="mt-0.5 text-xs text-[#9ca3af]">
+                Créez un compte recruteur. Un email sera envoyé pour définir le mot de passe.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         {success ? (
-          <div className="py-8 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-[#226D68]/10 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-8 w-8 text-[#226D68]" />
-              </div>
+          <div className="py-6 text-center">
+            <div className="w-12 h-12 rounded-lg bg-[#E8F4F3] flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 className="h-6 w-6 text-[#226D68]" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-anthracite mb-2">
-              Compte créé avec succès !
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Le compte recruteur a été créé. Un email avec un lien de réinitialisation de mot de passe a été envoyé. Le lien est valable pendant 24 heures.
+            <h3 className="text-sm font-semibold text-[#2C2C2C] mb-1">Compte créé !</h3>
+            <p className="text-xs text-[#9ca3af]">
+              Un email avec lien de réinitialisation a été envoyé (valable 24h).
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-4">
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-600">{error}</p>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name" className="text-sm font-medium text-gray-anthracite">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="first_name" className="text-xs font-medium text-[#2C2C2C]">
                   Prénom <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -133,12 +129,12 @@ export function InviteMemberDialog({ open, onOpenChange, companyId, onSuccess })
                   disabled={loading}
                 />
                 {errors.first_name && (
-                  <p className="text-sm text-red-500 mt-1">{errors.first_name.message}</p>
+                  <p className="text-xs text-red-500 mt-0.5">{errors.first_name.message}</p>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="last_name" className="text-sm font-medium text-gray-anthracite">
+              <div className="space-y-1.5">
+                <Label htmlFor="last_name" className="text-xs font-medium text-[#2C2C2C]">
                   Nom <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -150,17 +146,17 @@ export function InviteMemberDialog({ open, onOpenChange, companyId, onSuccess })
                   disabled={loading}
                 />
                 {errors.last_name && (
-                  <p className="text-sm text-red-500 mt-1">{errors.last_name.message}</p>
+                  <p className="text-xs text-red-500 mt-0.5">{errors.last_name.message}</p>
                 )}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-gray-anthracite">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs font-medium text-[#2C2C2C]">
                 Adresse email <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#9ca3af]" />
                 <Input
                   id="email"
                   type="email"
@@ -173,12 +169,12 @@ export function InviteMemberDialog({ open, onOpenChange, companyId, onSuccess })
                 />
               </div>
               {errors.email && (
-                <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
+                <p className="text-xs text-red-500 mt-0.5">{errors.email.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-anthracite">
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-xs font-medium text-[#2C2C2C]">
                 Mot de passe temporaire <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -190,36 +186,38 @@ export function InviteMemberDialog({ open, onOpenChange, companyId, onSuccess })
                 disabled={loading}
               />
               {errors.password && (
-                <p className="text-sm text-red-500 mt-1">{errors.password.message}</p>
+                <p className="text-xs text-red-500 mt-0.5">{errors.password.message}</p>
               )}
-              <p className="text-xs text-muted-foreground mt-2">
-                Un mot de passe temporaire sera utilisé pour créer le compte. Le collaborateur recevra un email avec un lien pour définir son propre mot de passe.
+              <p className="text-[10px] text-[#9ca3af] mt-1">
+                Mot de passe temporaire. Le collaborateur recevra un email pour le personnaliser.
               </p>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-2 pt-4 border-t border-[#e5e7eb]">
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={handleClose}
                 disabled={loading}
-                className="border-blue-deep text-blue-deep hover:bg-blue-deep/10"
+                className="h-8 text-xs border-[#d1d5db] text-[#2C2C2C]"
               >
                 Annuler
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
+                size="sm"
                 disabled={loading}
-                className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                className="h-8 text-xs bg-[#226D68] hover:bg-[#1a5a55]"
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                     Envoi...
                   </>
                 ) : (
                   <>
-                    <UserPlus className="h-4 w-4 mr-2" />
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
                     Créer le compte
                   </>
                 )}

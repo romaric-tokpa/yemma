@@ -1,9 +1,14 @@
 """
 Configuration de l'application
 """
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+
+# Chemin vers le .env du projet (racine yemma, depuis services/payment/app/core/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+_ENV_FILE = _PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -23,11 +28,12 @@ class Settings(BaseSettings):
     DB_NAME: str = "yemma_db"
     DATABASE_URL: str = ""
 
-    # Stripe
-    STRIPE_SECRET_KEY: str = Field(..., description="Stripe secret key")
+    # Stripe (obligatoire pour checkout, placeholder en dev pour plans/subscriptions)
+    STRIPE_SECRET_KEY: str = Field(default="sk_test_placeholder", description="Stripe secret key")
     STRIPE_PUBLISHABLE_KEY: str = Field(default="", description="Stripe publishable key")
     STRIPE_WEBHOOK_SECRET: str = Field(default="", description="Stripe webhook secret")
     STRIPE_CURRENCY: str = Field(default="eur", description="Currency for payments")
+    TRIAL_DAYS: int = Field(default=3, description="Nombre de jours d'essai gratuit pour les abonnements")
 
     # Service URLs
     COMPANY_SERVICE_URL: str = Field(default="http://localhost:8005", description="Company service URL")
@@ -47,7 +53,7 @@ class Settings(BaseSettings):
         return self.CORS_ORIGINS if isinstance(self.CORS_ORIGINS, list) else []
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE if _ENV_FILE.exists() else ".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
     )

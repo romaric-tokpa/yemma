@@ -168,7 +168,7 @@ async def get_candidate_from_index(candidate_id: int):
     try:
         await es_client.connect()
         result = await es_client.client.get(
-            index="candidates",
+            index=es_client.index_name,
             id=str(candidate_id)
         )
         return {

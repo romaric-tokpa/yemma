@@ -16,19 +16,27 @@ import json
 from datetime import datetime
 
 # Importer la vérification du token interne
+# En Docker : ./services:/services monté
+# En local : chemin relatif vers services/shared
 import sys
 import os
-shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
-if shared_path not in sys.path:
-    sys.path.insert(0, shared_path)
+_services_paths = [
+    "/services",  # Docker: ./services:/services
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")),
+]
+for _sp in _services_paths:
+    if os.path.exists(_sp) and _sp not in sys.path:
+        _parent = os.path.dirname(_sp) if os.path.basename(_sp) == "services" else _sp
+        if _parent not in sys.path and os.path.exists(os.path.join(_sp, "shared")):
+            sys.path.insert(0, _parent)
+        break
 
 try:
-    from services.shared.internal_auth import verify_internal_token
+    from services.shared.fastapi_deps import verify_internal_token
 except ImportError:
-    # Fallback si le module shared n'existe pas
-    from fastapi import Security, Header
+    from fastapi import Header
     async def verify_internal_token(x_service_token: str = Header(None, alias="X-Service-Token")):
-        """Vérification basique du token interne"""
+        """Fallback : vérification basique du token interne"""
         if not x_service_token:
             raise HTTPException(status_code=401, detail="Missing X-Service-Token")
         return {"service": "internal"}
@@ -64,7 +72,14 @@ class InvitationNotificationRequest(BaseModel):
 
 
 class CandidateWelcomeRequest(BaseModel):
-    """Requête pour envoyer un email de bienvenue à un candidat après complétion de l'onboarding"""
+    """Requête pour envoyer un email à un candidat après soumission de son profil pour validation"""
+    candidate_email: str = Field(..., description="Email du candidat")
+    candidate_name: str = Field(..., description="Nom du candidat")
+    dashboard_url: str = Field(default="", description="URL du tableau de bord candidat")
+
+
+class CandidateProfileCreatedRequest(BaseModel):
+    """Requête pour envoyer un email au candidat après création de son profil (onboarding complété)"""
     candidate_email: str = Field(..., description="Email du candidat")
     candidate_name: str = Field(..., description="Nom du candidat")
     dashboard_url: str = Field(default="", description="URL du tableau de bord candidat")
@@ -98,6 +113,13 @@ class CompanyOnboardingCompletedRequest(BaseModel):
     recipient_name: str = Field(..., description="Nom du recruteur")
     company_name: str = Field(..., description="Nom de l'entreprise")
     dashboard_url: str = Field(default="", description="URL du tableau de bord entreprise")
+
+
+class PasswordResetRequest(BaseModel):
+    """Requête pour envoyer un email de réinitialisation de mot de passe"""
+    recipient_email: str = Field(..., description="Email de l'utilisateur")
+    reset_url: str = Field(..., description="URL complète du lien de réinitialisation (avec token)")
+    recipient_name: Optional[str] = Field(default=None, description="Nom de l'utilisateur")
 
 
 @router.post("/notify_validation", status_code=status.HTTP_202_ACCEPTED)
@@ -271,6 +293,53 @@ async def notify_invitation(
         )
 
 
+@router.post("/notify_candidate_profile_created", status_code=status.HTTP_202_ACCEPTED)
+async def notify_candidate_profile_created(
+    request: CandidateProfileCreatedRequest,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email au candidat après création de son profil (onboarding complété avec parsing CV).
+    Appelé par le Candidate Service après complétion de l'onboarding.
+    """
+    try:
+        notification_repo = NotificationRepository(session)
+        dashboard_url = request.dashboard_url or f"{settings.FRONTEND_URL}/candidate/dashboard"
+        template_data = {
+            "recipient_name": request.candidate_name,
+            "candidate_name": request.candidate_name,
+            "dashboard_url": dashboard_url
+        }
+        notification = Notification(
+            notification_type="candidate_profile_created",
+            recipient_email=request.candidate_email,
+            recipient_name=request.candidate_name,
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+        notification = await notification_repo.create(notification)
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="candidate_profile_created",
+            recipient_email=request.candidate_email,
+            recipient_name=request.candidate_name,
+            template_data=template_data,
+            notification_id=notification.id,
+        )
+        return {
+            "message": "Candidate profile created notification queued",
+            "notification_id": notification.id,
+            "status": "pending"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue candidate profile created notification: {str(e)}"
+        )
+
+
 @router.post("/notify_candidate_welcome", status_code=status.HTTP_202_ACCEPTED)
 async def notify_candidate_welcome(
     request: CandidateWelcomeRequest,
@@ -433,6 +502,51 @@ async def notify_company_registration(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue company registration notification: {str(e)}",
+        )
+
+
+@router.post("/notify_password_reset", status_code=status.HTTP_202_ACCEPTED)
+async def notify_password_reset(
+    request: PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email de réinitialisation de mot de passe à l'utilisateur.
+    Appelé par le Auth Service après génération du token de réinitialisation.
+    """
+    try:
+        notification_repo = NotificationRepository(session)
+        template_data = {
+            "reset_url": request.reset_url,
+        }
+        recipient_name = request.recipient_name or request.recipient_email.split("@")[0]
+        notification = Notification(
+            notification_type="password_reset",
+            recipient_email=request.recipient_email,
+            recipient_name=recipient_name,
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+        notification = await notification_repo.create(notification)
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="password_reset",
+            recipient_email=request.recipient_email,
+            recipient_name=recipient_name,
+            template_data=template_data,
+            notification_id=notification.id,
+        )
+        return {
+            "message": "Password reset notification queued",
+            "notification_id": notification.id,
+            "status": "pending",
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue password reset notification: {str(e)}",
         )
 
 

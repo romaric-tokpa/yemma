@@ -274,9 +274,17 @@ STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_CURRENCY=eur
 
+# Essai gratuit (en jours, 0 = pas d'essai)
+TRIAL_DAYS=3
+
 # Frontend URL (pour les redirections après paiement)
 FRONTEND_URL=http://localhost:3000
 ```
+
+## Essai gratuit et coordonnées bancaires
+
+- **TRIAL_DAYS** : Nombre de jours d'essai gratuit (par défaut 3). L'utilisateur renseigne ses coordonnées bancaires sur Stripe Checkout ; aucun prélèvement n'est effectué avant la fin de l'essai.
+- **Facturation automatique** : Après la période d'essai, Stripe prélève automatiquement le montant selon le plan choisi.
 
 ## Notes importantes
 

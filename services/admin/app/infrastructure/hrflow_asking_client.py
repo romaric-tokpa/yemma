@@ -33,9 +33,18 @@ async def ask_profile(profile_key: str, question: str) -> str:
     Raises:
         HrFlowAskingError: Si l'API key n'est pas configurée ou si l'appel échoue.
     """
-    if not settings.HRFLOW_API_KEY or not settings.HRFLOW_SOURCE_KEY:
+    _placeholder = "your-hrflow-api-key"
+    if (
+        not settings.HRFLOW_API_KEY
+        or settings.HRFLOW_API_KEY.strip() == _placeholder
+        or not settings.HRFLOW_SOURCE_KEY
+    ):
         logger.warning("HRFLOW_API_KEY ou HRFLOW_SOURCE_KEY non configurés")
-        raise HrFlowAskingError("Profile Asking (CvGPT) n'est pas configuré. Vérifiez HRFLOW_API_KEY et HRFLOW_SOURCE_KEY.")
+        raise HrFlowAskingError(
+            "Profile Asking (CvGPT) n'est pas configuré. "
+            "Configurez HRFLOW_API_KEY et HRFLOW_USER_EMAIL dans .env "
+            "(clé API depuis https://hrflow.ai, avec Profile Asking activé)."
+        )
 
     url = f"{settings.HRFLOW_API_URL.rstrip('/')}/profile/asking"
     headers = {
@@ -58,9 +67,14 @@ async def ask_profile(profile_key: str, question: str) -> str:
             data = response.json()
     except httpx.HTTPStatusError as e:
         logger.error("HrFlow Profile Asking error: %s %s", e.response.status_code, e.response.text)
+        try:
+            body = e.response.json()
+            msg = body.get("message") or body.get("detail") or e.response.text
+        except Exception:
+            msg = e.response.text or str(e)
         raise HrFlowAskingError(
-            f"Erreur HrFlow Profile Asking: {e.response.status_code}. "
-            "Vérifiez que l'API Asking est activée et que le profil est indexé."
+            f"Erreur HrFlow ({e.response.status_code}): {msg}. "
+            "Vérifiez que la clé API est valide et que Profile Asking est activé."
         ) from e
     except httpx.RequestError as e:
         logger.exception("HrFlow Profile Asking request error: %s", e)

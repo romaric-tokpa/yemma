@@ -53,10 +53,10 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - yemma-network
-    # Port non exposé - les services Docker communiquent via le réseau interne
-    # Pour accéder depuis l'extérieur, utilisez: docker-compose exec postgres psql -U postgres -d yemma_db
-    # ports:
-    #   - "${DB_PORT:-5433}:5432"
+    # Port exposé pour migrations locales (alembic depuis la machine hôte)
+    # 5433 par défaut pour éviter conflit avec PostgreSQL système sur 5432
+    ports:
+      - "${DB_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-yemma_db}"]
       interval: 10s
@@ -217,8 +217,8 @@ services:
       # OAuth2
       OAUTH2_SECRET_KEY: ${OAUTH2_SECRET_KEY:-your-oauth2-secret-key-change-in-production}
       
-      # CORS (format JSON pour les listes Pydantic)
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8000","http://127.0.0.1"]}
+      # CORS (format JSON pour les listes Pydantic) - inclut 8080 pour reset-password via nginx
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8080","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8080","http://127.0.0.1:8000","http://127.0.0.1"]}
       
       # Redis
       REDIS_HOST: redis
@@ -229,6 +229,13 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification:8000
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
+      
+      # OAuth (Google, LinkedIn)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      AUTH_SERVICE_EXTERNAL_URL: ${AUTH_SERVICE_EXTERNAL_URL:-http://localhost:8001}
     volumes:
       - ./services/auth-service:/app
       - ./services/shared:/shared
@@ -259,6 +266,8 @@ services:
       context: ./services
       dockerfile: candidate/Dockerfile
     container_name: yemma-candidate
+    env_file:
+      - .env
     environment:
       # Application
       APP_NAME: candidate-service
@@ -289,6 +298,9 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      
+      # Authentification inter-services (pour accepter les appels du service admin)
+      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
     volumes:
       - ./services/candidate:/app
       - ./services/shared:/shared
@@ -491,6 +503,9 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
 
+      # Authentification inter-services (pour accepter les appels du service admin lors de l'indexation)
+      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
+
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
     volumes:
@@ -523,6 +538,8 @@ services:
       context: ./services
       dockerfile: admin/Dockerfile
     container_name: yemma-admin
+    env_file:
+      - .env
     environment:
       # Application
       APP_NAME: admin-service
@@ -533,6 +550,15 @@ services:
       CANDIDATE_SERVICE_URL: http://candidate:8000
       SEARCH_SERVICE_URL: http://search:8000
       NOTIFICATION_SERVICE_URL: http://notification:8000
+      
+      # Authentification inter-services (requis pour appeler le service candidat)
+      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
+      
+      # HrFlow.ai - Profile Asking (CvGPT) pour Analyse par IA
+      HRFLOW_API_KEY: ${HRFLOW_API_KEY:-}
+      HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-ae16505f6f0eebe3abb79ad1bf83ec53b4886432}
+      HRFLOW_USER_EMAIL: ${HRFLOW_USER_EMAIL:-}
+      HRFLOW_API_URL: ${HRFLOW_API_URL:-https://api.hrflow.ai/v1}
       
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
@@ -646,6 +672,7 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_your_stripe_publishable_key}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_your_webhook_secret}
       STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
+      TRIAL_DAYS: ${TRIAL_DAYS:-3}
       
       # Service URLs
       COMPANY_SERVICE_URL: http://company:8000
@@ -659,9 +686,9 @@ services:
       - /app/__pycache__
     networks:
       - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${PAYMENT_PORT:-8006}:8006"
+    # Exposé pour accès direct (Vite proxy localhost:8006) ou via Nginx
+    ports:
+      - "${PAYMENT_PORT:-8006}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -695,8 +722,8 @@ services:
       DB_NAME: ${DB_NAME:-yemma_db}
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
       
-      # Email Provider
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-fastapi_mail}
+      # Email Provider (smtp = configuration SMTP existante du projet)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
       
       # SMTP
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
@@ -736,6 +763,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
     volumes:
       - ./services/notification:/app
+      - ./services:/services
+      - ./yemma_emails:/tmp/yemma_emails
       - /app/__pycache__
     networks:
       - yemma-network
@@ -760,6 +789,8 @@ services:
       context: ./services/notification
       dockerfile: Dockerfile
     container_name: yemma-notification-worker
+    env_file:
+      - .env
     environment:
       # Application
       APP_NAME: notification-worker
@@ -774,8 +805,8 @@ services:
       DB_NAME: ${DB_NAME:-yemma_db}
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
       
-      # Email Provider
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-fastapi_mail}
+      # Email Provider (smtp = configuration SMTP existante)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
       
       # SMTP
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}

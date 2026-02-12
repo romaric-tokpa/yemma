@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { candidateApi, authApiService, companyApi, paymentApiService, documentApi } from '@/services/api'
+import { LogoutConfirmDialog } from '@/components/common/LogoutConfirmDialog'
 import { buildPhotoUrl } from '@/utils/photoUtils'
 import { formatDateTime } from '@/utils/dateUtils'
 import { 
@@ -113,6 +114,7 @@ export default function AdminDashboard() {
     }
   })
   const [statsTab, setStatsTab] = useState('overview') // 'overview' | 'sectors' | 'period'
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
 
   // Vérifier si l'utilisateur actuel est SUPER_ADMIN (pour afficher le lien Invitations Admin)
   useEffect(() => {
@@ -463,11 +465,11 @@ export default function AdminDashboard() {
     setViewingCompany(null)
   }
 
-  const handleLogout = () => {
-    if (window.confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
-      authApiService.logout()
-      navigate('/login')
-    }
+  const handleLogout = () => setLogoutDialogOpen(true)
+
+  const confirmLogout = () => {
+    authApiService.logout()
+    navigate('/login')
   }
 
   // Filtrer les profils selon la recherche
@@ -566,6 +568,18 @@ export default function AdminDashboard() {
             </Button>
           </div>
 
+          <div>
+            <Link to="/admin/cvtheque">
+              <Button
+                variant="ghost"
+                className="w-full justify-start h-8 text-xs px-2 mb-0.5 text-gray-anthracite hover:bg-[#226D68]/10 hover:text-[#226D68]"
+              >
+                <Search className="w-3.5 h-3.5 mr-2 shrink-0" />
+                {sidebarOpen && <span className="truncate">CVthèque</span>}
+              </Button>
+            </Link>
+          </div>
+
           {isSuperAdmin && (
             <>
               <Separator className="my-2" />
@@ -643,6 +657,12 @@ export default function AdminDashboard() {
           </Button>
         </div>
       </aside>
+
+      <LogoutConfirmDialog
+        open={logoutDialogOpen}
+        onOpenChange={setLogoutDialogOpen}
+        onConfirm={confirmLogout}
+      />
 
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />
@@ -1263,67 +1283,75 @@ export default function AdminDashboard() {
           {activeSection === 'companies' && (
             <>
               {activeSubsection === 'list' && (
-                <Card className="border border-border shadow-sm overflow-hidden">
-                  <CardHeader className="py-2.5 px-3 border-b border-border bg-[#226D68]/5">
-                    <CardTitle className="flex items-center gap-1.5 text-sm font-semibold text-gray-anthracite">
-                      <Building className="w-4 h-4 text-[#226D68]" />
+                <Card className="border border-neutral-200 shadow-none overflow-hidden bg-white">
+                  <CardHeader className="py-2 px-3 border-b border-neutral-200 bg-[#E8F4F3]/60">
+                    <CardTitle className="flex items-center gap-1.5 text-xs font-semibold text-[#2C2C2C] font-heading">
+                      <Building className="w-3.5 h-3.5 text-[#226D68]" />
                       Annuaire entreprises
-                        </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground">
+                    </CardTitle>
+                    <CardDescription className="text-[11px] text-neutral-500 mt-0.5">
                       {companiesLoading ? 'Chargement…' : `${companies.length} entreprise${companies.length !== 1 ? 's' : ''} partenaire${companies.length !== 1 ? 's' : ''}`}
-                        </CardDescription>
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-3">
+                  <CardContent className="p-2">
                     {companiesLoading ? (
-                      <div className="flex justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-[#226D68]" />
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin text-[#226D68]" />
                       </div>
                     ) : companies.length === 0 ? (
-                      <div className="flex flex-col items-center py-10 text-center rounded-lg border border-dashed border-border bg-muted/20">
-                        <Building className="h-10 w-10 text-muted-foreground opacity-60 mb-2" />
-                        <p className="text-sm font-medium text-gray-anthracite">Aucune entreprise</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Aucune entreprise partenaire enregistrée.</p>
+                      <div className="flex flex-col items-center py-8 text-center rounded-md border border-dashed border-neutral-200 bg-[#F4F6F8]">
+                        <Building className="h-8 w-8 text-neutral-400 mb-1.5" />
+                        <p className="text-xs font-medium text-[#2C2C2C]">Aucune entreprise</p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">Aucune entreprise partenaire enregistrée.</p>
                       </div>
                     ) : (
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {companies.map((company) => {
                           const subscription = companySubscriptions[company.id]
                           const hasContactInfo = company.contact_first_name || company.contact_last_name || company.contact_email || company.contact_phone || company.contact_function
+                          const contactParts = []
+                          if (company.contact_first_name || company.contact_last_name) contactParts.push([company.contact_first_name, company.contact_last_name].filter(Boolean).join(' '))
+                          if (company.contact_email) contactParts.push(company.contact_email)
+                          if (company.contact_phone) contactParts.push(company.contact_phone)
                           return (
-                            <Card 
-                              key={company.id} 
-                              className={`border transition-colors ${selectedCompany?.id === company.id ? 'border-[#226D68] bg-[#226D68]/5' : 'border-border hover:border-[#226D68]/30'}`}
+                            <Card
+                              key={company.id}
+                              className={`border transition-colors cursor-pointer ${selectedCompany?.id === company.id ? 'border-[#226D68] bg-[#E8F4F3]/50 shadow-sm' : 'border-neutral-200 hover:border-[#226D68]/40 hover:bg-[#F4F6F8]'}`}
+                              onClick={() => setSelectedCompany(company)}
                             >
-                              <CardContent className="py-2.5 px-3">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    {company.logo_url && (
-                                      <img src={company.logo_url} alt={company.name} className="w-9 h-9 rounded-lg object-cover border border-border shrink-0" />
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="text-sm font-medium text-gray-anthracite truncate">{company.name}</h3>
-                                        {subscription?.plan && (
-                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-[#226D68]/30 text-[#1a5a55]">
-                                            {subscription.plan.plan_type || 'N/A'}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <p className="text-xs text-muted-foreground truncate">{company.legal_id}</p>
-                                      {hasContactInfo && (company.contact_email || company.contact_first_name) && (
-                                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                                              {company.contact_first_name} {company.contact_last_name}
-                                          {company.contact_email && ` · ${company.contact_email}`}
-                                        </p>
+                              <CardContent className="py-2 px-2.5">
+                                <div className="flex items-center gap-2.5">
+                                  {company.logo_url ? (
+                                    <img src={company.logo_url} alt={company.name} className="w-8 h-8 rounded-md object-cover border border-neutral-200 shrink-0" />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-md bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                                      <Building className="w-4 h-4 text-[#226D68]" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <h3 className="text-xs font-medium text-[#2C2C2C] truncate">{company.name}</h3>
+                                      {subscription?.plan && (
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-3.5 border-[#226D68]/30 text-[#1a5a55] font-normal shrink-0">
+                                          {subscription.plan.plan_type || 'N/A'}
+                                        </Badge>
                                       )}
                                     </div>
+                                    <p className="text-[10px] text-neutral-500 truncate">{company.legal_id}</p>
+                                    {hasContactInfo && contactParts.length > 0 && (
+                                      <p className="text-[10px] text-neutral-600 truncate mt-0.5 flex items-center gap-1">
+                                        {company.contact_phone && <Phone className="w-2.5 h-2.5 text-[#226D68] shrink-0" />}
+                                        {contactParts.join(' · ')}
+                                      </p>
+                                    )}
                                   </div>
                                   <Button
                                     size="sm"
+                                    variant="ghost"
                                     onClick={(e) => { e.stopPropagation(); handleViewCompany(company) }}
-                                    className="h-7 px-2.5 text-xs bg-[#226D68] hover:bg-[#1a5a55] text-white shrink-0"
+                                    className="h-6 px-2 text-[10px] text-[#226D68] hover:bg-[#226D68]/10 hover:text-[#1a5a55] shrink-0"
                                   >
-                                    <Eye className="h-3 w-3 mr-1" />
+                                    <Eye className="w-2.5 h-2.5 mr-1" />
                                     Voir
                                   </Button>
                                 </div>
@@ -1338,53 +1366,53 @@ export default function AdminDashboard() {
               )}
 
               {activeSubsection === 'recruiters' && (
-                <Card className="border border-border shadow-sm overflow-hidden">
-                  <CardHeader className="py-2.5 px-3 border-b border-border bg-[#226D68]/5">
-                    <CardTitle className="flex items-center gap-1.5 text-sm font-semibold text-gray-anthracite">
-                      <UserCheck className="w-4 h-4 text-[#226D68]" />
+                <Card className="border border-neutral-200 shadow-none overflow-hidden bg-white">
+                  <CardHeader className="py-2 px-3 border-b border-neutral-200 bg-[#E8F4F3]/60">
+                    <CardTitle className="flex items-center gap-1.5 text-xs font-semibold text-[#2C2C2C] font-heading">
+                      <UserCheck className="w-3.5 h-3.5 text-[#226D68]" />
                       Recruteurs par entreprise
-                        </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground">
+                    </CardTitle>
+                    <CardDescription className="text-[11px] text-neutral-500 mt-0.5">
                       {selectedCompany ? `${selectedCompany.name} · ${companyRecruiters.length} recruteur${companyRecruiters.length !== 1 ? 's' : ''}` : 'Choisir une entreprise dans la liste'}
-                        </CardDescription>
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-3">
+                  <CardContent className="p-2">
                     {!selectedCompany ? (
-                      <div className="flex flex-col items-center py-10 text-center rounded-lg border border-dashed border-border bg-muted/20">
-                        <UserCheck className="h-10 w-10 text-muted-foreground opacity-60 mb-2" />
-                        <p className="text-sm font-medium text-gray-anthracite">Sélectionnez une entreprise</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 mb-3">Ouvrez la liste des entreprises puis cliquez sur « Voir » pour afficher les recruteurs.</p>
-                        <Button variant="outline" size="sm" className="h-8 border-[#226D68]/40 text-[#226D68] hover:bg-[#226D68]/10" onClick={() => { setActiveSubsection('list'); setCompaniesSubmenuOpen(true) }}>
+                      <div className="flex flex-col items-center py-8 text-center rounded-md border border-dashed border-neutral-200 bg-[#F4F6F8]">
+                        <UserCheck className="h-8 w-8 text-neutral-400 mb-1.5" />
+                        <p className="text-xs font-medium text-[#2C2C2C]">Sélectionnez une entreprise</p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5 mb-2">Cliquez sur « Voir » dans la liste pour afficher les recruteurs.</p>
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] border-[#226D68]/40 text-[#226D68] hover:bg-[#226D68]/10" onClick={() => { setActiveSubsection('list'); setCompaniesSubmenuOpen(true) }}>
                           Aller à la liste
                         </Button>
                       </div>
                     ) : companyRecruiters.length === 0 ? (
-                      <div className="flex flex-col items-center py-10 text-center rounded-lg border border-dashed border-border bg-muted/20">
-                        <Users className="h-10 w-10 text-muted-foreground opacity-60 mb-2" />
-                        <p className="text-sm font-medium text-gray-anthracite">Aucun recruteur</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Aucun compte recruteur associé à cette entreprise.</p>
+                      <div className="flex flex-col items-center py-8 text-center rounded-md border border-dashed border-neutral-200 bg-[#F4F6F8]">
+                        <Users className="h-8 w-8 text-neutral-400 mb-1.5" />
+                        <p className="text-xs font-medium text-[#2C2C2C]">Aucun recruteur</p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">Aucun compte recruteur associé à cette entreprise.</p>
                       </div>
                     ) : (
-                      <div className="space-y-1.5">
-                        <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-[#226D68]/10 border border-[#226D68]/20">
-                          <p className="text-xs font-medium text-[#1a5a55]">{selectedCompany.name}</p>
+                      <div className="space-y-1">
+                        <div className="mb-1.5 px-2 py-1 rounded-md bg-[#E8F4F3]/80 border border-[#226D68]/20">
+                          <p className="text-[11px] font-medium text-[#1a5a55]">{selectedCompany.name}</p>
                         </div>
                         {companyRecruiters.map((recruiter) => (
-                          <Card key={recruiter.id || recruiter.user_id} className="border border-border">
-                            <CardContent className="py-2 px-3 flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#226D68]/20 flex items-center justify-center text-[#226D68] font-semibold text-sm shrink-0">
-                                  {recruiter.first_name?.[0] || recruiter.email?.[0] || 'U'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-anthracite truncate">
+                          <Card key={recruiter.id || recruiter.user_id} className="border border-neutral-200">
+                            <CardContent className="py-2 px-2.5 flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-full bg-[#E8F4F3] flex items-center justify-center text-[#226D68] font-semibold text-xs shrink-0">
+                                {recruiter.first_name?.[0] || recruiter.email?.[0] || 'U'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-[#2C2C2C] truncate">
                                   {recruiter.first_name && recruiter.last_name ? `${recruiter.first_name} ${recruiter.last_name}` : recruiter.email}
                                 </p>
-                                  <p className="text-xs text-muted-foreground truncate">{recruiter.email}</p>
-                                  {recruiter.role_in_company && (
-                                  <Badge variant="outline" className="mt-0.5 text-[10px] px-1.5 py-0 h-4 border-[#226D68]/20 text-[#1a5a55]">
-                                      {recruiter.role_in_company}
-                                    </Badge>
-                                  )}
+                                <p className="text-[10px] text-neutral-500 truncate">{recruiter.email}</p>
+                                {recruiter.role_in_company && (
+                                  <Badge variant="outline" className="mt-0.5 text-[10px] px-1 py-0 h-3.5 border-[#226D68]/20 text-[#1a5a55] font-normal">
+                                    {recruiter.role_in_company}
+                                  </Badge>
+                                )}
                               </div>
                             </CardContent>
                           </Card>
@@ -1396,58 +1424,62 @@ export default function AdminDashboard() {
               )}
 
               {activeSubsection === 'subscriptions' && (
-                <Card className="border border-border shadow-sm overflow-hidden">
-                  <CardHeader className="py-2.5 px-3 border-b border-border bg-[#226D68]/5">
-                    <CardTitle className="flex items-center gap-1.5 text-sm font-semibold text-gray-anthracite">
-                      <CreditCard className="w-4 h-4 text-[#226D68]" />
+                <Card className="border border-neutral-200 shadow-none overflow-hidden bg-white">
+                  <CardHeader className="py-2 px-3 border-b border-neutral-200 bg-[#E8F4F3]/60">
+                    <CardTitle className="flex items-center gap-1.5 text-xs font-semibold text-[#2C2C2C] font-heading">
+                      <CreditCard className="w-3.5 h-3.5 text-[#226D68]" />
                       Abonnements
-                        </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground">
+                    </CardTitle>
+                    <CardDescription className="text-[11px] text-neutral-500 mt-0.5">
                       Plans, statut et quotas par entreprise
-                        </CardDescription>
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-2 sm:p-3">
+                  <CardContent className="p-2">
                     {companiesLoading ? (
-                      <div className="flex justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-[#226D68]" />
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin text-[#226D68]" />
                       </div>
                     ) : companies.length === 0 ? (
-                      <div className="flex flex-col items-center py-10 text-center rounded-lg border border-dashed border-border bg-muted/20">
-                        <CreditCard className="h-10 w-10 text-muted-foreground opacity-60 mb-2" />
-                        <p className="text-sm font-medium text-gray-anthracite">Aucune entreprise</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">Aucune entreprise partenaire enregistrée.</p>
+                      <div className="flex flex-col items-center py-8 text-center rounded-md border border-dashed border-neutral-200 bg-[#F4F6F8]">
+                        <CreditCard className="h-8 w-8 text-neutral-400 mb-1.5" />
+                        <p className="text-xs font-medium text-[#2C2C2C]">Aucune entreprise</p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">Aucune entreprise partenaire enregistrée.</p>
                       </div>
                     ) : (
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {companies.map((company) => {
                           const subscription = companySubscriptions[company.id]
                           return (
-                            <Card key={company.id} className="border border-border">
-                              <CardContent className="py-2.5 px-3 flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    {company.logo_url && (
-                                    <img src={company.logo_url} alt={company.name} className="w-9 h-9 rounded-lg object-cover border border-border shrink-0" />
+                            <Card key={company.id} className="border border-neutral-200">
+                              <CardContent className="py-2 px-2.5 flex items-center justify-between gap-2.5">
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  {company.logo_url ? (
+                                    <img src={company.logo_url} alt={company.name} className="w-8 h-8 rounded-md object-cover border border-neutral-200 shrink-0" />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-md bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                                      <Building className="w-4 h-4 text-[#226D68]" />
+                                    </div>
                                   )}
                                   <div className="min-w-0">
-                                    <h3 className="text-sm font-medium text-gray-anthracite truncate">{company.name}</h3>
-                                      {subscription?.plan ? (
-                                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-[#226D68]/30 text-[#1a5a55]">
-                                            {subscription.plan.plan_type || 'FREEMIUM'}
-                                          </Badge>
+                                    <h3 className="text-xs font-medium text-[#2C2C2C] truncate">{company.name}</h3>
+                                    {subscription?.plan ? (
+                                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-3.5 border-[#226D68]/30 text-[#1a5a55] font-normal">
+                                          {subscription.plan.plan_type || 'FREEMIUM'}
+                                        </Badge>
                                         {subscription.status === 'active' && (
-                                          <Badge className="text-[10px] px-1.5 py-0 h-4 bg-[#226D68]/15 text-[#1a5a55] border-0">
+                                          <Badge className="text-[10px] px-1 py-0 h-3.5 bg-[#226D68]/15 text-[#1a5a55] border-0">
                                             actif
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      ) : (
-                                      <p className="text-xs text-muted-foreground mt-0.5">Aucun abonnement</p>
-                                      )}
-                                    </div>
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p className="text-[10px] text-neutral-500 mt-0.5">Aucun abonnement</p>
+                                    )}
                                   </div>
+                                </div>
                                 {subscription?.quota_limit != null && (
-                                  <span className="text-xs text-muted-foreground shrink-0">
+                                  <span className="text-[10px] text-neutral-500 shrink-0">
                                     {subscription.quota_used ?? 0}/{subscription.quota_limit}
                                   </span>
                                 )}
@@ -1467,53 +1499,49 @@ export default function AdminDashboard() {
 
       {viewingCompany && (
         <Dialog open={!!viewingCompany} onOpenChange={(open) => !open && handleCloseCompanyView()}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-border rounded-lg">
-            <DialogHeader className="border-b border-border pb-2.5 bg-[#226D68]/5 -m-6 mb-0 p-4 rounded-t-lg">
-              <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-gray-anthracite">
-                <Building className="w-4 h-4 text-[#226D68]" />
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto border-neutral-200 rounded-lg">
+            <DialogHeader className="border-b border-neutral-200 pb-2 bg-[#E8F4F3]/60 -m-6 mb-0 p-3 rounded-t-lg">
+              <DialogTitle className="flex items-center gap-1.5 text-xs font-semibold text-[#2C2C2C] font-heading">
+                <Building className="w-3.5 h-3.5 text-[#226D68]" />
                 Fiche entreprise
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+              <DialogDescription className="text-[11px] text-neutral-500 mt-0.5">
                 Informations générales et contact référent
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4 mt-4">
+            <div className="space-y-3 mt-3">
               {/* Informations générales */}
-              <div className="rounded-lg border border-border bg-white overflow-hidden">
-                <div className="px-3 py-2 border-b border-border bg-muted/20">
-                  <h3 className="text-xs font-semibold text-gray-anthracite uppercase tracking-wider">Informations générales</h3>
+              <div className="rounded-md border border-neutral-200 bg-white overflow-hidden">
+                <div className="px-2.5 py-1.5 border-b border-neutral-200 bg-[#F4F6F8]">
+                  <h3 className="text-[10px] font-semibold text-[#2C2C2C] uppercase tracking-wider">Informations générales</h3>
                 </div>
-                <div className="p-3 space-y-3">
-                  <div className="flex items-start gap-3">
+                <div className="p-2.5 space-y-2">
+                  <div className="flex items-start gap-2.5">
                     {viewingCompany.logo_url && (
-                      <img
-                        src={viewingCompany.logo_url}
-                        alt={viewingCompany.name}
-                        className="w-14 h-14 rounded-lg object-cover border border-border flex-shrink-0"
-                      />
+                      <img src={viewingCompany.logo_url} alt={viewingCompany.name} className="w-10 h-10 rounded-md object-cover border border-neutral-200 flex-shrink-0" />
                     )}
-                    <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex-1 min-w-0 space-y-1">
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Raison sociale</p>
-                        <p className="text-sm font-semibold text-gray-anthracite">{viewingCompany.name}</p>
+                        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">Raison sociale</p>
+                        <p className="text-xs font-semibold text-[#2C2C2C]">{viewingCompany.name}</p>
                       </div>
                       {viewingCompany.legal_id && (
-                      <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">RCCM</p>
-                          <p className="text-xs">{viewingCompany.legal_id}</p>
-                      </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">RCCM</p>
+                          <p className="text-[11px]">{viewingCompany.legal_id}</p>
+                        </div>
                       )}
                       {viewingCompany.adresse && (
-                        <div className="flex items-start gap-1.5">
-                          <MapPin className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
-                          <p className="text-xs text-muted-foreground">{viewingCompany.adresse}</p>
+                        <div className="flex items-start gap-1">
+                          <MapPin className="w-2.5 h-2.5 text-neutral-500 mt-0.5 shrink-0" />
+                          <p className="text-[11px] text-neutral-600">{viewingCompany.adresse}</p>
                         </div>
                       )}
                       {companySubscriptions[viewingCompany.id]?.plan && (
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Plan</p>
-                          <Badge variant="outline" className="text-xs border-[#226D68]/30 text-[#1a5a55]">
+                          <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">Plan</p>
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 h-3.5 border-[#226D68]/30 text-[#1a5a55] font-normal">
                             {companySubscriptions[viewingCompany.id].plan.plan_type || 'N/A'}
                           </Badge>
                         </div>
@@ -1525,40 +1553,40 @@ export default function AdminDashboard() {
 
               {/* Contact référent */}
               {(viewingCompany.contact_first_name || viewingCompany.contact_last_name || viewingCompany.contact_email || viewingCompany.contact_phone || viewingCompany.contact_function) && (
-                <div className="rounded-lg border border-border bg-white overflow-hidden">
-                  <div className="px-3 py-2 border-b border-border bg-[#226D68]/5">
-                    <h3 className="text-xs font-semibold text-gray-anthracite uppercase tracking-wider flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#226D68]" />
+                <div className="rounded-md border border-neutral-200 bg-white overflow-hidden">
+                  <div className="px-2.5 py-1.5 border-b border-neutral-200 bg-[#E8F4F3]/60">
+                    <h3 className="text-[10px] font-semibold text-[#2C2C2C] uppercase tracking-wider flex items-center gap-1">
+                      <User className="w-3 h-3 text-[#226D68]" />
                       Contact référent
                     </h3>
                   </div>
-                  <div className="p-3 space-y-2">
+                  <div className="p-2.5 space-y-1.5">
                     {(viewingCompany.contact_first_name || viewingCompany.contact_last_name) && (
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Nom</p>
-                        <p className="text-sm font-medium text-gray-anthracite">
+                        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">Nom</p>
+                        <p className="text-xs font-medium text-[#2C2C2C]">
                           {viewingCompany.contact_first_name} {viewingCompany.contact_last_name}
                         </p>
                       </div>
                     )}
                     {viewingCompany.contact_function && (
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Fonction</p>
-                        <p className="text-xs">{viewingCompany.contact_function}</p>
+                        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">Fonction</p>
+                        <p className="text-[11px]">{viewingCompany.contact_function}</p>
                       </div>
                     )}
                     {viewingCompany.contact_email && (
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1"><Mail className="w-3 h-3" /> Email</p>
-                        <a href={`mailto:${viewingCompany.contact_email}`} className="text-xs text-[#226D68] hover:underline">
+                        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium flex items-center gap-1"><Mail className="w-2.5 h-2.5" /> Email</p>
+                        <a href={`mailto:${viewingCompany.contact_email}`} className="text-[11px] text-[#226D68] hover:underline">
                           {viewingCompany.contact_email}
                         </a>
                       </div>
                     )}
                     {viewingCompany.contact_phone && (
                       <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-1"><Phone className="w-3 h-3" /> Téléphone</p>
-                        <a href={`tel:${viewingCompany.contact_phone}`} className="text-xs text-[#226D68] hover:underline">
+                        <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium flex items-center gap-1"><Phone className="w-2.5 h-2.5 text-[#226D68]" /> Téléphone</p>
+                        <a href={`tel:${viewingCompany.contact_phone}`} className="text-[11px] text-[#226D68] hover:underline">
                           {viewingCompany.contact_phone}
                         </a>
                       </div>
@@ -1568,45 +1596,45 @@ export default function AdminDashboard() {
               )}
 
               {/* Statut et abonnement */}
-              <div className="rounded-lg border border-border bg-white overflow-hidden">
-                <div className="px-3 py-2 border-b border-border bg-muted/20">
-                  <h3 className="text-xs font-semibold text-gray-anthracite uppercase tracking-wider">Statut et abonnement</h3>
+              <div className="rounded-md border border-neutral-200 bg-white overflow-hidden">
+                <div className="px-2.5 py-1.5 border-b border-neutral-200 bg-[#F4F6F8]">
+                  <h3 className="text-[10px] font-semibold text-[#2C2C2C] uppercase tracking-wider">Statut et abonnement</h3>
                 </div>
-                <div className="p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Statut</p>
-                    <Badge variant="outline" className="text-xs border-border">{viewingCompany.status || 'ACTIVE'}</Badge>
+                <div className="p-2.5 space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">Statut</p>
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-3.5 border-neutral-200">{viewingCompany.status || 'ACTIVE'}</Badge>
                   </div>
                   {viewingCompany.created_at && (
                     <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Inscription</span>
-                      <span className="text-xs">{formatDateTime(viewingCompany.created_at)}</span>
+                      <Calendar className="w-2.5 h-2.5 text-neutral-500" />
+                      <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">Inscription</span>
+                      <span className="text-[11px]">{formatDateTime(viewingCompany.created_at)}</span>
                     </div>
                   )}
                   {companySubscriptions[viewingCompany.id] && (
-                    <div className="pt-1 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs border-[#226D68]/30 text-[#1a5a55]">
+                    <div className="pt-0.5 space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-3.5 border-[#226D68]/30 text-[#1a5a55] font-normal">
                           {companySubscriptions[viewingCompany.id].plan?.plan_type || 'FREEMIUM'}
                         </Badge>
                         {companySubscriptions[viewingCompany.id].status === 'active' && (
-                          <Badge className="text-xs bg-[#226D68]/15 text-[#1a5a55 border-0">actif</Badge>
+                          <Badge className="text-[10px] px-1 py-0 h-3.5 bg-[#226D68]/15 text-[#1a5a55 border-0 font-normal">actif</Badge>
                         )}
                       </div>
                       {companySubscriptions[viewingCompany.id].quota_limit != null && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-neutral-600">
                           Quota : {companySubscriptions[viewingCompany.id].quota_used ?? 0} / {companySubscriptions[viewingCompany.id].quota_limit}
-                          </p>
-                        )}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-border">
-              <Button variant="outline" size="sm" className="h-8 text-xs border-border text-gray-anthracite hover:bg-[#226D68]/10 hover:text-[#226D68]" onClick={handleCloseCompanyView}>
+            <div className="flex justify-end gap-1.5 mt-3 pt-2.5 border-t border-neutral-200">
+              <Button variant="outline" size="sm" className="h-7 text-[11px] border-neutral-200 text-[#2C2C2C] hover:bg-[#226D68]/10 hover:text-[#226D68]" onClick={handleCloseCompanyView}>
                 Fermer
               </Button>
             </div>

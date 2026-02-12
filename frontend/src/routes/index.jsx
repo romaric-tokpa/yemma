@@ -7,6 +7,7 @@ const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const Login = lazy(() => import('@/pages/Login'))
 const RegisterChoice = lazy(() => import('@/pages/RegisterChoice'))
 const RegisterCandidat = lazy(() => import('@/pages/RegisterCandidat'))
+const RegisterCandidatOAuthCallback = lazy(() => import('@/pages/RegisterCandidatOAuthCallback'))
 const RegisterCompany = lazy(() => import('@/pages/RegisterCompany'))
 const ResetPassword = lazy(() => import('@/pages/ResetPassword'))
 const AcceptInvitation = lazy(() => import('@/pages/AcceptInvitation'))
@@ -36,6 +37,7 @@ const CandidateDetailPage = lazy(() => import('@/pages/CandidateDetailPage'))
 
 // Routes Admin
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'))
+const AdminCvtheque = lazy(() => import('@/pages/AdminCvtheque'))
 const AdminReview = lazy(() => import('@/pages/AdminReview'))
 const AdminInvitationsPage = lazy(() => import('@/pages/AdminInvitationsPage'))
 const CreateAdminAccount = lazy(() => import('@/pages/CreateAdminAccount'))
@@ -45,6 +47,10 @@ const NotFound = lazy(() => import('@/pages/NotFound'))
 
 // Page Contact
 const Contact = lazy(() => import('@/pages/Contact'))
+
+// Pages Paiement (retour Stripe)
+const PaymentSuccess = lazy(() => import('@/pages/PaymentSuccess'))
+const PaymentCancel = lazy(() => import('@/pages/PaymentCancel'))
 
 // Pages Démo
 const DemoCvtheque = lazy(() => import('@/pages/DemoCvtheque'))
@@ -58,6 +64,7 @@ export default function AppRoutes() {
     <Routes>
       {/* Routes publiques (accessibles sans authentification) */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/register" element={<Navigate to="/register/choice" replace />} />
       <Route path="/register/choice" element={<RegisterChoice />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/legal/mentions" element={<MentionsLegales />} />
@@ -72,12 +79,31 @@ export default function AppRoutes() {
       {/* Routes d'authentification (publiques mais avec logique spéciale) */}
       <Route path="/login" element={<Login />} />
       <Route path="/register/candidat" element={<RegisterCandidat />} />
+      <Route path="/register/candidat/oauth-callback" element={<RegisterCandidatOAuthCallback />} />
       <Route path="/register/company" element={<RegisterCompany />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/invitation/accept" element={<AcceptInvitation />} />
       
       {/* Route publique pour création de compte admin via token d'invitation */}
       <Route path="/admin/create-account" element={<CreateAdminAccount />} />
+
+      {/* Paiement - Retour Stripe (protégé entreprise) */}
+      <Route
+        path="/payment/success"
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
+            <PaymentSuccess />
+          </AuthGuard>
+        }
+      />
+      <Route
+        path="/payment/cancel"
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
+            <PaymentCancel />
+          </AuthGuard>
+        }
+      />
 
       {/* Routes protégées - Candidat */}
       {/* Onboarding simplifié : upload CV → profil créé via Hrflow.ai */}
@@ -158,12 +184,12 @@ export default function AppRoutes() {
         } 
       />
       
-      {/* Gestion entreprise (admin uniquement) */}
+      {/* Gestion entreprise (admin uniquement) - redirige vers dashboard avec tab */}
       <Route 
         path="/company/management" 
         element={
           <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
-            <CompanyManagement />
+            <Navigate to="/company/dashboard?tab=management" replace />
           </AuthGuard>
         } 
       />
@@ -194,12 +220,22 @@ export default function AppRoutes() {
         } 
       />
       
-      {/* Détail candidat */}
+      {/* Détail candidat - recruteurs, entreprises et admin */}
       <Route 
         path="/candidates/:candidateId" 
         element={
-          <AuthGuard allowedRoles={['ROLE_RECRUITER', 'ROLE_COMPANY_ADMIN']}>
+          <AuthGuard allowedRoles={['ROLE_RECRUITER', 'ROLE_COMPANY_ADMIN', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <CandidateDetailPage />
+          </AuthGuard>
+        } 
+      />
+
+      {/* CVthèque admin - accès identique à l'entreprise */}
+      <Route 
+        path="/admin/cvtheque" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminCvtheque />
           </AuthGuard>
         } 
       />
