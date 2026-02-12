@@ -32,6 +32,24 @@ const formatSkillLevel = (level) => {
   return map[level] || level
 }
 
+const formatAvailability = (v) => {
+  const map = { immediate: 'Immédiate', '1_week': 'Sous 1 semaine', '2_weeks': 'Sous 2 semaines', '1_month': 'Sous 1 mois', '2_months': 'Sous 2 mois', '3_months': 'Sous 3 mois', negotiable: 'À négocier' }
+  return map[v] || v
+}
+
+const formatRemotePreference = (v) => {
+  const map = { onsite: 'Sur site uniquement', hybrid: 'Hybride', remote: 'Télétravail complet', flexible: 'Flexible' }
+  return map[v] || v
+}
+
+const hasJobPreferences = (jp) => {
+  if (!jp) return false
+  return (jp.desired_positions?.length > 0) || jp.contract_type || (jp.contract_types?.length > 0) ||
+    (jp.target_sectors?.length > 0) || jp.desired_location || jp.preferred_locations || jp.mobility ||
+    jp.remote_preference || jp.willing_to_relocate || jp.availability ||
+    (jp.salary_min != null) || (jp.salary_max != null) || (jp.salary_expectations != null)
+}
+
 export default function CandidateDetailPage() {
   const { candidateId } = useParams()
   const navigate = useNavigate()
@@ -378,25 +396,74 @@ export default function CandidateDetailPage() {
               </Card>
             )}
 
-            {/* Préférences emploi */}
-            {candidate.job_preferences && (candidate.job_preferences.desired_positions?.length || candidate.job_preferences.contract_type || candidate.job_preferences.desired_location || candidate.job_preferences.salary_expectations) && (
+            {/* Préférences emploi - toutes les infos */}
+            {hasJobPreferences(candidate.job_preferences) && (
               <Card className="border border-[#e5e7eb] overflow-hidden">
                 <CardHeader className="py-2.5 px-4 bg-[#F4F6F8]/50 flex flex-row items-center gap-2">
                   <Target className="h-4 w-4 text-[#226D68]" />
                   <CardTitle className="text-sm font-semibold text-[#2C2C2C]">Recherche d'emploi</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 pt-2 space-y-2">
+                <CardContent className="p-4 pt-2 space-y-3">
                   {candidate.job_preferences.desired_positions?.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {candidate.job_preferences.desired_positions.map((pos, i) => (
-                        <Badge key={i} className="text-[10px] h-5 bg-[#E8F4F3] text-[#226D68] border-0">{pos}</Badge>
-                      ))}
+                    <div>
+                      <p className="text-[10px] font-semibold text-[#9ca3af] uppercase mb-1">Poste(s) recherché(s)</p>
+                      <div className="flex flex-wrap gap-1">
+                        {candidate.job_preferences.desired_positions.map((pos, i) => (
+                          <Badge key={i} className="text-[10px] h-5 bg-[#E8F4F3] text-[#226D68] border-0">{pos}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(candidate.job_preferences.contract_types?.length > 0 || candidate.job_preferences.contract_type) && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-[#9ca3af] uppercase mb-1">Type(s) de contrat</p>
+                      <div className="flex flex-wrap gap-1">
+                        {(candidate.job_preferences.contract_types?.length > 0 ? candidate.job_preferences.contract_types : [candidate.job_preferences.contract_type]).map((t, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px] h-5 border-[#226D68]/30 text-[#226D68]">{t}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {candidate.job_preferences.target_sectors?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-[#9ca3af] uppercase mb-1">Secteurs ciblés</p>
+                      <div className="flex flex-wrap gap-1">
+                        {candidate.job_preferences.target_sectors.map((s, i) => (
+                          <Badge key={i} className="text-[10px] h-5 bg-[#FDF2F0] text-[#e76f51] border-0">{s}</Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
                   <div className="space-y-1 text-xs">
-                    {candidate.job_preferences.contract_type && <p><span className="text-[#9ca3af]">Contrat:</span> {candidate.job_preferences.contract_type}</p>}
-                    {candidate.job_preferences.desired_location && <p><span className="text-[#9ca3af]">Lieu:</span> {candidate.job_preferences.desired_location}</p>}
-                    {candidate.job_preferences.salary_expectations && <p><span className="text-[#9ca3af]">Salaire:</span> {(candidate.job_preferences.salary_expectations / 1000).toFixed(0)}k FCFA/mois</p>}
+                    {candidate.job_preferences.desired_location && <p><span className="text-[#9ca3af]">Lieu souhaité:</span> {candidate.job_preferences.desired_location}</p>}
+                    {candidate.job_preferences.preferred_locations && (
+                      <p><span className="text-[#9ca3af]">Zones préférées:</span> {candidate.job_preferences.preferred_locations}</p>
+                    )}
+                    {candidate.job_preferences.mobility && <p><span className="text-[#9ca3af]">Mobilité:</span> {candidate.job_preferences.mobility}</p>}
+                    {candidate.job_preferences.remote_preference && (
+                      <p><span className="text-[#9ca3af]">Télétravail:</span> {formatRemotePreference(candidate.job_preferences.remote_preference)}</p>
+                    )}
+                    {candidate.job_preferences.willing_to_relocate != null && (
+                      <p><span className="text-[#9ca3af]">Prêt à déménager:</span> {candidate.job_preferences.willing_to_relocate ? 'Oui' : 'Non'}</p>
+                    )}
+                    {candidate.job_preferences.availability && (
+                      <p><span className="text-[#9ca3af]">Disponibilité:</span> {formatAvailability(candidate.job_preferences.availability)}</p>
+                    )}
+                    {(() => {
+                      const sm = candidate.job_preferences.salary_min
+                      const sx = candidate.job_preferences.salary_max
+                      const hasMin = sm != null && sm > 0
+                      const hasMax = sx != null && sx > 0
+                      if (!hasMin && !hasMax) return null
+                      let label = ''
+                      if (hasMin && hasMax) label = `${(sm / 1000).toFixed(0)}k – ${(sx / 1000).toFixed(0)}k`
+                      else if (hasMin) label = `À partir de ${(sm / 1000).toFixed(0)}k`
+                      else label = `Jusqu'à ${(sx / 1000).toFixed(0)}k`
+                      return <p><span className="text-[#9ca3af]">Salaire:</span> {label} FCFA/mois</p>
+                    })()}
+                    {candidate.job_preferences.salary_expectations != null && candidate.job_preferences.salary_expectations > 0 && (candidate.job_preferences.salary_min == null || candidate.job_preferences.salary_min === 0) && (candidate.job_preferences.salary_max == null || candidate.job_preferences.salary_max === 0) && (
+                      <p><span className="text-[#9ca3af]">Salaire:</span> {(candidate.job_preferences.salary_expectations / 1000).toFixed(0)}k FCFA/mois</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
