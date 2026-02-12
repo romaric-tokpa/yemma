@@ -596,6 +596,66 @@ services:
       start_period: 180s
     restart: unless-stopped
 
+  parsing:
+    build:
+      context: ./services
+      dockerfile: yemma-parsing-service/Dockerfile
+      args:
+        - APP_ENV=production
+    container_name: yemma-parsing
+    environment:
+      APP_NAME: yemma-parsing-service
+      APP_ENV: ${APP_ENV:-production}
+      PYTHONPATH: /app
+      DEBUG: ${DEBUG:-false}
+      HRFLOW_API_KEY: ${HRFLOW_API_KEY:-}
+      HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-}
+      HRFLOW_API_URL: ${HRFLOW_API_URL:-https://api.hrflow.ai/v1}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      AUTH_SERVICE_URL: http://auth:8000
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com}
+    networks:
+      - yemma-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    restart: unless-stopped
+
+  parsing-worker:
+    build:
+      context: ./services
+      dockerfile: yemma-parsing-service/Dockerfile
+      args:
+        - APP_ENV=production
+    container_name: yemma-parsing-worker
+    environment:
+      APP_NAME: yemma-parsing-worker
+      APP_ENV: ${APP_ENV:-production}
+      PYTHONPATH: /app
+      DEBUG: ${DEBUG:-false}
+      HRFLOW_API_KEY: ${HRFLOW_API_KEY:-}
+      HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-}
+      HRFLOW_API_URL: ${HRFLOW_API_URL:-https://api.hrflow.ai/v1}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+    networks:
+      - yemma-network
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2 --queues=parsing
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   # ============================================
   # FRONTEND
   # ============================================
