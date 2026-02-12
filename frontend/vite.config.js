@@ -40,6 +40,10 @@ export default defineConfig({
         target: process.env.VITE_AUTH_PROXY_TARGET || 'http://localhost:8001',
         changeOrigin: true,
       },
+      '/api/v1/admin-invitations': {
+        target: process.env.VITE_AUTH_PROXY_TARGET || 'http://localhost:8001',
+        changeOrigin: true,
+      },
       '/api/v1/profiles': {
         target: process.env.VITE_CANDIDATE_PROXY_TARGET || 'http://localhost:8002',
         changeOrigin: true,

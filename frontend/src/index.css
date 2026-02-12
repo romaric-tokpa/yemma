@@ -41,6 +41,22 @@
   }
 }
 
+/* Logos partenaires - défilement plus rapide */
+.animate-scroll-right-fast {
+  animation: scroll-right 35s linear infinite;
+  will-change: transform;
+}
+.animate-scroll-left-fast {
+  animation: scroll-left 35s linear infinite;
+  will-change: transform;
+}
+@media (hover: hover) {
+  .animate-scroll-right-fast:hover,
+  .animate-scroll-left-fast:hover {
+    animation-play-state: paused;
+  }
+}
+
 @layer base {
   :root {
     /* Charte graphique Yemma Solutions - Nouvelle charte */
@@ -167,6 +183,15 @@
   
   .zoom-in {
     animation: zoom-in 0.3s ease-out;
+  }
+
+  /* Section "Pourquoi 500+ entreprises" - décor flottant */
+  @keyframes benefits-float {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+    50% { transform: translateY(-8px) scale(1.02); opacity: 0.8; }
+  }
+  .animate-benefits-float {
+    animation: benefits-float 8s ease-in-out infinite;
   }
   
   /* Amélioration du focus pour l'accessibilité */

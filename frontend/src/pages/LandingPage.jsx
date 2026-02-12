@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import {
   ArrowRight, CheckCircle2, Users, Shield, Clock, Star, Zap,
   Target, Timer, Menu, X, Cpu, Briefcase, HeartPulse, ShoppingCart,
@@ -43,10 +44,19 @@ export default function LandingPage() {
     'Conformité RGPD garantie',
   ]
 
-  const testimonials = [
-    { name: 'Sophie Martin', role: 'DRH, TechCorp (150 employés)', content: 'En 2 semaines, nous avons recruté 3 développeurs seniors. Yemma a divisé notre temps de recrutement par 4.', metric: '4x plus rapide' },
-    { name: 'Jean Dupont', role: 'Fondateur, StartupHub', content: 'La qualité des profils vérifiés est exceptionnelle. Nous avons économisé 15 000€ en frais d\'agence cette année.', metric: '15k€ économisés' },
-    { name: 'Marie Leclerc', role: 'Responsable RH, InnovateLab', content: 'Notre taux de rétention a augmenté de 40% depuis qu\'on utilise Yemma. Les candidats correspondent vraiment au poste.', metric: '+40% rétention' },
+  const partnerCompanies = [
+    { name: 'TechCorp', initials: 'TC' },
+    { name: 'StartupHub', initials: 'SH' },
+    { name: 'InnovateLab', initials: 'IL' },
+    { name: 'FinancePlus', initials: 'FP' },
+    { name: 'ConsultGroup', initials: 'CG' },
+    { name: 'DigitalPro', initials: 'DP' },
+    { name: 'HealthTech', initials: 'HT' },
+    { name: 'RetailMax', initials: 'RM' },
+    { name: 'DataFlow', initials: 'DF' },
+    { name: 'CloudSync', initials: 'CS' },
+    { name: 'AgileSoft', initials: 'AS' },
+    { name: 'NextGen', initials: 'NG' },
   ]
 
   const sectorRows = [
@@ -141,56 +151,106 @@ export default function LandingPage() {
         )}
       </nav>
 
-      {/* Hero */}
-      <section className="pt-16 md:pt-20 pb-10 md:pb-14 bg-[#F4F6F8]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F4F3] text-[#226D68] text-xs font-semibold mb-4">
-                <Star className="h-3.5 w-3.5" /> +500 entreprises
-              </div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#2C2C2C] leading-tight mb-3">
-                Recrutez les{' '}
-                <span className="text-[#226D68]">meilleurs talents</span>
-                {' '}en 48h
-              </h1>
-              <p className="text-sm sm:text-base text-[#6b7280] mb-5 max-w-lg">
-                La plateforme RH qui réduit vos coûts de recrutement de <strong className="text-[#226D68]">60%</strong> tout en vous donnant accès à des candidats vérifiés par des experts.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2 mb-5">
-                <Button size="lg" onClick={() => navigate('/register/company')}
-                  className="h-10 px-5 text-sm font-semibold bg-[#226D68] hover:bg-[#1a5a55] text-white">
+      {/* Hero - compact & pro */}
+      <section className="relative pt-16 md:pt-20 pb-10 md:pb-12 overflow-hidden bg-gradient-to-br from-[#E8F4F3]/50 via-[#F4F6F8] to-[#E8F4F3]/30">
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 lg:gap-10">
+            <div className="lg:max-w-[55%]">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F4F3] text-[#226D68] text-[11px] font-semibold mb-3"
+              >
+                +500 entreprises
+              </motion.div>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.05 }}
+                className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#2C2C2C] leading-tight mb-2.5 font-heading"
+              >
+                Recrutez les <span className="text-[#226D68]">meilleurs talents</span> en 48h
+              </motion.h1>
+
+              <motion.p
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="text-sm sm:text-base text-[#6b7280] mb-4 max-w-lg"
+              >
+                La plateforme RH qui réduit vos coûts de <strong className="text-[#226D68]">60%</strong> avec des candidats vérifiés par des experts.
+              </motion.p>
+
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.15 }}
+                className="flex flex-col sm:flex-row gap-2 mb-4"
+              >
+                <Button
+                  size="sm"
+                  onClick={() => navigate('/register/company')}
+                  className="h-9 px-4 text-sm font-semibold bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                >
                   Essai gratuit 14 jours
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => navigate('/register/candidat')}
-                  className="h-10 px-5 text-sm font-semibold border-[#e76f51] text-[#e76f51] hover:bg-[#FDF2F0]">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate('/register/candidat')}
+                  className="h-9 px-4 text-sm font-semibold border-[#e76f51] text-[#e76f51] hover:bg-[#FDF2F0]"
+                >
                   Je suis candidat
                 </Button>
-              </div>
-              <div className="flex flex-wrap gap-4 text-xs text-[#6b7280]">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-[#226D68]" /> Sans engagement</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-[#226D68]" /> Support inclus</span>
-              </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="flex flex-wrap gap-3 text-[11px] text-[#6b7280]"
+              >
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-[#226D68]" /> Sans engagement</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-[#226D68]" /> Support inclus</span>
+              </motion.div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+
+            <motion.div
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="grid grid-cols-2 gap-2 sm:gap-3"
+            >
               {stats.map((s, i) => {
                 const Icon = s.icon
+                const accentColors = ['#226D68', '#e76f51', '#226D68', '#e76f51']
+                const accent = accentColors[i]
                 return (
-                  <div key={i} className="bg-white rounded-lg p-3 sm:p-4 border border-gray-100 shadow-sm animate-in transition-transform hover:scale-[1.02]">
-                    <Icon className="h-5 w-5 text-[#226D68] mb-1.5" />
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.15 + i * 0.05 }}
+                    className="bg-white rounded-lg p-3 border-l-4 shadow-sm hover:shadow-md transition-all"
+                    style={{ borderLeftColor: accent }}
+                  >
+                    <Icon className="h-4 w-4 mb-1.5" style={{ color: accent }} />
                     <p className="text-lg sm:text-xl font-bold text-[#2C2C2C]">{s.value}</p>
                     <p className="text-[10px] sm:text-xs text-[#6b7280]">{s.label}</p>
-                  </div>
+                  </motion.div>
                 )
               })}
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Secteurs d'activités - défilement animé */}
-      <section className="py-8 md:py-10 bg-white overflow-hidden">
+      <section className="py-8 md:py-10 bg-white overflow-hidden border-t border-b border-[#E8F4F3]/60">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-6">
             <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-1">
@@ -235,42 +295,109 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Benefits */}
-      <section id="benefits" className="py-10 md:py-12 bg-[#F4F6F8]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-8">
-            <h2 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-1">
-              Pourquoi <span className="text-[#226D68]">500+ entreprises</span> nous font confiance
+      {/* Benefits - Pourquoi 500+ entreprises nous font confiance */}
+      <section id="benefits" className="py-10 md:py-12 bg-[#F4F6F8] overflow-hidden relative">
+        {/* Subtle decorative background - flottant doux */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 left-0 w-64 h-64 bg-[#226D68]/5 rounded-full blur-3xl -translate-x-1/2 animate-benefits-float" style={{ animationDelay: '0s' }} />
+          <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-[#E8F4F3]/60 rounded-full blur-3xl translate-x-1/3 animate-benefits-float" style={{ animationDelay: '2s' }} />
+        </div>
+
+        <motion.div
+          className="max-w-6xl mx-auto px-4 sm:px-6 relative"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: '-80px' }}
+          variants={{
+            visible: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+            hidden: {},
+          }}
+        >
+          <motion.div
+            className="text-center mb-8"
+            variants={{
+              visible: { opacity: 1, y: 0 },
+              hidden: { opacity: 0, y: 20 },
+            }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+          >
+            <h2 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-1 font-heading">
+              Pourquoi{' '}
+              <motion.span
+                className="inline-block text-[#226D68]"
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                500+ entreprises
+              </motion.span>
+              {' '}nous font confiance
             </h2>
-            <p className="text-sm text-[#6b7280]">Résultats concrets, mesurables</p>
-          </div>
+            <motion.p
+              className="text-sm text-[#6b7280]"
+              variants={{
+                visible: { opacity: 1 },
+                hidden: { opacity: 0 },
+              }}
+              transition={{ delay: 0.3 }}
+            >
+              Résultats concrets, mesurables
+            </motion.p>
+          </motion.div>
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {benefits.map((b, i) => {
               const Icon = b.icon
+              const isCoral = i % 2 === 1
+              const accent = isCoral ? '#e76f51' : '#226D68'
+              const accentBg = isCoral ? '#FDF2F0' : '#E8F4F3'
               return (
-                <Card key={i} className="border-0 shadow-sm bg-white hover:shadow-md transition-all duration-300 hover:-translate-y-1 animate-in" style={{ animationDelay: `${i * 80}ms`, animationFillMode: 'backwards' }}>
-                  <CardContent className="p-4">
-                    <div className="w-9 h-9 rounded-lg bg-[#E8F4F3] flex items-center justify-center mb-3">
-                      <Icon className="h-5 w-5 text-[#226D68]" />
-                    </div>
-                    <h3 className="font-semibold text-[#2C2C2C] text-sm mb-1">{b.title}</h3>
-                    <p className="text-sm text-[#6b7280] leading-relaxed">{b.desc}</p>
-                  </CardContent>
-                </Card>
+                <motion.div
+                  key={i}
+                  variants={{
+                    visible: { opacity: 1, y: 0 },
+                    hidden: { opacity: 0, y: 30 },
+                  }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                >
+                  <motion.div
+                    whileHover={{ y: -8, scale: 1.02 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                    className="h-full"
+                  >
+                    <Card className="border-0 shadow-sm bg-white overflow-hidden h-full group cursor-default transition-all duration-300 hover:shadow-lg">
+                      <div className="h-1 w-full" style={{ backgroundColor: accent }} />
+                      <CardContent className="p-4 relative">
+                        <motion.div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
+                          style={{ backgroundColor: accentBg }}
+                          whileHover={{ scale: 1.15, rotate: 8 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                        >
+                          <Icon className="h-5 w-5" style={{ color: accent }} />
+                        </motion.div>
+                        <h3 className="font-semibold text-[#2C2C2C] text-sm mb-1">{b.title}</h3>
+                        <p className="text-sm text-[#6b7280] leading-relaxed">{b.desc}</p>
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: `linear-gradient(to right, ${accent}, transparent)` }} />
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </motion.div>
               )
             })}
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* Features */}
-      <section className="py-8 md:py-10 bg-white">
+      <section className="py-8 md:py-10 bg-gradient-to-r from-[#E8F4F3]/40 via-white to-[#FDF2F0]/40">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <h3 className="text-lg font-bold text-[#2C2C2C] mb-4 text-center">Tout inclus</h3>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             {features.map((f, i) => (
               <span key={i} className="flex items-center gap-2 text-sm text-[#6b7280] animate-in" style={{ animationDelay: `${i * 60}ms`, animationFillMode: 'backwards' }}>
-                <CheckCircle2 className="h-4 w-4 text-[#226D68] shrink-0" />
+                <CheckCircle2 className={`h-4 w-4 shrink-0 ${i % 2 === 0 ? 'text-[#226D68]' : 'text-[#e76f51]'}`} />
                 {f}
               </span>
             ))}
@@ -278,40 +405,59 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-10 md:py-12 bg-[#F4F6F8]">
+      {/* Entreprises qui nous font confiance - logos défilants */}
+      <section className="py-6 md:py-8 bg-gradient-to-b from-[#F4F6F8] via-[#E8F4F3]/20 to-[#F4F6F8] overflow-hidden">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-8">
-            <h2 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-1">
-              Ils ont <span className="text-[#e76f51]">transformé</span> leur recrutement
+          <div className="text-center mb-4">
+            <h2 className="text-lg md:text-xl font-bold text-[#2C2C2C]">
+              Ils nous font <span className="text-[#226D68]">confiance</span>
             </h2>
+            <p className="text-[11px] text-[#6b7280] mt-0.5">500+ entreprises</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-4 max-w-5xl mx-auto">
-            {testimonials.map((t, i) => (
-              <Card key={i} className="border-0 shadow-sm bg-white animate-in transition-all hover:shadow-md" style={{ animationDelay: `${i * 100}ms`, animationFillMode: 'backwards' }}>
-                <CardContent className="p-4">
-                  <div className="flex gap-1 mb-2">
-                    {[1, 2, 3, 4, 5].map((_) => (
-                      <Star key={_} className="h-3.5 w-3.5 fill-[#e76f51] text-[#e76f51]" />
-                    ))}
-                  </div>
-                  <p className="text-sm text-[#2C2C2C] mb-3 italic">"{t.content}"</p>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold text-sm text-[#2C2C2C]">{t.name}</p>
-                      <p className="text-xs text-[#6b7280]">{t.role}</p>
+
+          <div className="space-y-2 relative">
+            <div className="absolute left-0 top-0 w-12 h-full z-20 pointer-events-none bg-gradient-to-r from-[#F4F6F8] to-transparent" />
+            <div className="absolute right-0 top-0 w-12 h-full z-20 pointer-events-none bg-gradient-to-l from-[#F4F6F8] to-transparent" />
+
+            {/* Ligne 1 - défile vers la droite */}
+            <div className="relative flex overflow-hidden">
+              <div className="flex gap-3 animate-scroll-right-fast items-center">
+                {[...partnerCompanies, ...partnerCompanies].map((company, idx) => (
+                  <div
+                    key={`row1-${idx}`}
+                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-neutral-200 shadow-sm hover:border-[#226D68]/20 transition-colors"
+                  >
+                    <div className="w-7 h-7 rounded-md bg-[#E8F4F3] flex items-center justify-center font-semibold text-[#226D68] text-[10px]">
+                      {company.initials}
                     </div>
-                    <span className="px-2 py-1 rounded text-[10px] font-bold bg-[#FDF2F0] text-[#e76f51]">{t.metric}</span>
+                    <span className="font-medium text-[#2C2C2C] text-xs whitespace-nowrap">{company.name}</span>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                ))}
+              </div>
+            </div>
+
+            {/* Ligne 2 - défile vers la gauche */}
+            <div className="relative flex overflow-hidden">
+              <div className="flex gap-3 animate-scroll-left-fast items-center">
+                {[...partnerCompanies].reverse().concat([...partnerCompanies].reverse()).map((company, idx) => (
+                  <div
+                    key={`row2-${idx}`}
+                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-neutral-200 shadow-sm hover:border-[#e76f51]/20 transition-colors"
+                  >
+                    <div className="w-7 h-7 rounded-md bg-[#FDF2F0] flex items-center justify-center font-semibold text-[#e76f51] text-[10px]">
+                      {company.initials}
+                    </div>
+                    <span className="font-medium text-[#2C2C2C] text-xs whitespace-nowrap">{company.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* CTA finale */}
-      <section className="py-10 md:py-12 bg-[#226D68]">
+      <section className="py-10 md:py-12 bg-gradient-to-br from-[#226D68] via-[#1e5d59] to-[#1a5a55]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-xl md:text-2xl font-bold text-white mb-2">
             Prêt à économiser 60% sur vos recrutements ?
