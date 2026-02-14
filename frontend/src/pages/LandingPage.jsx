@@ -220,7 +220,7 @@ export default function LandingPage() {
       </section>
 
       {/* Secteurs d'activités - style capture */}
-      <section className="py-10 xs:py-12 md:py-16 bg-[#0B3C5D] overflow-hidden">
+      <section className="py-10 xs:py-12 md:py-16 bg-[#226D68] overflow-hidden">
         <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-start lg:gap-16">
             {/* Colonne gauche - Titre */}
@@ -234,7 +234,7 @@ export default function LandingPage() {
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight">
                 La plateforme de recrutement
                 <br />
-                <span className="text-[#226D68]">des profils préqualifiés</span>
+                <span className="text-[#e76f51]">des profils préqualifiés</span>
               </h2>
               <p className="text-white/80 text-sm md:text-base mt-4 max-w-md">
                 Tous les secteurs d&apos;activité couverts. Recrutez des profils vérifiés dans votre domaine.
@@ -255,7 +255,7 @@ export default function LandingPage() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, margin: '-30px' }}
                     transition={{ duration: 0.5, delay: idx * 0.1 }}
-                    className="border-b border-white/20 last:border-b-0 py-6 md:py-8 first:pt-0"
+                    className="border-b border-dashed border-[#e76f51]/50 last:border-b-0 py-6 md:py-8 first:pt-0"
                   >
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
@@ -267,7 +267,7 @@ export default function LandingPage() {
                           <ul className="space-y-2">
                             {leftCol.map((sector) => (
                               <li key={sector} className="flex items-center gap-2 text-white/90 text-sm">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#226D68] shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#e76f51] shrink-0" />
                                 {sector}
                               </li>
                             ))}
@@ -275,7 +275,7 @@ export default function LandingPage() {
                           <ul className="space-y-2">
                             {rightCol.map((sector) => (
                               <li key={sector} className="flex items-center gap-2 text-white/90 text-sm">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#226D68] shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#e76f51] shrink-0" />
                                 {sector}
                               </li>
                             ))}

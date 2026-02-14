@@ -16,9 +16,12 @@ FROM nginx:alpine AS production
 # Copier la configuration nginx personnalisée
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copier les fichiers pré-buildés (dist/ doit être commité dans le repo)
-# IMPORTANT: Exécuter "npm run build" localement avant chaque déploiement
+# Copier les fichiers pré-buildés (dist/ doit exister - npm run build avant)
+# En CI: le workflow exécute "npm run build" avant ce build
 COPY dist /usr/share/nginx/html
+
+# Vérifier que index.html existe (évite 404 silencieux)
+RUN test -f /usr/share/nginx/html/index.html || (echo "ERREUR: dist/ vide - exécutez npm run build" && exit 1)
 
 # Exposer le port 3000 (pour cohérence avec docker-compose)
 EXPOSE 3000
