@@ -544,6 +544,19 @@ export default function CandidateDashboard() {
         />
       )}
 
+      {/* Bouton menu mobile flottant (visible quand sidebar fermée sur mobile) */}
+      {!sidebarOpen && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSidebarOpen(true)}
+          className="fixed bottom-4 left-4 z-50 lg:hidden h-12 w-12 rounded-full shadow-lg bg-white border-[#226D68] hover:bg-[#E8F4F3]"
+          aria-label="Ouvrir le menu"
+        >
+          <Menu className="h-5 w-5 text-[#226D68]" />
+        </Button>
+      )}
+
       {/* Main Content */}
       <main id="dashboard-main" className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-light min-w-0" aria-label="Contenu du profil">
         <div className="container mx-auto px-4 py-3 sm:px-5 md:px-6 lg:px-8 max-w-7xl safe-x">
@@ -740,31 +753,38 @@ export default function CandidateDashboard() {
             </Card>
           </div>
 
-          {/* Barre d'onglets compacte */}
+          {/* Barre d'onglets compacte - responsive avec scroll horizontal sur mobile */}
           <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); navigate({ hash: `#${value}` }) }} className="w-full">
-            <TabsList className="w-full justify-start h-auto p-0.5 bg-[#E8F4F3]/30 border border-border rounded-lg overflow-x-auto">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                return (
-                  <TabsTrigger
-                    key={item.id}
-                    value={item.id}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all hover:bg-muted data-[state=active]:hover:bg-[#1a5a55]"
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="whitespace-nowrap">{item.label}</span>
-                    {item.count != null && item.count > 0 && (
-                      <Badge 
-                        variant="secondary" 
-                        className="ml-1 h-4 px-1 text-[10px] font-medium data-[state=active]:bg-white/20 data-[state=active]:text-white"
-                      >
-                        {item.count}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                )
-              })}
-            </TabsList>
+            <div className="relative">
+              {/* Indicateur de scroll gauche */}
+              <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-gray-light to-transparent z-10 pointer-events-none sm:hidden" />
+              {/* Indicateur de scroll droite */}
+              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-gray-light to-transparent z-10 pointer-events-none sm:hidden" />
+
+              <TabsList className="w-full justify-start h-auto p-0.5 bg-[#E8F4F3]/30 border border-border rounded-lg overflow-x-auto scrollbar-hide flex-nowrap touch-pan-x">
+                {navItems.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <TabsTrigger
+                      key={item.id}
+                      value={item.id}
+                      className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-2 sm:py-1.5 text-[11px] sm:text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all hover:bg-muted data-[state=active]:hover:bg-[#1a5a55] min-h-[40px] sm:min-h-0"
+                    >
+                      <Icon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
+                      <span className="whitespace-nowrap hidden xs:inline sm:inline">{item.label}</span>
+                      {item.count != null && item.count > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="ml-0.5 sm:ml-1 h-4 px-1 text-[10px] font-medium data-[state=active]:bg-white/20 data-[state=active]:text-white"
+                        >
+                          {item.count}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  )
+                })}
+              </TabsList>
+            </div>
 
               {/* Contenu des onglets */}
               <TabsContent value="profile" className="mt-3">
@@ -1095,8 +1115,8 @@ export default function CandidateDashboard() {
                                           </div>
                                         </div>
                                         
-                                        {/* Actions */}
-                                        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {/* Actions - toujours visible sur mobile, hover sur desktop */}
+                                        <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                           <Button
                                             variant="ghost"
                                             size="sm"
@@ -1104,19 +1124,19 @@ export default function CandidateDashboard() {
                                               setEditingExperience(exp)
                                               setShowExperienceDialog(true)
                                             }}
-                                            className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                            className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                             title="Modifier"
                                           >
-                                            <Edit className="h-3 w-3 text-[#226D68]" />
+                                            <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
                                           </Button>
                                           <Button
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => handleDeleteExperience(exp.id)}
-                                            className="h-6 w-6 p-0 hover:bg-red-50"
+                                            className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
                                             title="Supprimer"
                                           >
-                                            <Trash2 className="h-3 w-3 text-red-500" />
+                                            <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
                                           </Button>
                                         </div>
                                       </div>
@@ -1274,8 +1294,8 @@ export default function CandidateDashboard() {
                                       </div>
                                     </div>
 
-                                    {/* Actions compactes */}
-                                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {/* Actions compactes - toujours visible sur mobile */}
+                                    <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -1283,17 +1303,17 @@ export default function CandidateDashboard() {
                                           setEditingEducation(edu)
                                           setShowEducationDialog(true)
                                         }}
-                                        className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                        className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                       >
-                                        <Edit className="h-3 w-3 text-[#226D68]" />
+                                        <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
                                       </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={() => handleDeleteEducation(edu.id)}
-                                        className="h-6 w-6 p-0 hover:bg-red-50" 
+                                        className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
                                       >
-                                        <Trash2 className="h-3 w-3 text-red-500" />
+                                        <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
                                       </Button>
                                     </div>
                                   </div>
@@ -1409,8 +1429,8 @@ export default function CandidateDashboard() {
                                     </div>
                                   </div>
                                   
-                                  {/* Actions */}
-                                  <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {/* Actions - toujours visible sur mobile */}
+                                  <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -1418,19 +1438,19 @@ export default function CandidateDashboard() {
                                         setEditingCertification(cert)
                                         setShowCertificationDialog(true)
                                       }}
-                                      className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                      className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                       title="Modifier"
                                     >
-                                      <Edit className="h-3 w-3 text-[#226D68]" />
+                                      <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
                                     </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
                                       onClick={() => handleDeleteCertification(cert.id)}
-                                      className="h-6 w-6 p-0 hover:bg-red-50"
+                                      className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
                                       title="Supprimer"
                                     >
-                                      <Trash2 className="h-3 w-3 text-red-500" />
+                                      <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
                                     </Button>
                                   </div>
                                 </div>
@@ -1610,25 +1630,25 @@ export default function CandidateDashboard() {
                                           </div>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-0.5 shrink-0">
+                                      <div className="flex items-center gap-1 shrink-0">
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                           onClick={() => {
                                             setEditingSkill(skill)
                                             setShowSkillDialog(true)
                                           }}
                                         >
-                                          <Edit className="h-3 w-3 text-[#226D68]" />
+                                          <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
                                         </Button>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="sm" 
-                                          className="h-6 w-6 p-0 hover:bg-red-50" 
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
                                           onClick={() => handleDeleteSkill(skill.id)}
                                         >
-                                          <Trash2 className="h-3 w-3 text-red-500" />
+                                          <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
                                         </Button>
                                       </div>
                                     </div>
@@ -1675,21 +1695,21 @@ export default function CandidateDashboard() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-5 w-5 p-0 hover:bg-[#E8F4F3]"
+                                      className="h-7 w-7 sm:h-5 sm:w-5 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                       onClick={() => {
                                         setEditingSkill(skill)
                                         setShowSkillDialog(true)
                                       }}
                                     >
-                                      <Edit className="h-2.5 w-2.5 text-[#226D68]" />
+                                      <Edit className="h-3.5 w-3.5 sm:h-2.5 sm:w-2.5 text-[#226D68]" />
                                     </Button>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-5 w-5 p-0 hover:bg-red-50" 
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 sm:h-5 sm:w-5 p-0 hover:bg-red-50 active:bg-red-50"
                                       onClick={() => handleDeleteSkill(skill.id)}
                                     >
-                                      <Trash2 className="h-2.5 w-2.5 text-red-500" />
+                                      <Trash2 className="h-3.5 w-3.5 sm:h-2.5 sm:w-2.5 text-red-500" />
                                     </Button>
                                   </div>
                                 </div>
@@ -1760,25 +1780,25 @@ export default function CandidateDashboard() {
                                           </div>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-0.5 shrink-0">
+                                      <div className="flex items-center gap-1 shrink-0">
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-6 w-6 p-0 hover:bg-purple-50"
+                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-purple-50 active:bg-purple-50"
                                           onClick={() => {
                                             setEditingSkill(skill)
                                             setShowSkillDialog(true)
                                           }}
                                         >
-                                          <Edit className="h-3 w-3 text-purple-600" />
+                                          <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-purple-600" />
                                         </Button>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="sm" 
-                                          className="h-6 w-6 p-0 hover:bg-red-50" 
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
                                           onClick={() => handleDeleteSkill(skill.id)}
                                         >
-                                          <Trash2 className="h-3 w-3 text-red-500" />
+                                          <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
                                         </Button>
                                       </div>
                                     </div>
@@ -2179,34 +2199,34 @@ export default function CandidateDashboard() {
                                       </div>
                                     </div>
                                     
-                                    {/* Actions compactes */}
-                                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={handleViewDocument} 
-                                        className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                    {/* Actions compactes - toujours visible sur mobile */}
+                                    <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleViewDocument}
+                                        className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                         title="Voir"
                                       >
-                                        <Eye className="h-3 w-3 text-[#226D68]" />
+                                        <Eye className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
                                       </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={handleDownloadDocument} 
-                                        className="h-6 w-6 p-0 hover:bg-[#E8F4F3]"
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleDownloadDocument}
+                                        className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                         title="Télécharger"
                                       >
-                                        <Download className="h-3 w-3 text-[#226D68]" />
+                                        <Download className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
                                       </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={handleDeleteDocument} 
-                                        className="h-6 w-6 p-0 hover:bg-red-50"
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleDeleteDocument}
+                                        className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
                                         title="Supprimer"
                                       >
-                                        <Trash2 className="h-3 w-3 text-red-500" />
+                                        <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
                                       </Button>
                                     </div>
                                   </div>

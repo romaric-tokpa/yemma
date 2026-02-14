@@ -3,15 +3,8 @@ Dépendance FastAPI pour vérifier les tokens de service interne
 """
 from fastapi import Depends, HTTPException, status, Header
 from typing import Optional
-import sys
-import os
 
-# Ajouter le chemin du module shared au PYTHONPATH
-shared_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
-if shared_path not in sys.path:
-    sys.path.insert(0, shared_path)
-
-from services.shared.internal_auth import verify_service_token
+from shared.internal_auth import verify_service_token
 
 
 async def verify_internal_token(

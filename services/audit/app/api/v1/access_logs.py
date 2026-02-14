@@ -64,7 +64,7 @@ async def create_access_log(
         action_type=log_data.action_type,
         ip_address=ip_address or log_data.ip_address,
         user_agent=user_agent or log_data.user_agent,
-        metadata=json.dumps(log_data.metadata) if log_data.metadata else None,
+        extra_metadata=json.dumps(log_data.metadata) if log_data.metadata else None,
     )
     
     access_log = await repo.create(access_log)
@@ -119,7 +119,7 @@ async def log_access(
         action_type=log_data.action_type,
         ip_address=ip_address or log_data.ip_address,
         user_agent=user_agent or log_data.user_agent,
-        metadata=json.dumps(log_data.metadata) if log_data.metadata else None,
+        extra_metadata=json.dumps(log_data.metadata) if log_data.metadata else None,
     )
     
     access_log = await repo.create(access_log)

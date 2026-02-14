@@ -27,10 +27,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
     AUTH_SERVICE_URL: str = Field(default="http://localhost:8001", description="Auth service URL")
     
-    # CORS
-    CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
-        description="Allowed CORS origins"
+    # CORS (string comma-separated depuis .env/docker-compose, converti en liste)
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:8000",
+        description="Allowed CORS origins (comma-separated)"
     )
 
     model_config = SettingsConfigDict(
@@ -38,6 +38,11 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Retourne CORS_ORIGINS comme une liste"""
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

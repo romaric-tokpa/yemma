@@ -44,8 +44,8 @@ class AccessLog(SQLModel, table=True):
     ip_address: Optional[str] = Field(default=None, max_length=45, description="Adresse IP")
     user_agent: Optional[str] = Field(default=None, max_length=500, description="User Agent")
     
-    # Métadonnées supplémentaires
-    metadata: Optional[str] = Field(default=None, description="Métadonnées JSON supplémentaires")
+    # Métadonnées supplémentaires (extra_metadata car "metadata" est réservé par SQLAlchemy)
+    extra_metadata: Optional[str] = Field(default=None, sa_column_kwargs={"name": "metadata"}, description="Métadonnées JSON supplémentaires")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

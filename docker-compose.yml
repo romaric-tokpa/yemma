@@ -1,4 +1,5 @@
 # Docker Compose for Production (Hostinger deployment)
+# Architecture: Database per Service - Optimisé pour VPS 8 Go RAM
 # Usage: docker-compose up -d
 #
 # Le réseau yemma-network est partagé avec Traefik (external: true).
@@ -46,35 +47,185 @@ services:
     restart: unless-stopped
 
   # ============================================
-  # INFRASTRUCTURE
+  # INFRASTRUCTURE - BASES DE DONNÉES (Database per Service)
   # ============================================
 
-  postgres:
-    image: postgres:15
-    container_name: yemma-postgres
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-auth
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-yemma_db}
+      POSTGRES_DB: auth_db
       PGDATA: /var/lib/postgresql/data/pgdata
       LANG: en_US.UTF-8
       LC_ALL: en_US.UTF-8
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=64MB"
+      - "-c"
+      - "max_connections=50"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_auth_data:/var/lib/postgresql/data
     networks:
       - yemma-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-yemma_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d auth_db"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 30s
     restart: unless-stopped
 
+  postgres-candidate:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-candidate
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: candidate_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "max_connections=100"
+    volumes:
+      - postgres_candidate_data:/var/lib/postgresql/data
+    networks:
+      - yemma-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d candidate_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres-company:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-company
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: company_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=64MB"
+      - "-c"
+      - "max_connections=50"
+    volumes:
+      - postgres_company_data:/var/lib/postgresql/data
+    networks:
+      - yemma-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d company_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres-payment:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-payment
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: payment_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=32MB"
+      - "-c"
+      - "max_connections=20"
+    volumes:
+      - postgres_payment_data:/var/lib/postgresql/data
+    networks:
+      - yemma-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres-document:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-document
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: document_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=32MB"
+      - "-c"
+      - "max_connections=20"
+    volumes:
+      - postgres_document_data:/var/lib/postgresql/data
+    networks:
+      - yemma-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d document_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres-logs:
+    image: postgres:15-alpine
+    container_name: yemma-postgres-logs
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: logs_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=64MB"
+      - "-c"
+      - "max_connections=50"
+    volumes:
+      - postgres_logs_data:/var/lib/postgresql/data
+    networks:
+      - yemma-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d logs_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ============================================
+  # INFRASTRUCTURE - CACHE, STOCKAGE, RECHERCHE
+  # ============================================
+
   redis:
     image: redis:7-alpine
     container_name: yemma-redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password} --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     networks:
@@ -97,7 +248,6 @@ services:
       - minio_data:/data
     networks:
       - yemma-network
-    # Pas de ports exposés : accès interne uniquement via le réseau Docker
     restart: unless-stopped
 
   elasticsearch:
@@ -125,7 +275,6 @@ services:
       - elasticsearch_data:/usr/share/elasticsearch/data
     networks:
       - yemma-network
-    # Pas de ports exposés : accès interne uniquement via le réseau Docker
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
@@ -152,7 +301,6 @@ services:
       - XPACK_REPORTING_ENCRYPTIONKEY=minimal-32-char-reporting-encryption-key
     networks:
       - yemma-network
-    # Pas de port exposé : accès interne uniquement (via nginx si nécessaire)
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -180,12 +328,12 @@ services:
       APP_ENV: ${APP_ENV:-production}
       PYTHONPATH: /app
       DEBUG: ${DEBUG:-false}
-      DB_HOST: postgres
+      DB_HOST: postgres-auth
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: auth_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-auth:5432/auth_db
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
@@ -199,9 +347,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
     networks:
       - yemma-network
-    # Pas de port exposé : accès via nginx uniquement
     depends_on:
-      postgres:
+      postgres-auth:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -223,14 +370,14 @@ services:
     environment:
       APP_NAME: candidate-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app:/shared
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
-      DB_HOST: postgres
+      DB_HOST: postgres-candidate
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: candidate_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-candidate:5432/candidate_db
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
@@ -243,7 +390,7 @@ services:
     networks:
       - yemma-network
     depends_on:
-      postgres:
+      postgres-candidate:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -259,22 +406,22 @@ services:
 
   document:
     build:
-      context: ./services/document
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: document/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-document
     environment:
       APP_NAME: document-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
-      DB_HOST: postgres
+      DB_HOST: postgres-document
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: document_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-document:5432/document_db
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
@@ -289,11 +436,11 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
-      CORS_ORIGINS: ${CORS_ORIGINS:-"https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000,http://localhost:8000"}
+      CORS_ORIGINS: ${CORS_ORIGINS:-"https://yemma-solutions.com","https://www.yemma-solutions.com","http://localhost:3000","http://localhost:8000"}
     networks:
       - yemma-network
     depends_on:
-      postgres:
+      postgres-document:
         condition: service_healthy
       minio:
         condition: service_started
@@ -307,15 +454,15 @@ services:
 
   search:
     build:
-      context: ./services/search
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: search/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-search
     environment:
       APP_NAME: search-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
       ELASTICSEARCH_HOST: elasticsearch
       ELASTICSEARCH_PORT: 9200
@@ -365,7 +512,7 @@ services:
     environment:
       APP_NAME: admin-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app:/shared
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
       CANDIDATE_SERVICE_URL: http://candidate:8000
       SEARCH_SERVICE_URL: http://search:8000
@@ -394,14 +541,14 @@ services:
     environment:
       APP_NAME: company-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app:/shared
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
-      DB_HOST: postgres
+      DB_HOST: postgres-company
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: company_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-company:5432/company_db
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       AUTH_SERVICE_URL: http://auth:8000
@@ -415,7 +562,7 @@ services:
     networks:
       - yemma-network
     depends_on:
-      postgres:
+      postgres-company:
         condition: service_healthy
       auth:
         condition: service_healthy
@@ -429,22 +576,22 @@ services:
 
   payment:
     build:
-      context: ./services/payment
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: payment/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-payment
     environment:
       APP_NAME: payment-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
-      DB_HOST: postgres
+      DB_HOST: postgres-payment
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: payment_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-payment:5432/payment_db
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_your_stripe_secret_key}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_your_stripe_publishable_key}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_your_webhook_secret}
@@ -455,7 +602,7 @@ services:
     networks:
       - yemma-network
     depends_on:
-      postgres:
+      postgres-payment:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -467,23 +614,23 @@ services:
 
   notification:
     build:
-      context: ./services/notification
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: notification/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-notification
     environment:
       APP_NAME: notification-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
       PORT: ${NOTIFICATION_PORT:-8000}
-      DB_HOST: postgres
+      DB_HOST: postgres-logs
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: logs_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-logs:5432/logs_db
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-fastapi_mail}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -508,7 +655,7 @@ services:
     networks:
       - yemma-network
     depends_on:
-      postgres:
+      postgres-logs:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -522,22 +669,22 @@ services:
 
   notification-worker:
     build:
-      context: ./services/notification
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: notification/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-notification-worker
     environment:
       APP_NAME: notification-worker
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
-      DB_HOST: postgres
+      DB_HOST: postgres-logs
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: logs_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-logs:5432/logs_db
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-fastapi_mail}
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -556,9 +703,9 @@ services:
       TASK_QUEUE: celery
     networks:
       - yemma-network
-    command: sh -c "cd /app && export PYTHONPATH=/app && exec python -m celery -A app.infrastructure.celery_app worker --loglevel=info --concurrency=2 --queues=notifications"
+    command: sh -c "cd /app && export PYTHONPATH=/app:/ && exec python -m celery -A app.infrastructure.celery_app worker --loglevel=info --concurrency=2 --queues=notifications"
     depends_on:
-      postgres:
+      postgres-logs:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -566,27 +713,27 @@ services:
 
   audit:
     build:
-      context: ./services/audit
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: audit/Dockerfile
       args:
         - APP_ENV=production
     container_name: yemma-audit
     environment:
       APP_NAME: audit-service
       APP_ENV: ${APP_ENV:-production}
-      PYTHONPATH: /app
+      PYTHONPATH: /app:/
       DEBUG: ${DEBUG:-false}
-      DB_HOST: postgres
+      DB_HOST: postgres-logs
       DB_PORT: 5432
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
+      DB_NAME: logs_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-logs:5432/logs_db
       CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000,http://localhost:8000}
     networks:
       - yemma-network
     depends_on:
-      postgres:
+      postgres-logs:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -667,7 +814,6 @@ services:
       target: production
     container_name: yemma-frontend
     environment:
-      # URL publique - utilisée pour les redirections et liens
       - VITE_API_BASE_URL=https://yemma-solutions.com
       - VITE_PUBLIC_URL=https://yemma-solutions.com
       - PUBLIC_URL=https://yemma-solutions.com
@@ -693,15 +839,22 @@ networks:
     external: true
 
 # ============================================
-# VOLUMES
+# VOLUMES (sans name: pour portabilité Docker Compose)
 # ============================================
 
 volumes:
-  postgres_data:
-    name: yemma-postgres-data
+  postgres_auth_data:
+  postgres_candidate_data:
+  postgres_company_data:
+  postgres_payment_data:
+  postgres_document_data:
+  postgres_logs_data:
   redis_data:
-    name: yemma-redis-data
   minio_data:
-    name: yemma-minio-data
   elasticsearch_data:
-    name: yemma-elasticsearch-data
+
+# ============================================
+# INSTRUCTIONS DE MIGRATION
+# ============================================
+# Pour migrer les données de l'ancienne base unique (yemma_db) vers cette
+# architecture Database per Service, consultez : MIGRATION_DATABASE_PER_SERVICE.md

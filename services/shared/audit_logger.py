@@ -6,15 +6,8 @@ un accès à un profil candidat.
 """
 import httpx
 from typing import Optional
-import sys
-import os
 
-# Ajouter le chemin du module shared au PYTHONPATH
-shared_path = os.path.join(os.path.dirname(os.path.dirname(__file__)))
-if shared_path not in sys.path:
-    sys.path.insert(0, shared_path)
-
-from services.shared.internal_auth import get_service_token_header
+from .internal_auth import get_service_token_header
 
 
 async def log_access(

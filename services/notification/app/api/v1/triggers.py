@@ -15,24 +15,9 @@ from app.domain.models import Notification, NotificationStatus
 import json
 from datetime import datetime
 
-# Importer la vérification du token interne
-# En Docker : ./services:/services monté
-# En local : chemin relatif vers services/shared
-import sys
-import os
-_services_paths = [
-    "/services",  # Docker: ./services:/services
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")),
-]
-for _sp in _services_paths:
-    if os.path.exists(_sp) and _sp not in sys.path:
-        _parent = os.path.dirname(_sp) if os.path.basename(_sp) == "services" else _sp
-        if _parent not in sys.path and os.path.exists(os.path.join(_sp, "shared")):
-            sys.path.insert(0, _parent)
-        break
-
+# Importer la vérification du token interne (shared copié dans /shared)
 try:
-    from services.shared.fastapi_deps import verify_internal_token
+    from shared.fastapi_deps import verify_internal_token
 except ImportError:
     from fastapi import Header
     async def verify_internal_token(x_service_token: str = Header(None, alias="X-Service-Token")):

@@ -3,44 +3,8 @@ Dépendance FastAPI pour vérifier les tokens de service interne
 """
 from fastapi import Depends, HTTPException, status, Header
 from typing import Optional
-import sys
-import os
-import importlib.util
 
-# Le module shared est monté dans /shared via docker-compose
-shared_path = "/shared"
-internal_auth_path = os.path.join(shared_path, "internal_auth.py")
-
-# Importer depuis shared en utilisant importlib pour éviter les problèmes de module
-import importlib.util
-
-if os.path.exists(internal_auth_path):
-    spec = importlib.util.spec_from_file_location("shared.internal_auth", internal_auth_path)
-    if spec and spec.loader:
-        internal_auth_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(internal_auth_module)
-        verify_service_token = internal_auth_module.verify_service_token
-    else:
-        # Fallback: essayer depuis services/shared (chemin relatif)
-        shared_module_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
-        if os.path.exists(shared_module_path) and shared_module_path not in sys.path:
-            sys.path.insert(0, shared_module_path)
-        try:
-            from services.shared.internal_auth import verify_service_token
-        except ImportError:
-            raise RuntimeError(f"Failed to load verify_service_token from {internal_auth_path}. Make sure the shared volume is mounted.")
-else:
-    # Le fichier n'existe pas, essayer d'importer depuis services/shared
-    shared_module_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "shared")
-    if os.path.exists(shared_module_path) and shared_module_path not in sys.path:
-        sys.path.insert(0, shared_module_path)
-    try:
-        from services.shared.internal_auth import verify_service_token
-    except ImportError:
-        # Dernier fallback: définir une fonction dummy qui lèvera une erreur explicite
-        def verify_service_token(token: str):
-            raise RuntimeError(f"Shared module not found at {internal_auth_path}. Make sure ./services/shared:/shared is mounted in docker-compose.yml.")
-        print(f"⚠️ Warning: Shared module not found at {internal_auth_path}. Using dummy function.")
+from shared.internal_auth import verify_service_token
 
 
 async def verify_internal_token(

@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     APP_ENV=${APP_ENV} \
-    PYTHONPATH=/app:/shared
+    PYTHONPATH=/app:/
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \

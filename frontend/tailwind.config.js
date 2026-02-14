@@ -116,7 +116,7 @@ export default {
         },
       },
       fontFamily: {
-        'heading': ['Poppins', 'sans-serif'],
+        'heading': ['Sora', 'sans-serif'],
         'body': ['Inter', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
         'mono': ['JetBrains Mono', 'Fira Code', 'monospace'],
       },

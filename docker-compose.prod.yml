@@ -1,0 +1,52 @@
+# ============================================
+# YEMMA - Override Production (images GHCR)
+# ============================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Prérequis: GHCR_IMAGE_PREFIX défini (ex: ghcr.io/owner/repo)
+# Le workflow deploy.yml exporte cette variable avant les commandes.
+# Pour déploiement manuel: export GHCR_IMAGE_PREFIX=ghcr.io/votre-org/yemma
+# ============================================
+
+services:
+  nginx:
+    image: ${GHCR_IMAGE_PREFIX}/nginx:latest
+
+  auth:
+    image: ${GHCR_IMAGE_PREFIX}/auth:latest
+
+  candidate:
+    image: ${GHCR_IMAGE_PREFIX}/candidate:latest
+
+  company:
+    image: ${GHCR_IMAGE_PREFIX}/company:latest
+
+  document:
+    image: ${GHCR_IMAGE_PREFIX}/document:latest
+
+  search:
+    image: ${GHCR_IMAGE_PREFIX}/search:latest
+
+  admin:
+    image: ${GHCR_IMAGE_PREFIX}/admin:latest
+
+  payment:
+    image: ${GHCR_IMAGE_PREFIX}/payment:latest
+
+  notification:
+    image: ${GHCR_IMAGE_PREFIX}/notification:latest
+
+  notification-worker:
+    image: ${GHCR_IMAGE_PREFIX}/notification:latest
+
+  audit:
+    image: ${GHCR_IMAGE_PREFIX}/audit:latest
+
+  parsing:
+    image: ${GHCR_IMAGE_PREFIX}/parsing:latest
+
+  parsing-worker:
+    image: ${GHCR_IMAGE_PREFIX}/parsing:latest
+
+  frontend:
+    image: ${GHCR_IMAGE_PREFIX}/frontend:latest

@@ -11,41 +11,41 @@ Yemma Solutions est une plateforme complète de recrutement qui permet :
 
 ## 🏗️ Architecture
 
-L'application suit une architecture microservices avec les services suivants :
+L'application suit une architecture **microservices** avec **Database per Service** : chaque service possède sa propre base PostgreSQL.
 
 ### Services Backend
 
-| Service | Port | Description |
-|---------|------|-------------|
-| **auth-service** | 8001 | Authentification, gestion des utilisateurs et rôles |
-| **candidate-service** | 8002 | Gestion des profils candidats et onboarding |
-| **admin-service** | 8009 | Validation et administration des profils |
-| **company-service** | 8005 | Gestion des entreprises et recruteurs |
-| **search-service** | 8004 | Recherche de profils avec Elasticsearch |
-| **document-service** | 8003 | Stockage et gestion des documents (CV, etc.) |
-| **payment-service** | 8006 | Gestion des abonnements et paiements Stripe |
-| **notification-service** | 8007 | Envoi d'emails et notifications |
-| **audit-service** | 8008 | Audit et conformité RGPD |
+| Service | Description |
+|---------|-------------|
+| **auth** | Authentification, gestion des utilisateurs et rôles (JWT, OAuth) |
+| **candidate** | Gestion des profils candidats et onboarding |
+| **company** | Gestion des entreprises et recruteurs |
+| **admin** | Validation et administration des profils |
+| **search** | Recherche de profils avec Elasticsearch |
+| **document** | Stockage et gestion des documents (CV, etc.) |
+| **payment** | Gestion des abonnements et paiements Stripe |
+| **notification** | Envoi d'emails et notifications (Celery) |
+| **audit** | Logs d'accès et conformité RGPD |
+| **parsing** | Parsing de CV via HRFlow.ai |
 
 ### Frontend
 
-- **React App** : Application React moderne avec Vite (port 3000)
+- **React App** : Application React avec Vite, TailwindCSS, Radix UI (port 3000)
 
 ### Infrastructure
 
-- **PostgreSQL** : Base de données principale (port 5432)
-- **Redis** : Cache et sessions (port 6379)
+- **Nginx** : API Gateway et reverse proxy (port 80)
+- **PostgreSQL** : 6 instances (auth_db, candidate_db, company_db, payment_db, document_db, logs_db)
+- **Redis** : Cache, sessions et broker Celery (port 6379)
 - **Elasticsearch** : Moteur de recherche (port 9200)
-- **MinIO/S3** : Stockage d'objets pour les documents (port 9000)
-- **Nginx** : Reverse proxy et load balancer (port 80)
+- **MinIO** : Stockage S3-compatible pour les documents (port 9000)
+- **Kibana** : Visualisation Elasticsearch (port 5601)
 
 ## 📋 Prérequis
 
-- **Docker** et **Docker Compose** (recommandé)
-- **Node.js** 18+ (pour le développement frontend local)
-- **Python** 3.11+ (pour le développement backend local)
-- **PostgreSQL** 15+ (si développement local sans Docker)
-- **Elasticsearch** 8.x (si développement local sans Docker)
+- **Docker** et **Docker Compose**
+- **Node.js** 18+ (développement frontend local)
+- **Python** 3.11+ (développement backend local)
 
 ## 🚀 Installation rapide
 
@@ -59,103 +59,105 @@ cd yemma
 ### 2. Configurer les variables d'environnement
 
 ```bash
-# Copier le fichier d'exemple
-cp env.example .env
-
+cp .env.example .env
 # Éditer .env et modifier les valeurs essentielles
-nano .env
 ```
 
-**Variables essentielles à modifier :**
-- `DB_PASSWORD` : Mot de passe PostgreSQL
-- `JWT_SECRET_KEY` : Clé secrète JWT (générer avec `openssl rand -hex 32`)
-- `REDIS_PASSWORD` : Mot de passe Redis
-- `ELASTICSEARCH_PASSWORD` : Mot de passe Elasticsearch
-- `STRIPE_SECRET_KEY` : Clé API Stripe (pour les paiements)
-- `S3_ACCESS_KEY` et `S3_SECRET_KEY` : Clés d'accès MinIO/S3
+**Variables essentielles :**
+- `DB_USER`, `DB_PASSWORD` : PostgreSQL
+- `JWT_SECRET_KEY` : Clé JWT (`openssl rand -hex 32`)
+- `REDIS_PASSWORD` : Redis
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` : Paiements
+- `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` : Stockage
 
-### 3. Démarrer tous les services
+### 3. Première installation (bases vides)
+
+Pour une **nouvelle installation** sans données existantes :
 
 ```bash
-# Démarrer tous les services avec Docker Compose
+# 1. Démarrer l'infrastructure
+docker-compose up -d postgres-auth postgres-candidate postgres-company postgres-payment postgres-document postgres-logs redis elasticsearch minio
+docker-compose ps   # Attendre que tout soit healthy
+
+# 2. Migrations Alembic (candidate)
+docker-compose run --rm -e PYTHONPATH= candidate alembic -c /app/alembic.ini upgrade head
+
+# 3. Démarrer les services (company, payment, document, notification, audit créent leurs tables au démarrage)
 docker-compose up -d
-
-# Voir les logs en temps réel
-docker-compose logs -f
-
-# Vérifier le statut des services
-docker-compose ps
 ```
 
-### 4. Accéder à l'application
+### 4. Migration depuis une base existante
 
-- **Frontend** : http://localhost:3000
-- **API Documentation** : 
-  - Auth Service : http://localhost:8001/docs
-  - Candidate Service : http://localhost:8002/docs
-  - Company Service : http://localhost:8005/docs
-  - Search Service : http://localhost:8004/docs
-  - Admin Service : http://localhost:8009/docs
+Si vous migrez depuis l'ancienne architecture (base unique `yemma_db`), suivez le guide détaillé :
+
+📄 **[MIGRATION_DATABASE_PER_SERVICE.md](./MIGRATION_DATABASE_PER_SERVICE.md)**
+
+### 5. Accéder à l'application
+
+- **Frontend** : http://localhost:3000 (ou via Nginx sur le port 80)
+- **API Documentation** (via Nginx) :
+  - Auth : http://localhost/api/v1/auth/docs
+  - Candidate : http://localhost/api/v1/profiles (Swagger dans le service)
+  - Company : http://localhost/api/v1/companies
+  - Search : http://localhost/api/v1/search
+  - Admin : http://localhost/api/v1/admin
 
 ## 📁 Structure du projet
 
 ```
 yemma/
-├── frontend/                 # Application React
+├── frontend/                 # Application React (Vite)
 │   ├── src/
 │   │   ├── components/       # Composants réutilisables
-│   │   ├── pages/           # Pages de l'application
-│   │   ├── services/        # Clients API
-│   │   └── utils/           # Utilitaires
+│   │   ├── pages/            # Pages de l'application
+│   │   ├── layouts/          # Layouts par rôle
+│   │   └── routes/           # Configuration des routes
 │   └── package.json
-├── services/                # Services backend
-│   ├── auth-service/        # Authentification
-│   ├── candidate-service/  # Profils candidats
-│   ├── company-service/    # Entreprises et recruteurs
-│   ├── admin-service/       # Administration
-│   ├── search-service/      # Recherche Elasticsearch
-│   ├── document-service/    # Gestion documents
-│   ├── payment-service/     # Paiements Stripe
-│   ├── notification-service/# Notifications email
-│   ├── audit-service/       # Audit RGPD
-│   └── shared/              # Code partagé
-├── nginx/                   # Configuration Nginx
-├── docker-compose.yml       # Orchestration Docker
-├── .env                     # Variables d'environnement
-└── README.md               # Ce fichier
+├── services/                 # Services backend
+│   ├── auth-service/         # Authentification
+│   ├── candidate/            # Profils candidats
+│   ├── company/              # Entreprises et recruteurs
+│   ├── admin/                # Administration
+│   ├── search/               # Recherche Elasticsearch
+│   ├── document/             # Gestion documents
+│   ├── payment/              # Paiements Stripe
+│   ├── notification/         # Notifications email
+│   ├── audit/                # Audit RGPD
+│   ├── yemma-parsing-service/# Parsing CV (HRFlow.ai)
+│   └── shared/               # Module partagé (internal_auth, audit_logger)
+├── nginx/                    # Configuration API Gateway
+├── docker-compose.yml        # Orchestration Docker
+├── MIGRATION_DATABASE_PER_SERVICE.md  # Guide de migration
+└── README.md
 ```
 
 ## 🔧 Développement
 
-### Backend (FastAPI)
+### Build des services (module shared)
 
-Chaque service backend suit une architecture hexagonale :
+Les services `document`, `search`, `payment`, `notification` et `audit` utilisent le module partagé `shared`. Le build utilise le contexte `./services` :
 
 ```bash
-# Se placer dans un service
-cd services/auth-service
+# Rebuild un service après modification
+docker-compose build --no-cache audit
+docker-compose up -d audit
+```
 
-# Créer un environnement virtuel
+### Backend (FastAPI)
+
+```bash
+cd services/auth-service   # ou candidate, company, etc.
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Installer les dépendances
+source venv/bin/activate
 pip install -r requirements.txt
-
-# Démarrer en mode développement
 uvicorn app.main:app --reload --port 8001
 ```
 
 ### Frontend (React)
 
 ```bash
-# Se placer dans le frontend
 cd frontend
-
-# Installer les dépendances
 npm install
-
-# Démarrer en mode développement
 npm run dev
 ```
 
@@ -176,75 +178,40 @@ service/
 
 ## 🔐 Authentification et rôles
 
-Le système utilise JWT (JSON Web Tokens) avec les rôles suivants :
-
-- **ROLE_CANDIDAT** : Candidat inscrit sur la plateforme
-- **ROLE_COMPANY_ADMIN** : Administrateur d'entreprise (compte maître)
+- **ROLE_CANDIDAT** : Candidat inscrit
+- **ROLE_COMPANY_ADMIN** : Administrateur d'entreprise
 - **ROLE_RECRUITER** : Recruteur membre d'une entreprise
 - **ROLE_ADMIN** : Administrateur RH (validation des profils)
-- **ROLE_SUPER_ADMIN** : Super administrateur (accès total)
+- **ROLE_SUPER_ADMIN** : Super administrateur
 
 ## 📊 Fonctionnalités principales
 
-### Pour les candidats
-- ✅ Création de profil en plusieurs étapes
-- ✅ Upload de documents (CV, diplômes, etc.)
-- ✅ Suivi du statut de validation
-- ✅ Gestion des compétences et expériences
+### Candidats
+- Création de profil (onboarding avec upload CV)
+- Gestion des compétences, expériences, formations
+- Suivi du statut de validation
 
-### Pour les entreprises
-- ✅ Recherche avancée de profils validés
-- ✅ Filtres multiples (secteur, compétences, expérience, etc.)
-- ✅ Gestion de l'équipe de recrutement
-- ✅ Abonnements et quotas
-- ✅ Consultation de profils avec avis experts
+### Entreprises
+- Recherche avancée de profils validés
+- Gestion de l'équipe de recrutement
+- Abonnements Stripe (Freemium, Pro, Enterprise)
+- Consultation de profils avec audit RGPD
 
-### Pour les administrateurs
-- ✅ Validation/rejet de profils candidats
-- ✅ Évaluation avec scores détaillés
-- ✅ Gestion des entreprises
-- ✅ Consultation des statistiques
+### Administrateurs
+- Validation/rejet de profils candidats
+- Évaluation avec scores détaillés
+- Gestion des invitations admin
 
-## 🗄️ Base de données
+## 🗄️ Base de données (Database per Service)
 
-Chaque service possède sa propre base de données PostgreSQL :
-- `yemma_auth_db` : Utilisateurs et authentification
-- `yemma_candidate_db` : Profils candidats
-- `yemma_company_db` : Entreprises et recruteurs
-- `yemma_admin_db` : Données d'administration
-- `yemma_document_db` : Métadonnées des documents
-- `yemma_payment_db` : Abonnements et paiements
-- `yemma_notification_db` : Historique des notifications
-- `yemma_audit_db` : Logs d'audit
-
-## 🔍 Recherche
-
-Le service de recherche utilise **Elasticsearch** avec :
-- Indexation complète de tous les champs de profil
-- Recherche full-text avec fuzzy search
-- Filtres avancés (secteur, compétences, expérience, localisation, etc.)
-- Synonymes pour les compétences et titres de postes
-- Boosting intelligent selon la pertinence
-
-## 💳 Paiements
-
-Intégration **Stripe** pour les abonnements :
-- **Freemium** : 10 consultations/mois, recherche limitée
-- **Pro** : Consultations illimitées, recherche illimitée
-- **Enterprise** : Tout Pro + accès documents + multi-comptes
-
-## 📧 Notifications
-
-Service de notification avec support de plusieurs providers :
-- SMTP (Gmail, etc.)
-- SendGrid
-- Mailgun
-
-Templates d'emails pour :
-- Validation de profil
-- Actions requises
-- Invitations recruteurs
-- Notifications d'entreprise
+| Base | Service(s) | Tables principales |
+|------|------------|---------------------|
+| auth_db | auth | users, roles, user_roles, refresh_tokens |
+| candidate_db | candidate | profiles, experiences, educations, skills, job_preferences |
+| company_db | company | companies, team_members, invitations |
+| payment_db | payment | plans, subscriptions, payments, invoices, quotas |
+| document_db | document | documents |
+| logs_db | notification, audit | notifications, access_logs |
 
 ## 🐳 Commandes Docker utiles
 
@@ -253,116 +220,31 @@ Templates d'emails pour :
 docker-compose up -d
 
 # Démarrer un service spécifique
-docker-compose up -d auth-service
+docker-compose up -d auth candidate
 
-# Rebuild un service après modification
-docker-compose build auth-service
-docker-compose up -d auth-service
+# Rebuild un service (après modification du code ou Dockerfile)
+docker-compose build --no-cache audit
+docker-compose up -d audit
 
-# Voir les logs d'un service
-docker-compose logs -f auth-service
+# Voir les logs
+docker-compose logs -f auth
 
 # Accéder au shell d'un conteneur
-docker-compose exec auth-service /bin/bash
-
-# Arrêter tous les services
-docker-compose down
+docker-compose exec auth /bin/bash
 
 # Arrêter et supprimer les volumes (⚠️ supprime les données)
 docker-compose down -v
-
-# Voir l'utilisation des ressources
-docker stats
 ```
-
-## 🧪 Tests
-
-### Backend
-
-```bash
-# Depuis la racine du projet
-cd tests/backend
-
-# Exécuter tous les tests
-pytest
-
-# Exécuter les tests d'un service spécifique
-pytest test_candidate_service.py
-
-# Avec couverture
-pytest --cov=services/candidate/app
-```
-
-### Frontend
-
-```bash
-cd frontend
-
-# Exécuter les tests
-npm test
-
-# Avec couverture
-npm run test:coverage
-```
-
-## 📝 Variables d'environnement
-
-Les variables d'environnement sont définies dans le fichier `.env` à la racine. Voir `env.example` pour la liste complète.
-
-**Variables importantes :**
-- `DB_*` : Configuration PostgreSQL
-- `JWT_SECRET_KEY` : Clé secrète pour les tokens JWT
-- `REDIS_*` : Configuration Redis
-- `ELASTICSEARCH_*` : Configuration Elasticsearch
-- `STRIPE_*` : Configuration Stripe
-- `S3_*` : Configuration MinIO/S3
-- `EMAIL_*` : Configuration email
-
-## 🚀 Déploiement
-
-### Production
-
-1. Configurer les variables d'environnement de production
-2. Utiliser des secrets managers (AWS Secrets Manager, HashiCorp Vault, etc.)
-3. Configurer HTTPS avec certificats SSL
-4. Configurer les backups de base de données
-5. Mettre en place la surveillance et les alertes
-
-### CI/CD
-
-Le projet peut être intégré avec :
-- GitHub Actions
-- GitLab CI/CD
-- Jenkins
-- CircleCI
 
 ## 📚 Documentation
 
-- [Architecture détaillée](./ARCHITECTURE.md) (à créer)
-- [Guide de développement](./DEVELOPMENT.md) (à créer)
-- [Documentation API](http://localhost:8001/docs) (Swagger UI)
+- [Guide de migration Database per Service](./MIGRATION_DATABASE_PER_SERVICE.md)
 - [Documentation des services](./services/) (README de chaque service)
-
-## 🤝 Contribution
-
-1. Créer une branche depuis `main`
-2. Développer la fonctionnalité
-3. Ajouter les tests
-4. Créer une Pull Request
+- Swagger UI : disponible sur chaque service (voir nginx pour les routes)
 
 ## 📄 Licence
 
 Propriétaire - Yemma Solutions © 2024
-
-## 🆘 Support
-
-Pour toute question ou problème :
-- Créer une issue sur le repository
-- Contacter l'équipe de développement
-
-## 🔄 Changelog
-
-Voir les [releases](../../releases) pour l'historique des versions.
 
 ---
 

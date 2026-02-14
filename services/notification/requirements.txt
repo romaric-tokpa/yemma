@@ -9,6 +9,8 @@ email-validator==2.1.0
 sqlmodel==0.0.14
 sqlalchemy[asyncio]==2.0.23
 asyncpg==0.29.0
+psycopg2-binary==2.9.9  # Pour Alembic (migrations synchrones)
+alembic==1.12.1
 
 # HTTP Client
 httpx==0.25.2

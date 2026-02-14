@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -213,7 +213,7 @@
   
   /* Typographie selon charte et brief */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Sora', sans-serif;
     font-weight: 600;
     color: hsl(var(--foreground));
     line-height: 1.2;
@@ -416,4 +416,42 @@ html, body {
 
 .rich-text-content h3 {
   font-size: 1.125rem;
+}
+
+/* ============================================
+   UTILITAIRES RESPONSIVE
+   ============================================ */
+
+/* Cache la scrollbar tout en gardant le scroll fonctionnel */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Touch actions pour mobile */
+.touch-pan-x {
+  touch-action: pan-x;
+}
+
+.touch-pan-y {
+  touch-action: pan-y;
+}
+
+/* Amélioration du tap sur mobile */
+@media (hover: none) and (pointer: coarse) {
+  /* Augmenter les zones cliquables sur mobile */
+  button, [role="button"], a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Retour visuel au tap */
+  button:active, [role="button"]:active, a:active {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
 }

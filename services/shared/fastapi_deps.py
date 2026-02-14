@@ -3,13 +3,8 @@ Dépendances FastAPI partagées pour l'authentification inter-services
 """
 from fastapi import Depends, HTTPException, status, Header
 from typing import Optional
-import sys
-import os
 
-# Ajouter le chemin du module shared au PYTHONPATH
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from services.shared.internal_auth import verify_service_token
+from .internal_auth import verify_service_token
 
 
 async def verify_internal_token(
