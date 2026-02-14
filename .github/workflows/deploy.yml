@@ -30,43 +30,45 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Backend services : dockerfile relatif au context ./services
           - service: auth
             context: ./services
-            dockerfile: services/auth-service/Dockerfile
+            dockerfile: auth-service/Dockerfile
           - service: candidate
             context: ./services
-            dockerfile: services/candidate/Dockerfile
+            dockerfile: candidate/Dockerfile
           - service: company
             context: ./services
-            dockerfile: services/company/Dockerfile
+            dockerfile: company/Dockerfile
           - service: document
             context: ./services
-            dockerfile: services/document/Dockerfile
+            dockerfile: document/Dockerfile
           - service: search
             context: ./services
-            dockerfile: services/search/Dockerfile
+            dockerfile: search/Dockerfile
           - service: admin
             context: ./services
-            dockerfile: services/admin/Dockerfile
+            dockerfile: admin/Dockerfile
           - service: payment
             context: ./services
-            dockerfile: services/payment/Dockerfile
+            dockerfile: payment/Dockerfile
           - service: notification
             context: ./services
-            dockerfile: services/notification/Dockerfile
+            dockerfile: notification/Dockerfile
           - service: audit
             context: ./services
-            dockerfile: services/audit/Dockerfile
+            dockerfile: audit/Dockerfile
           - service: parsing
             context: ./services
-            dockerfile: services/yemma-parsing-service/Dockerfile
-          - service: nginx
-            context: ./nginx
-            dockerfile: nginx/Dockerfile
+            dockerfile: yemma-parsing-service/Dockerfile
+          # Frontend & Nginx : context spécifique
           - service: frontend
             context: ./frontend
-            dockerfile: frontend/Dockerfile
+            dockerfile: Dockerfile
             target: production
+          - service: nginx
+            context: ./nginx
+            dockerfile: Dockerfile
 
     steps:
       - name: Checkout code
@@ -93,7 +95,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          file: ${{ matrix.context }}/${{ matrix.dockerfile }}
           target: ${{ matrix.target || '' }}
           push: true
           tags: |
