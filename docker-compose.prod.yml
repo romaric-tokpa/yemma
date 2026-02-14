@@ -1,52 +1,66 @@
 # ============================================
 # YEMMA - Override Production (images GHCR)
 # ============================================
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Ce fichier surcharge la configuration pour utiliser les images pré-construites (GHCR)
+# au lieu de builder localement.
 #
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # Prérequis: GHCR_IMAGE_PREFIX défini (ex: ghcr.io/owner/repo)
-# Le workflow deploy.yml exporte cette variable avant les commandes.
-# Pour déploiement manuel: export GHCR_IMAGE_PREFIX=ghcr.io/votre-org/yemma
 # ============================================
 
 services:
-  nginx:
-    image: ${GHCR_IMAGE_PREFIX}/nginx:latest
-
   auth:
     image: ${GHCR_IMAGE_PREFIX}/auth:latest
+    build: {}
 
   candidate:
     image: ${GHCR_IMAGE_PREFIX}/candidate:latest
+    build: {}
 
   company:
     image: ${GHCR_IMAGE_PREFIX}/company:latest
+    build: {}
 
   document:
     image: ${GHCR_IMAGE_PREFIX}/document:latest
+    build: {}
 
   search:
     image: ${GHCR_IMAGE_PREFIX}/search:latest
+    build: {}
 
   admin:
     image: ${GHCR_IMAGE_PREFIX}/admin:latest
+    build: {}
 
   payment:
     image: ${GHCR_IMAGE_PREFIX}/payment:latest
+    build: {}
 
   notification:
     image: ${GHCR_IMAGE_PREFIX}/notification:latest
+    build: {}
 
   notification-worker:
     image: ${GHCR_IMAGE_PREFIX}/notification:latest
+    build: {}
 
   audit:
     image: ${GHCR_IMAGE_PREFIX}/audit:latest
+    build: {}
 
   parsing:
     image: ${GHCR_IMAGE_PREFIX}/parsing:latest
+    build: {}
 
   parsing-worker:
     image: ${GHCR_IMAGE_PREFIX}/parsing:latest
+    build: {}
 
   frontend:
     image: ${GHCR_IMAGE_PREFIX}/frontend:latest
+    build: {}
+
+  nginx:
+    image: ${GHCR_IMAGE_PREFIX}/nginx:latest
+    build: {}

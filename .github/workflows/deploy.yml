@@ -18,7 +18,7 @@ env:
 
 jobs:
   # ==========================================
-  # JOB 1 : BUILD & PUSH (sur serveurs GitHub)
+  # JOB 1 : BUILD & PUSH (parallèle)
   # ==========================================
   build-and-push:
     runs-on: ubuntu-latest
@@ -33,47 +33,36 @@ jobs:
           - service: auth
             context: ./services
             dockerfile: services/auth-service/Dockerfile
-            target: ""
           - service: candidate
             context: ./services
             dockerfile: services/candidate/Dockerfile
-            target: ""
           - service: company
             context: ./services
             dockerfile: services/company/Dockerfile
-            target: ""
           - service: document
             context: ./services
             dockerfile: services/document/Dockerfile
-            target: ""
           - service: search
             context: ./services
             dockerfile: services/search/Dockerfile
-            target: ""
           - service: admin
             context: ./services
             dockerfile: services/admin/Dockerfile
-            target: ""
           - service: payment
             context: ./services
             dockerfile: services/payment/Dockerfile
-            target: ""
           - service: notification
             context: ./services
             dockerfile: services/notification/Dockerfile
-            target: ""
           - service: audit
             context: ./services
             dockerfile: services/audit/Dockerfile
-            target: ""
           - service: parsing
             context: ./services
             dockerfile: services/yemma-parsing-service/Dockerfile
-            target: ""
           - service: nginx
             context: ./nginx
             dockerfile: nginx/Dockerfile
-            target: ""
           - service: frontend
             context: ./frontend
             dockerfile: frontend/Dockerfile
@@ -82,6 +71,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Build frontend (dist/)
+        if: matrix.service == 'frontend'
+        run: |
+          cd frontend
+          npm install
+          npm run build
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -109,7 +105,7 @@ jobs:
             APP_ENV=production
 
   # ==========================================
-  # JOB 2 : DEPLOY (sur VPS - uniquement sur main)
+  # JOB 2 : DEPLOY (sur VPS)
   # ==========================================
   deploy:
     needs: build-and-push
@@ -140,26 +136,32 @@ jobs:
             set -e
             cd /opt/yemma
 
-            # 0. Préfixe des images GHCR (pour docker-compose.prod.yml)
-            export GHCR_IMAGE_PREFIX=${{ env.REGISTRY }}/${{ github.repository }}
+            # 0. Définition du préfixe d'image
+            export GHCR_IMAGE_PREFIX="${{ env.REGISTRY }}/${{ github.repository }}"
 
             # 1. Login to GitHub Container Registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
-            # 2. Pull new images (utilise docker-compose.prod.yml)
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull --quiet
+            # 2. Pull new images
+            echo "Pulling images..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
 
-            # 3. Migrations Alembic (ordre des dépendances)
-            echo "Running migrations..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm auth alembic upgrade head || true
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm -e PYTHONPATH= candidate alembic -c /app/alembic.ini upgrade head || true
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm notification alembic upgrade head || true
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm audit alembic upgrade head || true
+            # 3. Migrations Alembic (Avant le démarrage des services)
+            echo "Migrating Auth..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm auth alembic upgrade head
 
-            # 4. Redémarrer les services
+            echo "Migrating Candidate..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm -e PYTHONPATH= candidate alembic -c /app/alembic.ini upgrade head
+
+            echo "Migrating Notification..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm notification alembic upgrade head
+            echo "Migrating Audit..."
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm audit alembic upgrade head
+
+            # 4. Redémarrage des services (Rolling Update)
+            echo "Starting services..."
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
 
-            # 5. Nettoyage des images inutilisées
+            # 5. Nettoyage
             docker image prune -f
-
-            echo "Deploy terminé avec succès."
+            echo "Deployment finished successfully!"
