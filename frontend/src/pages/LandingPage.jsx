@@ -78,19 +78,6 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen min-h-[100dvh] bg-white relative overflow-x-hidden w-full max-w-[100vw]">
-      {/* Bouton Feedback flottant - masqué sur très petits écrans, plus compact sur mobile */}
-      <motion.a
-        href={ROUTES.CONTACT}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5, delay: 1 }}
-        className="fixed top-1/2 -translate-y-1/2 z-40 w-8 h-20 sm:w-10 sm:h-28 bg-[#e76f51] hover:bg-[#d45a3f] text-white text-[10px] sm:text-xs font-semibold shadow-lg rounded-l-lg flex items-center justify-center transition-colors [writing-mode:vertical] [text-orientation:mixed]"
-        style={{ right: 'env(safe-area-inset-right, 0)' }}
-        aria-label="Donner un feedback"
-      >
-        Feedback
-      </motion.a>
-
       <SEO
         title="Plateforme de Recrutement | CVthèque de candidats vérifiés"
         description="Yemma Solutions - CVthèque de candidats 100% validés par des experts RH. Réduisez vos coûts de recrutement (~60%), accélérez vos embauches (objectif 48h). Recherche avancée, matching et évaluations expertes. Essai gratuit 14 jours."
