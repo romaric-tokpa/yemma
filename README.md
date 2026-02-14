@@ -236,6 +236,56 @@ docker-compose exec auth /bin/bash
 docker-compose down -v
 ```
 
+## 🔧 Dépannage déploiement
+
+### Erreur "password authentication failed for user postgres"
+
+Si les services (auth, candidate, etc.) ne peuvent pas se connecter à PostgreSQL :
+
+1. **Vérifier la cohérence** : `DB_USER` et `DB_PASSWORD` doivent être identiques dans le `.env` et utilisés par les conteneurs `postgres-*` et les services. Le `docker-compose.yml` utilise `${DB_PASSWORD:-postgres}` partout par défaut.
+
+2. **Corriger le `.env`** sur le VPS :
+   ```bash
+   # /opt/yemma/.env
+   DB_USER=postgres
+   DB_PASSWORD=postgres   # ou votre mot de passe, mais identique partout
+   ```
+
+3. **Réinitialiser les volumes** si la base a été créée avec un ancien mot de passe :
+   ```bash
+   cd /opt/yemma
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+   docker volume rm yemma_postgres_auth_data yemma_postgres_candidate_data yemma_postgres_company_data yemma_postgres_payment_data yemma_postgres_document_data yemma_postgres_logs_data 2>/dev/null || true
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+   ```
+   *(Les noms de volumes peuvent varier : `docker volume ls` pour les lister.)*
+
+4. **Vérifier les logs** :
+   ```bash
+   docker compose logs auth --tail=20
+   ```
+
+### Erreur 404 / MIME type (text/html pour .css)
+
+Si vous voyez une erreur **MIME type ('text/html')** pour les fichiers `.css` ou `.js` :
+
+1. **Vérifier que le frontend répond** (depuis le VPS) :
+   ```bash
+   docker exec yemma-nginx wget -qO- http://frontend:3000/ | head -5
+   ```
+
+2. **Vérifier les fichiers dans le conteneur frontend** :
+   ```bash
+   docker exec yemma-frontend ls -la /usr/share/nginx/html/assets/
+   ```
+
+3. **Redémarrer nginx** après modification de la config :
+   ```bash
+   docker compose restart nginx
+   ```
+
+L'API Gateway (nginx) proxyfie toutes les requêtes `/` vers le conteneur `frontend` qui sert les fichiers statiques.
+
 ## 📚 Documentation
 
 - [Guide de migration Database per Service](./MIGRATION_DATABASE_PER_SERVICE.md)

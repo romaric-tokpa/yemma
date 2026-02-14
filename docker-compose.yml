@@ -54,6 +54,7 @@ services:
     image: postgres:15-alpine
     container_name: yemma-postgres-auth
     environment:
+      # DB_USER/DB_PASSWORD doivent être identiques pour tous les postgres-* et services
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: auth_db
