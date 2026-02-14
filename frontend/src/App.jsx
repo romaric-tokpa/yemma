@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react'
 import { BrowserRouter as Router } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 import AppRoutes from './routes'
 import './index.css'
 
@@ -15,11 +16,13 @@ const LoadingFallback = () => (
 
 function App() {
   return (
-    <Router>
-      <Suspense fallback={<LoadingFallback />}>
-        <AppRoutes />
-      </Suspense>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <Suspense fallback={<LoadingFallback />}>
+          <AppRoutes />
+        </Suspense>
+      </Router>
+    </HelmetProvider>
   )
 }
 

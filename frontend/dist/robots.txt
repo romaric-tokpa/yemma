@@ -1,11 +1,22 @@
 # Robots.txt pour Yemma Solutions
 # https://yemma-solutions.com
+# Optimisé pour Google, Bing, et tous les moteurs de recherche
 
 User-agent: *
 Allow: /
+Allow: /contact
+Allow: /register/
+Allow: /login
+Allow: /demo/
+Allow: /legal/
 
-# Sitemap
+# Interdire l'accès aux pages d'API (les assets / CSS / JS restent accessibles pour le rendu)
+Disallow: /api/
+
+# Sitemap - essentiel pour l'indexation
 Sitemap: https://yemma-solutions.com/sitemap.xml
 
-# Interdire l'accès aux pages d'API
-Disallow: /api/
+# Bing (optionnel - améliore le crawl)
+User-agent: Bingbot
+Allow: /
+Sitemap: https://yemma-solutions.com/sitemap.xml

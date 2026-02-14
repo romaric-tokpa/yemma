@@ -12,6 +12,7 @@ import { CandidateSkeleton } from '../components/search/CandidateSkeleton'
 import { DemoExpertReviewDialog } from '../components/search/DemoExpertReviewDialog'
 import { generateAvatarFromFullName } from '@/utils/photoUtils'
 import { MOCK_CANDIDATES } from '../data/mockCandidates'
+import { SEO } from '../components/seo/SEO'
 
 // Les données mockées (1200+ profils) sont importées depuis mockCandidates.js
 // Elles couvrent tous les secteurs d'activité avec des profils variés et réalistes
@@ -199,6 +200,13 @@ export default function DemoCvtheque() {
   }
 
   return (
+    <>
+      <SEO
+        title="Démo CVthèque - Recherche candidats"
+        description="Découvrez la CVthèque Yemma Solutions. Recherchez des candidats par secteur, compétences, localisation. Démo gratuite de la plateforme de recrutement."
+        keywords="cvthèque démo, recherche candidats, plateforme recrutement démo, cvthèque emploi"
+        canonical="/demo/cvtheque"
+      />
     <div className="h-screen bg-gray-light flex flex-1 relative">
       {/* Header avec badge démo - Compact */}
       <div className="absolute top-0 left-0 right-0 z-40 bg-white border-b shadow-sm">
@@ -386,6 +394,7 @@ export default function DemoCvtheque() {
         </div>
       </div>
     </div>
+    </>
   )
 }
 

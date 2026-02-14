@@ -116,7 +116,7 @@ export default {
         },
       },
       fontFamily: {
-        'heading': ['Sora', 'sans-serif'],
+        'heading': ['DM Sans', 'Inter', 'sans-serif'],
         'body': ['Inter', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
         'mono': ['JetBrains Mono', 'Fira Code', 'monospace'],
       },

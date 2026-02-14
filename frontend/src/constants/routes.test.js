@@ -5,6 +5,7 @@ describe('routes', () => {
   describe('ROUTES', () => {
     it('expose les routes publiques', () => {
       expect(ROUTES.HOME).toBe('/')
+      expect(ROUTES.CANDIDAT).toBe('/candidat')
       expect(ROUTES.LOGIN).toBe('/login')
       expect(ROUTES.REGISTER_CHOICE).toBe('/register/choice')
       expect(ROUTES.CONTACT).toBe('/contact')

@@ -1,25 +1,22 @@
-import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { ROUTES } from '@/constants/routes'
 import { motion } from 'framer-motion'
+import { SEO } from '../components/seo/SEO'
 import {
   ArrowRight, CheckCircle2, Users, Shield, Clock, Star, Zap,
-  Target, Timer, Menu, X, Cpu, Briefcase, HeartPulse, ShoppingCart,
+  Target, Timer, Cpu, Briefcase, HeartPulse, ShoppingCart,
   Factory, GraduationCap, Building2, Truck, Lightbulb, Megaphone,
-  Scale, Home, Leaf, Rocket, ShoppingBag
+  Scale, Home, Leaf, Rocket, ShoppingBag, FileText, GitBranch, UserCheck
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
+import HeroIllustration from '../components/landing/HeroIllustration'
+import CTACardsIllustration from '../components/landing/CTACardsIllustration'
+import PublicNavbar from '../components/layout/PublicNavbar'
+import PublicFooter from '../components/layout/PublicFooter'
 
 export default function LandingPage() {
   const navigate = useNavigate()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 12)
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
 
   const stats = [
     { value: '10 000+', label: 'Candidats vérifiés', icon: Users },
@@ -28,11 +25,27 @@ export default function LandingPage() {
     { value: '-60%', label: 'Coûts recrutement', icon: Zap },
   ]
 
-  const benefits = [
-    { icon: Zap, title: 'Réduisez vos coûts de 60%', desc: 'Fini les agences de recrutement coûteuses. Recrutez directement avec Yemma.' },
-    { icon: Timer, title: 'Gagnez 15h par semaine', desc: 'Automatisez la recherche et le tri des candidats. Concentrez-vous sur l\'essentiel.' },
-    { icon: Target, title: 'Taux de matching de 87%', desc: 'Notre IA trouve les profils qui correspondent vraiment à vos besoins.' },
-    { icon: Shield, title: '100% des profils vérifiés', desc: 'Chaque candidat est validé par nos experts. Zéro risque, que des talents.' },
+  // Bloc "Pourquoi 500+ entreprises nous font confiance" - aligné BRIEF_PROJET.md (§2 Réponse Yemma)
+  const trustSteps = [
+    {
+      title: '100 % des profils visibles validés par des experts',
+      desc: 'Entretien, évaluation, compte-rendu : chaque profil visible dans la CVthèque a été vérifié par nos experts RH. Fini le coût élevé des agences, le temps perdu à trier des CV non qualifiés et le risque de profils embellis.',
+      icon: 'brief',
+      dotColor: '#e76f51',
+    },
+    {
+      title: 'Recherche multi-critères et matching affiché',
+      desc: 'Secteur, compétences, expérience, localisation… Ciblez rapidement les bons profils. Matching affiché (ex. taux ~87 %) et évaluations détaillées (scores, soft skills, synthèse) pour aider à la décision.',
+      icon: 'candidates',
+      dotColor: '#226D68',
+      cta: true,
+    },
+    {
+      title: 'Économies et gain de temps',
+      desc: '~60 % sur les coûts de recrutement et ~15 h par semaine gagnées grâce à l\'automatisation de la recherche et du tri. Conformité RGPD garantie.',
+      icon: 'mission',
+      dotColor: '#e76f51',
+    },
   ]
 
   const features = [
@@ -44,478 +57,596 @@ export default function LandingPage() {
     'Conformité RGPD garantie',
   ]
 
-  const partnerCompanies = [
-    { name: 'TechCorp', initials: 'TC' },
-    { name: 'StartupHub', initials: 'SH' },
-    { name: 'InnovateLab', initials: 'IL' },
-    { name: 'FinancePlus', initials: 'FP' },
-    { name: 'ConsultGroup', initials: 'CG' },
-    { name: 'DigitalPro', initials: 'DP' },
-    { name: 'HealthTech', initials: 'HT' },
-    { name: 'RetailMax', initials: 'RM' },
-    { name: 'DataFlow', initials: 'DF' },
-    { name: 'CloudSync', initials: 'CS' },
-    { name: 'AgileSoft', initials: 'AS' },
-    { name: 'NextGen', initials: 'NG' },
+  // Secteurs groupés pour le bloc style capture - textes d'origine respectés
+  const sectorCategories = [
+    {
+      title: 'Technologie & Digital',
+      icon: Cpu,
+      sectors: ['Technologie', 'Digital', 'E-commerce', 'Cybersécurité', 'Startup', 'Télécom', 'R&D', 'Innovation'],
+    },
+    {
+      title: 'Services & Finance',
+      icon: Briefcase,
+      sectors: ['Finance', 'Commerce', 'Assurance', 'Consulting', 'Marketing', 'Juridique', 'Immobilier'],
+    },
+    {
+      title: 'Industrie & Santé',
+      icon: Factory,
+      sectors: ['Santé', 'Industrie', 'Biotech', 'Médical', 'BTP', 'Ingénierie', 'Éducation', 'Logistique', 'Environnement', 'Tourisme', 'Sport', 'Culture', 'Design', 'Public', 'Événementiel'],
+    },
   ]
-
-  const sectorRows = [
-    [
-      { name: 'Technologie', icon: Cpu },
-      { name: 'Finance', icon: Briefcase },
-      { name: 'Santé', icon: HeartPulse },
-      { name: 'Commerce', icon: ShoppingCart },
-      { name: 'Industrie', icon: Factory },
-      { name: 'Éducation', icon: GraduationCap },
-      { name: 'BTP', icon: Building2 },
-      { name: 'Logistique', icon: Truck },
-      { name: 'Consulting', icon: Lightbulb },
-      { name: 'Marketing', icon: Megaphone },
-      { name: 'Juridique', icon: Scale },
-      { name: 'Immobilier', icon: Home },
-      { name: 'Environnement', icon: Leaf },
-      { name: 'Startup', icon: Rocket },
-      { name: 'E-commerce', icon: ShoppingBag },
-    ],
-    [
-      { name: 'Biotech', icon: HeartPulse },
-      { name: 'Médical', icon: HeartPulse },
-      { name: 'Digital', icon: Cpu },
-      { name: 'Cybersécurité', icon: Shield },
-      { name: 'Assurance', icon: Shield },
-      { name: 'Tourisme', icon: Home },
-      { name: 'Sport', icon: Target },
-      { name: 'Culture', icon: Leaf },
-      { name: 'Design', icon: Target },
-      { name: 'Ingénierie', icon: Factory },
-      { name: 'R&D', icon: Lightbulb },
-      { name: 'Public', icon: Users },
-      { name: 'Innovation', icon: Rocket },
-      { name: 'Télécom', icon: Cpu },
-      { name: 'Événementiel', icon: Megaphone },
-    ],
-  ]
-
-  const sectorColors = [
-    '#226D68', '#e76f51', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6',
-    '#06B6D4', '#84CC16', '#F97316', '#6366F1', '#14B8A6', '#EC4899',
-  ]
-  const getSectorColor = (name) => {
-    let hash = 0
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    return sectorColors[Math.abs(hash) % sectorColors.length]
-  }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Nav compacte */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ${
-        scrolled ? 'bg-white shadow-sm' : 'bg-white/95 backdrop-blur-sm'
-      }`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex justify-between items-center h-12 md:h-14">
-            <Link to="/" className="text-lg font-bold">
-              <span className="text-[#226D68]">Yemma</span>
-              <span className="text-[#e76f51]">-Solutions</span>
-            </Link>
-            <div className="hidden md:flex items-center gap-4">
-              <Link to="/how-it-works" className="text-sm font-medium text-[#2C2C2C] hover:text-[#226D68] transition-colors">
-                Comment ça marche
-              </Link>
-              <Link to="/contact" className="text-sm font-medium text-[#2C2C2C] hover:text-[#226D68] transition-colors">
-                Contact
-              </Link>
-              <Button variant="outline" size="sm" onClick={() => navigate('/login')}
-                className="h-8 text-sm border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3]">
-                Connexion
-              </Button>
-              <Button size="sm" onClick={() => navigate('/register/company')}
-                className="h-8 text-sm bg-[#226D68] hover:bg-[#1a5a55] text-white">
-                Essai gratuit
-              </Button>
-            </div>
-            <button className="md:hidden p-2 -mr-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Menu">
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t px-4 py-3 space-y-2">
-            <Link to="/how-it-works" className="block text-sm py-2 text-[#2C2C2C]" onClick={() => setMobileMenuOpen(false)}>Comment ça marche</Link>
-            <Link to="/contact" className="block text-sm py-2 text-[#2C2C2C]" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
-            <div className="pt-2 flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => { navigate('/login'); setMobileMenuOpen(false) }}>Connexion</Button>
-              <Button size="sm" className="flex-1 bg-[#226D68] hover:bg-[#1a5a55]" onClick={() => { navigate('/register/company'); setMobileMenuOpen(false) }}>Essai gratuit</Button>
-            </div>
-          </div>
-        )}
-      </nav>
+    <div className="min-h-screen min-h-[100dvh] bg-white relative overflow-x-hidden w-full max-w-[100vw]">
+      {/* Bouton Feedback flottant - masqué sur très petits écrans, plus compact sur mobile */}
+      <motion.a
+        href={ROUTES.CONTACT}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5, delay: 1 }}
+        className="fixed top-1/2 -translate-y-1/2 z-40 w-8 h-20 sm:w-10 sm:h-28 bg-[#e76f51] hover:bg-[#d45a3f] text-white text-[10px] sm:text-xs font-semibold shadow-lg rounded-l-lg flex items-center justify-center transition-colors [writing-mode:vertical] [text-orientation:mixed]"
+        style={{ right: 'env(safe-area-inset-right, 0)' }}
+        aria-label="Donner un feedback"
+      >
+        Feedback
+      </motion.a>
 
-      {/* Hero - compact & pro */}
-      <section className="relative pt-16 md:pt-20 pb-10 md:pb-12 overflow-hidden bg-gradient-to-br from-[#E8F4F3]/50 via-[#F4F6F8] to-[#E8F4F3]/30">
+      <SEO
+        title="Plateforme de Recrutement | CVthèque de candidats vérifiés"
+        description="Yemma Solutions - CVthèque de candidats 100% validés par des experts RH. Réduisez vos coûts de recrutement (~60%), accélérez vos embauches (objectif 48h). Recherche avancée, matching et évaluations expertes. Essai gratuit 14 jours."
+        keywords="recrutement, emploi, offre emploi, recherche emploi, candidat, recruteur, cvthèque, profils préqualifiés, matching, scoring, plateforme recrutement, RH"
+        canonical="/"
+      />
+      <PublicNavbar variant="light" />
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 lg:gap-10">
-            <div className="lg:max-w-[55%]">
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F4F3] text-[#226D68] text-[11px] font-semibold mb-3"
-              >
-                +500 entreprises
-              </motion.div>
-
+      {/* Hero */}
+      <section className="relative pt-16 xs:pt-20 md:pt-24 pb-12 xs:pb-16 md:pb-24 overflow-hidden bg-white">
+        <div className="max-w-7xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 sm:gap-12 lg:gap-16">
+            {/* Contenu gauche */}
+            <div className="lg:max-w-[50%] lg:flex-1">
               <motion.h1
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.05 }}
-                className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#2C2C2C] leading-tight mb-2.5 font-heading"
+                transition={{ duration: 0.5 }}
+                className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-bold text-[#2C2C2C] leading-[1.15] mb-4 sm:mb-6 font-heading"
               >
-                Recrutez les <span className="text-[#226D68]">meilleurs talents</span> en 48h
+                La plateforme qui met en relation
+                <br />
+                <span className="text-[#226D68]">candidats et entreprises</span>
               </motion.h1>
 
-              <motion.p
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="text-sm sm:text-base text-[#6b7280] mb-4 max-w-lg"
-              >
-                La plateforme RH qui réduit vos coûts de <strong className="text-[#226D68]">60%</strong> avec des candidats vérifiés par des experts.
-              </motion.p>
-
               <motion.div
-                initial={{ opacity: 0, y: 12 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.15 }}
-                className="flex flex-col sm:flex-row gap-2 mb-4"
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="mb-8"
               >
-                <Button
-                  size="sm"
-                  onClick={() => navigate('/register/company')}
-                  className="h-9 px-4 text-sm font-semibold bg-[#226D68] hover:bg-[#1a5a55] text-white"
-                >
-                  Essai gratuit 14 jours
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => navigate('/register/candidat')}
-                  className="h-9 px-4 text-sm font-semibold border-[#e76f51] text-[#e76f51] hover:bg-[#FDF2F0]"
-                >
-                  Je suis candidat
-                </Button>
+                <p className="text-base sm:text-lg text-[#6b7280] leading-relaxed mb-1">
+                  <strong className="text-[#2C2C2C]">Réduisez les coûts</strong> de recrutement (moins d&apos;agences), <strong className="text-[#2C2C2C]">accélérez</strong> vos embauches (objectif 48h) et <strong className="text-[#2C2C2C]">garantissez la qualité</strong> des profils grâce à une validation par des experts RH avant mise en visibilité.
+                </p>
+                <p className="text-base sm:text-lg text-[#6b7280] leading-relaxed mb-6">
+                  Une CVthèque de candidats vérifiés, accessibles via recherche avancée, avec des évaluations expertes (scores, résumés, avis) pour faciliter le matching et la décision.
+                </p>
               </motion.div>
 
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-                className="flex flex-wrap gap-3 text-[11px] text-[#6b7280]"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="flex flex-col sm:flex-row gap-3"
               >
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-[#226D68]" /> Sans engagement</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3 w-3 text-[#226D68]" /> Support inclus</span>
+                <Button
+                  size="lg"
+                  onClick={() => navigate(ROUTES.REGISTER_COMPANY)}
+                  className="h-11 px-6 text-base font-semibold bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                >
+                  Obtenir des profils
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate(ROUTES.CONTACT)}
+                  className="h-11 px-6 text-base font-semibold border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] bg-white"
+                >
+                  Prendre rdv
+                </Button>
               </motion.div>
             </div>
 
+            {/* Illustration droite - ordinateur, CV, lampe */}
             <motion.div
-              initial={{ opacity: 0, x: 16 }}
+              initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4, delay: 0.1 }}
-              className="grid grid-cols-2 gap-2 sm:gap-3"
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="lg:flex-1 lg:flex lg:justify-end lg:items-center"
             >
-              {stats.map((s, i) => {
-                const Icon = s.icon
-                const accentColors = ['#226D68', '#e76f51', '#226D68', '#e76f51']
-                const accent = accentColors[i]
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.15 + i * 0.05 }}
-                    className="bg-white rounded-lg p-3 border-l-4 shadow-sm hover:shadow-md transition-all"
-                    style={{ borderLeftColor: accent }}
-                  >
-                    <Icon className="h-4 w-4 mb-1.5" style={{ color: accent }} />
-                    <p className="text-lg sm:text-xl font-bold text-[#2C2C2C]">{s.value}</p>
-                    <p className="text-[10px] sm:text-xs text-[#6b7280]">{s.label}</p>
-                  </motion.div>
-                )
-              })}
+              <HeroIllustration />
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Secteurs d'activités - défilement animé */}
-      <section className="py-8 md:py-10 bg-white overflow-hidden border-t border-b border-[#E8F4F3]/60">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-6">
-            <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-1">
-              Tous les <span className="text-[#226D68]">secteurs d'activités</span> couverts
-            </h3>
-            <p className="text-xs md:text-sm text-[#6b7280]">100+ secteurs représentés</p>
+      {/* Bloc partenaires - compact avec défilement */}
+      <section className="py-5 xs:py-6 md:py-8 bg-white border-b border-gray-100 overflow-hidden">
+        <div className="max-w-5xl mx-auto px-3 xs:px-4 sm:px-6 mb-6">
+          <p className="text-center text-sm md:text-base text-[#2C2C2C]">
+            <span className="font-semibold underline decoration-[#226D68] decoration-2 underline-offset-2">+ 500 entreprises</span>
+            {' '}nous font confiance pour recruter des candidats vérifiés
+          </p>
+        </div>
+        <div className="relative w-full overflow-hidden">
+          <div className="absolute left-0 top-0 w-12 md:w-20 h-full z-10 pointer-events-none bg-gradient-to-r from-white to-transparent" />
+          <div className="absolute right-0 top-0 w-12 md:w-20 h-full z-10 pointer-events-none bg-gradient-to-l from-white to-transparent" />
+          <div className="flex animate-scroll-partners gap-8 md:gap-12">
+            {[...Array(2)].map((_, dup) =>
+              ['TechCorp', 'InnovateLab', 'DataFlow', 'CloudSync', 'FinancePlus', 'DigitalPro', 'StartupHub', 'ConsultGroup', 'HealthTech', 'RetailMax'].map((name) => (
+                <span key={`${name}-${dup}`} className="flex-shrink-0 text-xs md:text-sm font-semibold text-[#374151] grayscale opacity-80 whitespace-nowrap">
+                  {name}
+                </span>
+              ))
+            )}
           </div>
-          <div className="space-y-3 relative">
-            <div className="absolute left-0 top-0 w-16 h-full z-20 pointer-events-none bg-gradient-to-r from-white to-transparent" />
-            <div className="absolute right-0 top-0 w-16 h-full z-20 pointer-events-none bg-gradient-to-l from-white to-transparent" />
-            {sectorRows.map((row, rowIdx) => (
-              <div key={rowIdx} className="relative flex overflow-hidden">
-                <div className={`flex gap-2 ${rowIdx === 0 ? 'animate-scroll-right' : 'animate-scroll-left'}`}>
-                  {[...row, ...row].map(({ name, icon: Icon }, idx) => {
-                    const color = getSectorColor(name)
+        </div>
+      </section>
+
+      {/* Bloc stats CVthèque - fond pêche */}
+      <section className="py-10 xs:py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#FDEEDC' }}>
+        <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 sm:gap-8 md:gap-12">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="flex-1"
+            >
+              <p className="text-xl xs:text-2xl md:text-3xl lg:text-4xl font-bold text-[#2C2C2C] leading-tight">
+                Déjà{' '}
+                <span className="inline-block px-2 xs:px-3 py-0.5 xs:py-1 rounded-full bg-[#2C2C2C] text-white text-xl xs:text-2xl md:text-3xl lg:text-4xl font-bold whitespace-nowrap">
+                  +10700
+                </span>{' '}
+                profils de qualité
+              </p>
+              <p className="text-base xs:text-lg md:text-xl text-[#374151] mt-2 font-medium">
+                préqualifiés avec soin dans la CVthèque
+              </p>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="flex-shrink-0"
+            >
+              <div className="w-36 h-36 xs:w-48 xs:h-48 md:w-64 md:h-64 rounded-full overflow-hidden bg-[#FDF2F0] border-2 xs:border-4 border-white shadow-lg">
+                <img
+                  src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop"
+                  alt="Profils qualifiés dans la CVthèque Yemma"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Secteurs d'activités - style capture */}
+      <section className="py-10 xs:py-12 md:py-16 bg-[#0B3C5D] overflow-hidden">
+        <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:gap-16">
+            {/* Colonne gauche - Titre */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.5 }}
+              className="lg:w-2/5 lg:sticky lg:top-24 mb-10 lg:mb-0"
+            >
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight">
+                La plateforme de recrutement
+                <br />
+                <span className="text-[#226D68]">des profils préqualifiés</span>
+              </h2>
+              <p className="text-white/80 text-sm md:text-base mt-4 max-w-md">
+                Tous les secteurs d&apos;activité couverts. Recrutez des profils vérifiés dans votre domaine.
+              </p>
+            </motion.div>
+
+            {/* Colonne droite - Bloc secteurs */}
+            <div className="lg:flex-1 space-y-0">
+              {sectorCategories.map((category, idx) => {
+                const Icon = category.icon
+                const half = Math.ceil(category.sectors.length / 2)
+                const leftCol = category.sectors.slice(0, half)
+                const rightCol = category.sectors.slice(half)
                     return (
-                      <div
-                        key={`${rowIdx}-${idx}`}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-300 cursor-default bg-gray-100 border border-gray-200 text-[#6b7280] hover:scale-105 hover:-translate-y-0.5"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = color
-                          e.currentTarget.style.color = 'white'
-                          e.currentTarget.style.borderColor = color
-                          e.currentTarget.style.boxShadow = `0 4px 12px ${color}66`
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f3f4f6'
-                          e.currentTarget.style.color = '#6b7280'
-                          e.currentTarget.style.borderColor = '#e5e7eb'
-                          e.currentTarget.style.boxShadow = 'none'
-                        }}
-                      >
-                        <Icon className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
-                        {name}
+                  <motion.div
+                    key={category.title}
+                    initial={{ opacity: 0, x: 20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: '-30px' }}
+                    transition={{ duration: 0.5, delay: idx * 0.1 }}
+                    className="border-b border-white/20 last:border-b-0 py-6 md:py-8 first:pt-0"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                        <Icon className="w-6 h-6 text-white" strokeWidth={1.5} />
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-white mb-4">{category.title}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                          <ul className="space-y-2">
+                            {leftCol.map((sector) => (
+                              <li key={sector} className="flex items-center gap-2 text-white/90 text-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#226D68] shrink-0" />
+                                {sector}
+                              </li>
+                            ))}
+                          </ul>
+                          <ul className="space-y-2">
+                            {rightCol.map((sector) => (
+                              <li key={sector} className="flex items-center gap-2 text-white/90 text-sm">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#226D68] shrink-0" />
+                                {sector}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
                     )
                   })}
                 </div>
-              </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pourquoi 500+ entreprises nous font confiance - style capture */}
+      <section id="benefits" className="py-10 xs:py-12 md:py-16 bg-white overflow-hidden">
+        <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-xl md:text-2xl font-bold text-[#2C2C2C] text-center mb-2"
+          >
+            Pourquoi 500+ entreprises nous font confiance
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-sm text-[#6b7280] text-center mb-12"
+          >
+            Réponse Yemma : profils 100 % validés par des experts, recherche multi-critères, matching affiché et économies sur les coûts de recrutement
+          </motion.p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 md:gap-6">
+            {trustSteps.map((step, i) => (
+              <motion.div
+                key={step.title}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ duration: 0.5, delay: i * 0.15 }}
+                whileHover={{ y: -4 }}
+                className="flex flex-col items-center text-center"
+              >
+                {/* Icône avec points animés */}
+                <motion.div
+                  className="relative w-20 h-20 mb-6"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  whileInView={{ scale: 1, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.1 + 0.2 }}
+                >
+                  {step.icon === 'brief' && (
+                    <div className="w-full h-full rounded-xl border-2 border-gray-200 flex items-center justify-center bg-gray-50/50 relative">
+                      <FileText className="w-9 h-9 text-gray-500" strokeWidth={1.5} />
+                      <div className="absolute -right-0.5 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+                        {[0, 1, 2].map((j) => (
+                          <motion.span
+                            key={j}
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: step.dotColor }}
+                            animate={{ opacity: [0.5, 1, 0.5] }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: j * 0.2 }}
+                          />
+                        ))}
+                      </div>
+                      <motion.span
+                        className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: step.dotColor }}
+                        animate={{ opacity: [0.6, 1, 0.6] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                      <motion.span
+                        className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: step.dotColor }}
+                        animate={{ opacity: [0.6, 1, 0.6] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                      />
+                    </div>
+                  )}
+                  {step.icon === 'candidates' && (
+                    <div className="w-full h-full rounded-xl border-2 border-[#226D68]/40 flex items-center justify-center bg-[#E8F4F3]/60 relative">
+                      <GitBranch className="w-9 h-9 text-[#226D68]" strokeWidth={1.5} />
+                      <motion.span
+                        className="absolute w-2 h-2 rounded-full bg-[#226D68]"
+                        style={{ top: '15%', right: '20%' }}
+                        animate={{ scale: [1, 1.3, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                      <motion.span
+                        className="absolute w-1.5 h-1.5 rounded-full bg-[#226D68]"
+                        style={{ bottom: '30%', left: '15%' }}
+                        animate={{ scale: [1, 1.4, 1] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                      />
+                      <motion.span
+                        className="absolute w-1.5 h-1.5 rounded-full bg-[#226D68]"
+                        style={{ bottom: '15%', right: '20%' }}
+                        animate={{ scale: [1, 1.4, 1] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                      />
+                    </div>
+                  )}
+                  {step.icon === 'mission' && (
+                    <div className="w-full h-full rounded-xl border-2 border-gray-200 flex items-center justify-center bg-gray-50/50 relative overflow-visible">
+                      <UserCheck className="w-9 h-9 text-gray-500" strokeWidth={1.5} />
+                      <motion.span className="absolute -top-0.5 right-2 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: step.dotColor }}
+                        animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity }} />
+                      <motion.span className="absolute top-1/2 -right-0.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: step.dotColor }}
+                        animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity, delay: 0.3 }} />
+                      <motion.span className="absolute -bottom-0.5 left-2 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: step.dotColor }}
+                        animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 2, repeat: Infinity, delay: 0.6 }} />
+                    </div>
+                  )}
+                </motion.div>
+
+                <h3 className="font-bold text-[#2C2C2C] text-base md:text-lg mb-3">{step.title}</h3>
+                <p className="text-sm text-[#6b7280] leading-relaxed mb-4 max-w-xs">
+                  {step.desc}
+                </p>
+
+                {step.cta && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Button
+                      onClick={() => navigate(ROUTES.REGISTER_COMPANY)}
+                      className="mt-2 h-11 px-6 bg-[#226D68] hover:bg-[#1a5a55] text-white font-semibold transition-all hover:scale-105"
+                    >
+                      Faire une demande
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </motion.div>
+                )}
+        </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Benefits - Pourquoi 500+ entreprises nous font confiance */}
-      <section id="benefits" className="py-10 md:py-12 bg-[#F4F6F8] overflow-hidden relative">
-        {/* Subtle decorative background - flottant doux */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-1/4 left-0 w-64 h-64 bg-[#226D68]/5 rounded-full blur-3xl -translate-x-1/2 animate-benefits-float" style={{ animationDelay: '0s' }} />
-          <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-[#E8F4F3]/60 rounded-full blur-3xl translate-x-1/3 animate-benefits-float" style={{ animationDelay: '2s' }} />
-        </div>
-
-        <motion.div
-          className="max-w-6xl mx-auto px-4 sm:px-6 relative"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: '-80px' }}
-          variants={{
-            visible: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
-            hidden: {},
-          }}
-        >
-          <motion.div
-            className="text-center mb-8"
-            variants={{
-              visible: { opacity: 1, y: 0 },
-              hidden: { opacity: 0, y: 20 },
-            }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
+      {/* La promesse de Yemma pour vous */}
+      <section id="promesse" className="py-12 xs:py-16 md:py-20 bg-[#F9FAFB] overflow-hidden">
+        <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-2xl md:text-3xl font-bold text-[#2C2C2C] text-center mb-3"
           >
-            <h2 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-1 font-heading">
-              Pourquoi{' '}
-              <motion.span
-                className="inline-block text-[#226D68]"
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                500+ entreprises
-              </motion.span>
-              {' '}nous font confiance
-            </h2>
-            <motion.p
-              className="text-sm text-[#6b7280]"
-              variants={{
-                visible: { opacity: 1 },
-                hidden: { opacity: 0 },
-              }}
-              transition={{ delay: 0.3 }}
-            >
-              Résultats concrets, mesurables
-            </motion.p>
+            La promesse de Yemma pour vous
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-center text-[#6b7280] text-sm md:text-base max-w-2xl mx-auto mb-16"
+          >
+            Une CVthèque de candidats vérifiés, accessibles via recherche avancée. Évaluations expertes (scores, résumés, avis) pour faciliter le matching et la décision. Pas d&apos;agences, pas d&apos;intermédiaires : des profils validés par nos experts RH avant mise en visibilité.
+          </motion.p>
+
+          {/* Bloc 1 - Identification des profils */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col md:flex-row md:items-center gap-10 md:gap-16 mb-20"
+          >
+            <div className="md:w-2/5 relative">
+              <div className="relative">
+                <div className="flex gap-2 -rotate-2">
+                  {[0, 1, 2].map((i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: i * 0.1 }}
+                      className="w-20 h-28 xs:w-24 xs:h-32 md:w-28 md:h-36 bg-white rounded-lg shadow-lg border border-gray-100 flex flex-col p-2"
+                      style={{ transform: `translateY(${i * 4}px)` }}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gray-200 mx-auto mt-2" />
+                      <div className="flex-1 mt-2 space-y-1">
+                        <div className="h-1.5 bg-gray-100 rounded w-full" />
+                        <div className="h-1.5 bg-gray-100 rounded w-4/5" />
+                        <div className="h-1.5 bg-gray-100 rounded w-3/5" />
+                    </div>
+                    </motion.div>
+                  ))}
+                  </div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3 }}
+                  className="absolute -right-2 top-1/2 -translate-y-1/2 bg-[#e76f51] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-md"
+                >
+                  +10 700 profils
+                  <br />
+                  préqualifiés
+                </motion.div>
+              </div>
+            </div>
+            <div className="md:w-3/5">
+              <p className="text-[#226D68] font-semibold text-sm mb-2">Arrêtez de perdre du temps</p>
+              <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-4">
+                Nous identifions pour vous les meilleurs profils
+              </h3>
+              <p className="text-[#6b7280] text-sm md:text-base leading-relaxed mb-3">
+                Accédez à une CVthèque de candidats déjà validés par nos experts. Recherche multi-critères, <strong>matching</strong> et <strong>scoring</strong> pour cibler rapidement les profils les plus adaptés à vos besoins.
+              </p>
+              <p className="text-[#6b7280] text-sm md:text-base leading-relaxed">
+                Chaque profil est préqualifié avec une évaluation détaillée (scores, synthèse, compétences). Vous recevez une sélection pertinente en moins de 48h.
+              </p>
+            </div>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {benefits.map((b, i) => {
-              const Icon = b.icon
-              const isCoral = i % 2 === 1
-              const accent = isCoral ? '#e76f51' : '#226D68'
-              const accentBg = isCoral ? '#FDF2F0' : '#E8F4F3'
-              return (
+          {/* Bloc 2 - Gestion de A à Z */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col md:flex-row-reverse md:items-center gap-10 md:gap-16 mb-20"
+          >
+            <div className="md:w-2/5 relative">
+              <div className="relative bg-white rounded-xl shadow-lg border border-gray-100 p-6 max-w-xs">
+                <div className="space-y-2 mb-6">
+                  <div className="h-2 bg-gray-100 rounded w-full" />
+                  <div className="h-2 bg-gray-100 rounded w-4/5" />
+                  <div className="h-2 bg-gray-100 rounded w-3/5" />
+                </div>
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="h-6 w-32 bg-gray-200 rounded" />
+                </div>
                 <motion.div
-                  key={i}
-                  variants={{
-                    visible: { opacity: 1, y: 0 },
-                    hidden: { opacity: 0, y: 30 },
-                  }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3 }}
+                  className="absolute -top-2 -left-2 bg-[#0B3C5D] text-white text-xs font-bold px-3 py-2 rounded-lg shadow-md"
                 >
-                  <motion.div
-                    whileHover={{ y: -8, scale: 1.02 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                    className="h-full"
-                  >
-                    <Card className="border-0 shadow-sm bg-white overflow-hidden h-full group cursor-default transition-all duration-300 hover:shadow-lg">
-                      <div className="h-1 w-full" style={{ backgroundColor: accent }} />
-                      <CardContent className="p-4 relative">
-                        <motion.div
-                          className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
-                          style={{ backgroundColor: accentBg }}
-                          whileHover={{ scale: 1.15, rotate: 8 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                        >
-                          <Icon className="h-5 w-5" style={{ color: accent }} />
-                        </motion.div>
-                        <h3 className="font-semibold text-[#2C2C2C] text-sm mb-1">{b.title}</h3>
-                        <p className="text-sm text-[#6b7280] leading-relaxed">{b.desc}</p>
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: `linear-gradient(to right, ${accent}, transparent)` }} />
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+                  100% vérification
+                  <br />
+                  par nos experts
                 </motion.div>
-              )
-            })}
-          </div>
-        </motion.div>
-      </section>
+              </div>
+                    </div>
+            <div className="md:w-3/5 text-left md:text-right">
+              <p className="text-[#226D68] font-semibold text-sm mb-2">Concentrez-vous sur l&apos;essentiel</p>
+              <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-4">
+                Nous gérons tout de A à Z
+              </h3>
+              <p className="text-[#6b7280] text-sm md:text-base leading-relaxed mb-3">
+                Conformité RGPD garantie, traçabilité des accès et audit. Nos experts valident chaque profil par entretien et évaluation avant mise en CVthèque.
+              </p>
+              <p className="text-[#6b7280] text-sm md:text-base leading-relaxed">
+                Concentrez-vous sur l&apos;essentiel : votre recrutement. Nous assurons la qualité et la fiabilité des profils.
+              </p>
+                  </div>
+          </motion.div>
 
-      {/* Features */}
-      <section className="py-8 md:py-10 bg-gradient-to-r from-[#E8F4F3]/40 via-white to-[#FDF2F0]/40">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <h3 className="text-lg font-bold text-[#2C2C2C] mb-4 text-center">Tout inclus</h3>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-            {features.map((f, i) => (
-              <span key={i} className="flex items-center gap-2 text-sm text-[#6b7280] animate-in" style={{ animationDelay: `${i * 60}ms`, animationFillMode: 'backwards' }}>
-                <CheckCircle2 className={`h-4 w-4 shrink-0 ${i % 2 === 0 ? 'text-[#226D68]' : 'text-[#e76f51]'}`} />
-                {f}
-              </span>
-            ))}
+          {/* Bloc 3 - Sélection rigoureuse */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col md:flex-row md:items-center gap-10 md:gap-16"
+          >
+            <div className="md:w-2/5">
+              <div className="relative bg-white rounded-xl p-6 shadow-lg border border-gray-100 max-w-xs">
+                <div className="space-y-3">
+                  {['Entretien', 'Évaluation', 'Validation', 'CVthèque'].map((step, i) => (
+                    <motion.div
+                      key={step}
+                      initial={{ opacity: 0, x: -10 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: i * 0.1 }}
+                      className={`py-2 px-3 rounded-lg border border-gray-200 text-sm font-medium text-[#374151] ${i === 0 ? 'w-full' : i === 1 ? 'w-[90%] ml-[5%]' : i === 2 ? 'w-[80%] ml-[10%]' : 'w-[70%] ml-[15%]'}`}
+                    >
+                      {step}
+                    </motion.div>
+                  ))}
+                </div>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-4 py-2 px-4 bg-[#2C2C2C] text-white text-sm font-bold rounded-lg text-center w-3/4 mx-auto"
+                >
+                  Profils validés
+                </motion.div>
+              </div>
+            </div>
+            <div className="md:w-3/5">
+              <p className="text-[#226D68] font-semibold text-sm mb-2">Votre projet est exigeant, nous aussi</p>
+              <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-4">
+                La sélection de profils la plus rigoureuse du marché
+              </h3>
+              <p className="text-[#6b7280] text-sm md:text-base leading-relaxed mb-3">
+                Chaque candidat intègre la CVthèque après une phase de validation poussée. Nos experts RH échangent avec chaque candidat pour vérifier ses compétences, ses références et ses motivations.
+              </p>
+              <p className="text-[#6b7280] text-sm md:text-base leading-relaxed">
+                Nous ne retenons que les meilleurs profils audités. Matching et scoring vous aident à prendre la bonne décision.
+              </p>
           </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* Entreprises qui nous font confiance - logos défilants */}
-      <section className="py-6 md:py-8 bg-gradient-to-b from-[#F4F6F8] via-[#E8F4F3]/20 to-[#F4F6F8] overflow-hidden">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-4">
-            <h2 className="text-lg md:text-xl font-bold text-[#2C2C2C]">
-              Ils nous font <span className="text-[#226D68]">confiance</span>
-            </h2>
-            <p className="text-[11px] text-[#6b7280] mt-0.5">500+ entreprises</p>
-          </div>
-
-          <div className="space-y-2 relative">
-            <div className="absolute left-0 top-0 w-12 h-full z-20 pointer-events-none bg-gradient-to-r from-[#F4F6F8] to-transparent" />
-            <div className="absolute right-0 top-0 w-12 h-full z-20 pointer-events-none bg-gradient-to-l from-[#F4F6F8] to-transparent" />
-
-            {/* Ligne 1 - défile vers la droite */}
-            <div className="relative flex overflow-hidden">
-              <div className="flex gap-3 animate-scroll-right-fast items-center">
-                {[...partnerCompanies, ...partnerCompanies].map((company, idx) => (
-                  <div
-                    key={`row1-${idx}`}
-                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-neutral-200 shadow-sm hover:border-[#226D68]/20 transition-colors"
-                  >
-                    <div className="w-7 h-7 rounded-md bg-[#E8F4F3] flex items-center justify-center font-semibold text-[#226D68] text-[10px]">
-                      {company.initials}
-                    </div>
-                    <span className="font-medium text-[#2C2C2C] text-xs whitespace-nowrap">{company.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Ligne 2 - défile vers la gauche */}
-            <div className="relative flex overflow-hidden">
-              <div className="flex gap-3 animate-scroll-left-fast items-center">
-                {[...partnerCompanies].reverse().concat([...partnerCompanies].reverse()).map((company, idx) => (
-                  <div
-                    key={`row2-${idx}`}
-                    className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-neutral-200 shadow-sm hover:border-[#e76f51]/20 transition-colors"
-                  >
-                    <div className="w-7 h-7 rounded-md bg-[#FDF2F0] flex items-center justify-center font-semibold text-[#e76f51] text-[10px]">
-                      {company.initials}
-                    </div>
-                    <span className="font-medium text-[#2C2C2C] text-xs whitespace-nowrap">{company.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA finale */}
-      <section className="py-10 md:py-12 bg-gradient-to-br from-[#226D68] via-[#1e5d59] to-[#1a5a55]">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-xl md:text-2xl font-bold text-white mb-2">
-            Prêt à économiser 60% sur vos recrutements ?
+      {/* CTA finale - style capture (2 colonnes, fond pêche) */}
+      <section className="py-10 md:py-14 px-3 xs:px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto">
+          <div
+            className="rounded-2xl sm:rounded-[32px] p-5 xs:p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 sm:gap-8 lg:gap-12"
+            style={{ backgroundColor: '#FDEEDC' }}
+          >
+            <div className="lg:flex-[1.2] min-w-0">
+              <h2 className="text-xl xs:text-2xl md:text-3xl lg:text-4xl font-bold text-[#2C2C2C] leading-tight mb-3 sm:mb-4">
+                Recrutement : centralisez vos recherches !
           </h2>
-          <p className="text-sm text-[#E8F4F3] mb-5">Essai gratuit 14 jours · Sans carte bancaire</p>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <Button size="lg" onClick={() => navigate('/register/company')}
-              className="h-10 bg-white text-[#226D68] hover:bg-gray-100 font-semibold">
-              Commencer
+              <p className="text-sm xs:text-base md:text-lg text-[#374151] leading-relaxed mb-2">
+                Yemma Solutions simplifie et accélère vos recrutements. Une CVthèque de profils préqualifiés, avec matching et scoring, validés par des experts RH.
+              </p>
+              <p className="text-sm xs:text-base md:text-lg text-[#374151] leading-relaxed mb-4 sm:mb-6">
+                Une gestion recrutement simple, fluide et éprouvée, avec des économies jusqu&apos;à 60%.
+              </p>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => navigate(ROUTES.REGISTER_COMPANY)}
+                className="h-12 px-6 border-2 border-[#2C2C2C] bg-transparent text-[#2C2C2C] hover:bg-[#2C2C2C] hover:text-white font-medium rounded-lg transition-colors"
+              >
+                En savoir plus
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate('/demo/cvtheque')}
-              className="h-10 border-white text-white hover:bg-white/10">
-              Voir la démo
-            </Button>
+              <p className="text-sm text-[#6b7280] mt-3">Essai gratuit 14 jours · Sans carte bancaire</p>
+            </div>
+            <div className="lg:flex-1 flex items-center justify-center lg:justify-end">
+              <CTACardsIllustration />
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-[#2C2C2C] text-gray-400 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-            <div>
-              <Link to="/" className="text-base font-bold">
-                <span className="text-[#226D68]">Yemma</span>
-                <span className="text-[#e76f51]">-Solutions</span>
-              </Link>
-              <p className="text-xs text-gray-500 mt-1">Recrutement nouvelle génération</p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white text-xs uppercase tracking-wider mb-2">Entreprise</h4>
-              <ul className="space-y-1 text-xs">
-                <li><Link to="/how-it-works" className="hover:text-[#226D68] transition-colors">Comment ça marche</Link></li>
-                <li><Link to="/contact" className="hover:text-[#226D68] transition-colors">Contact</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white text-xs uppercase tracking-wider mb-2">Candidats</h4>
-              <ul className="space-y-1 text-xs">
-                <li><Link to="/register/candidat" className="hover:text-[#226D68] transition-colors">Créer un compte</Link></li>
-                <li><Link to="/login" className="hover:text-[#226D68] transition-colors">Connexion</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-white text-xs uppercase tracking-wider mb-2">Légal</h4>
-              <ul className="space-y-1 text-xs">
-                <li><Link to="/legal/mentions" className="hover:text-[#226D68] transition-colors">Mentions légales</Link></li>
-                <li><Link to="/legal/privacy" className="hover:text-[#226D68] transition-colors">Confidentialité</Link></li>
-                <li><Link to="/legal/terms" className="hover:text-[#226D68] transition-colors">CGU</Link></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-700 pt-4 text-center text-xs text-gray-500">
-            © {new Date().getFullYear()} Yemma. Tous droits réservés.
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }

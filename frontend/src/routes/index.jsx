@@ -17,8 +17,8 @@ const MentionsLegales = lazy(() => import('@/pages/legal/MentionsLegales'))
 const PrivacyPolicy = lazy(() => import('@/pages/legal/PrivacyPolicy'))
 const CGU = lazy(() => import('@/pages/legal/CGU'))
 
-// Page Comment ça marche
-const HowItWorks = lazy(() => import('@/pages/HowItWorks'))
+// Page Candidat
+const CandidatLanding = lazy(() => import('@/pages/CandidatLanding'))
 
 // Routes Candidat
 const CandidateOnboarding = lazy(() => import('@/pages/CandidateOnboarding'))
@@ -70,7 +70,7 @@ export default function AppRoutes() {
       <Route path="/legal/mentions" element={<MentionsLegales />} />
       <Route path="/legal/privacy" element={<PrivacyPolicy />} />
       <Route path="/legal/terms" element={<CGU />} />
-      <Route path="/how-it-works" element={<HowItWorks />} />
+      <Route path="/candidat" element={<CandidatLanding />} />
 
       {/* Routes Démo (accessibles sans authentification) */}
       <Route path="/demo/cvtheque" element={<DemoCvtheque />} />

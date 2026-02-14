@@ -1,10 +1,19 @@
 import { Link } from 'react-router-dom'
+import { ROUTES } from '@/constants/routes'
 import { User, Building, ArrowRight } from 'lucide-react'
+import { SEO } from '@/components/seo/SEO'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function RegisterChoice() {
   return (
+    <>
+      <SEO
+        title="Inscription - Candidat ou Recruteur"
+        description="Inscrivez-vous sur Yemma Solutions : créez votre profil candidat ou votre compte recruteur. Accès à la CVthèque de profils préqualifiés avec matching et scoring."
+        keywords="inscription candidat, inscription recruteur, créer compte emploi, plateforme recrutement inscription"
+        canonical="/register/choice"
+      />
     <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-6">
@@ -15,7 +24,7 @@ export default function RegisterChoice() {
           <p className="text-sm text-[#6b7280]">Choisissez votre profil pour commencer</p>
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
-          <Link to="/register/candidat" className="block">
+          <Link to={ROUTES.REGISTER_CANDIDAT} className="block">
             <Card className="h-full border border-gray-200 shadow-sm rounded-xl overflow-hidden hover:shadow-md hover:border-[#226D68]/40 transition-all">
               <CardHeader className="p-4 pb-2">
                 <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center mb-3">
@@ -34,7 +43,7 @@ export default function RegisterChoice() {
               </CardContent>
             </Card>
           </Link>
-          <Link to="/register/company" className="block">
+          <Link to={ROUTES.REGISTER_COMPANY} className="block">
             <Card className="h-full border border-gray-200 shadow-sm rounded-xl overflow-hidden hover:shadow-md hover:border-[#e76f51]/40 transition-all">
               <CardHeader className="p-4 pb-2">
                 <div className="w-10 h-10 rounded-lg bg-[#FDF2F0] flex items-center justify-center mb-3">
@@ -56,12 +65,13 @@ export default function RegisterChoice() {
         </div>
         <p className="text-center mt-4 text-xs text-[#6b7280]">
           Vous avez déjà un compte ?{' '}
-          <Link to="/login" className="text-[#226D68] font-medium hover:underline">Se connecter</Link>
+          <Link to={ROUTES.LOGIN} className="text-[#226D68] font-medium hover:underline">Se connecter</Link>
         </p>
         <p className="text-center mt-2 text-[10px] text-[#6b7280]">
-          <Link to="/" className="text-[#226D68] hover:underline">Retour à l&apos;accueil</Link>
+          <Link to={ROUTES.HOME} className="text-[#226D68] hover:underline">Retour à l&apos;accueil</Link>
         </p>
       </div>
     </div>
+    </>
   )
 }

@@ -57,6 +57,46 @@
   }
 }
 
+/* Section partenaires - défilement logos */
+@keyframes scroll-partners {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.animate-scroll-partners {
+  display: flex;
+  animation: scroll-partners 40s linear infinite;
+  will-change: transform;
+}
+@media (hover: hover) {
+  .animate-scroll-partners:hover {
+    animation-play-state: paused;
+  }
+}
+
+/* Section postes - défilement cartes */
+@keyframes scroll-jobs {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+.animate-scroll-jobs {
+  display: flex;
+  animation: scroll-jobs 50s linear infinite;
+  will-change: transform;
+}
+@media (hover: hover) {
+  .animate-scroll-jobs:hover {
+    animation-play-state: paused;
+  }
+}
+
 @layer base {
   :root {
     /* Charte graphique Yemma Solutions - Nouvelle charte */
@@ -109,6 +149,8 @@
 @layer base {
   html {
     font-size: 18px; /* Base augmentée pour meilleure lisibilité sur toutes les pages */
+    overflow-x: hidden;
+    max-width: 100vw;
   }
   
   * {
@@ -117,6 +159,8 @@
   
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    max-width: 100vw;
     font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 1rem; /* Hérite de html (18px) */
     color: #2C2C2C; /* Gris anthracite */
@@ -322,6 +366,7 @@ html, body {
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   -webkit-overflow-scrolling: touch;
+  min-width: 280px; /* Évite le collapse sur très petits écrans */
 }
 @media (max-width: 1023px) {
   body { touch-action: pan-y pinch-zoom; }

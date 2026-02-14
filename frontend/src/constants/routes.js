@@ -6,6 +6,7 @@
 export const ROUTES = {
   // Routes publiques
   HOME: '/',
+  CANDIDAT: '/candidat',
   REGISTER_CHOICE: '/register/choice',
   CONTACT: '/contact',
   

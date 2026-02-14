@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { ROUTES } from '@/constants/routes'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { authApiService, companyApi } from '@/services/api'
 import { registerCompanySchema } from '@/schemas/auth'
-import { Building, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Building, AlertCircle, ArrowLeft, CheckCircle2, Users, Shield, Zap } from 'lucide-react'
+import { SEO } from '@/components/seo/SEO'
 
 export default function RegisterCompany() {
   const navigate = useNavigate()
@@ -104,45 +105,88 @@ export default function RegisterCompany() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
-        <Card className="w-full max-w-[380px] rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 text-white text-center bg-gradient-to-r from-[#e76f51] to-[#d45a3f]">
-            <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-white/90" />
-            <h2 className="text-lg font-bold text-white mb-1">Inscription réussie</h2>
-            <p className="text-xs text-white/80">
-              Redirection vers la configuration de votre entreprise...
-            </p>
-          </div>
-        </Card>
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-[#226D68]" />
+          <h2 className="text-xl font-bold text-[#2C2C2C] mb-2">Inscription réussie</h2>
+          <p className="text-sm text-[#6b7280] mb-4">
+            Redirection vers la configuration de votre entreprise...
+          </p>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#226D68] border-t-transparent mx-auto" />
+        </div>
       </div>
     )
   }
 
+  const benefits = [
+    { icon: Users, text: 'Accédez à des profils candidats vérifiés par nos experts' },
+    { icon: Shield, text: '100% des profils validés avant mise en relation' },
+    { icon: Zap, text: 'Recevez 3 profils qualifiés en 48h maximum' },
+  ]
+
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
-      <div className="w-full max-w-[400px]">
-        <Card className="rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3.5 bg-gradient-to-r from-[#e76f51] to-[#d45a3f]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                <Building className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-bold text-white">Inscription Entreprise</CardTitle>
-                <CardDescription className="text-white/90 text-xs">Accédez à la CVthèque de profils validés</CardDescription>
-              </div>
+    <>
+      <SEO
+        title="Inscription Recruteur - Créer compte entreprise"
+        description="Créez votre compte recruteur sur Yemma Solutions. Accédez à la CVthèque de profils préqualifiés avec matching et scoring. Essai gratuit 14 jours. Recrutez en 48h."
+        keywords="inscription recruteur, créer compte entreprise, cvthèque recrutement, plateforme recrutement entreprise"
+        canonical="/register/company"
+      />
+      <div className="min-h-screen min-h-[100dvh] bg-white flex flex-col lg:flex-row overflow-x-hidden w-full max-w-[100vw]">
+        {/* Colonne gauche - Proposition de valeur */}
+        <div className="lg:w-1/2 bg-[#F4F6F8] flex flex-col justify-center px-4 xs:px-5 sm:px-6 py-12 lg:py-0 lg:px-16 min-w-0 overflow-x-hidden">
+          <Link to={ROUTES.HOME} className="inline-flex items-center gap-2 mb-12 lg:mb-16">
+            <div className="w-9 h-9 rounded-full bg-[#226D68] flex items-center justify-center">
+              <span className="text-white font-bold text-sm">Y</span>
             </div>
+            <span className="text-lg font-bold">
+              <span className="text-[#226D68]">Yemma</span>
+              <span className="text-[#e76f51]">-Solutions</span>
+            </span>
+          </Link>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#2C2C2C] mb-4 leading-tight">
+              Accédez à la CVthèque de profils préqualifiés
+              <br />
+              <span className="text-[#226D68]">en 48h</span>
+            </h1>
+            <p className="text-[#6b7280] mb-8 max-w-md">
+              Rejoignez la plateforme de recrutement qui connecte les entreprises aux candidats qualifiés et vérifiés.
+            </p>
+            <ul className="space-y-4">
+              {benefits.map((item, i) => {
+                const Icon = item.icon
+                return (
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                      <Icon className="w-5 h-5 text-[#226D68]" />
+                    </div>
+                    <span className="text-sm text-[#374151] pt-2">{item.text}</span>
+                  </li>
+                )
+              })}
+            </ul>
           </div>
-          
-          <CardContent className="p-4">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        </div>
+
+        {/* Colonne droite - Formulaire */}
+        <div className="lg:w-1/2 flex flex-col justify-center px-4 xs:px-5 sm:px-6 py-12 lg:py-0 lg:px-16 min-w-0 overflow-x-hidden">
+          <div className="max-w-md w-full mx-auto min-w-0 overflow-hidden">
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-[#2C2C2C] mb-1">Créer un compte entreprise</h2>
+              <p className="text-sm text-[#6b7280]">
+                Accédez à la CVthèque et recrutez en toute confiance.
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {error && (
-                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs">{error}</p>
+                    <p className="text-sm">{error}</p>
                     {error.includes('existe déjà') && (
-                      <Link to="/login" className="text-[10px] text-red-600 hover:underline mt-0.5 block">
+                      <Link to={ROUTES.LOGIN} className="text-xs text-red-600 hover:underline mt-1 block">
                         Se connecter avec cet email →
                       </Link>
                     )}
@@ -150,64 +194,64 @@ export default function RegisterCompany() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="firstName" className="text-xs font-medium">Prénom *</Label>
+                  <Label htmlFor="firstName" className="text-sm font-medium text-[#374151]">Prénom *</Label>
                   <Input id="firstName" {...register('firstName')} disabled={isLoading}
-                    className="h-9 text-sm mt-0.5" />
-                  {errors.firstName && <p className="text-[10px] text-red-600 mt-0.5">{errors.firstName.message}</p>}
+                    className="h-10 text-sm mt-1 border-gray-200 w-full min-w-0" placeholder="Jean" />
+                  {errors.firstName && <p className="text-xs text-red-600 mt-1">{errors.firstName.message}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="lastName" className="text-xs font-medium">Nom *</Label>
+                  <Label htmlFor="lastName" className="text-sm font-medium text-[#374151]">Nom *</Label>
                   <Input id="lastName" {...register('lastName')} disabled={isLoading}
-                    className="h-9 text-sm mt-0.5" />
-                  {errors.lastName && <p className="text-[10px] text-red-600 mt-0.5">{errors.lastName.message}</p>}
+                    className="h-10 text-sm mt-1 border-gray-200 w-full min-w-0" placeholder="Dupont" />
+                  {errors.lastName && <p className="text-xs text-red-600 mt-1">{errors.lastName.message}</p>}
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="email" className="text-xs font-medium">Email professionnel *</Label>
+                <Label htmlFor="email" className="text-sm font-medium text-[#374151]">Email professionnel *</Label>
                 <Input id="email" type="email" placeholder="contact@entreprise.com" {...register('email')}
-                  disabled={isLoading} className="h-9 text-sm mt-0.5" />
-                {errors.email && <p className="text-[10px] text-red-600 mt-0.5">{errors.email.message}</p>}
+                  disabled={isLoading} className="h-10 text-sm mt-1 border-gray-200 w-full min-w-0" />
+                {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
               </div>
 
               <div>
-                <Label htmlFor="companyName" className="text-xs font-medium">Nom entreprise *</Label>
+                <Label htmlFor="companyName" className="text-sm font-medium text-[#374151]">Nom de l&apos;entreprise *</Label>
                 <Input id="companyName" placeholder="Ex: Acme Corp" {...register('companyName')}
-                  disabled={isLoading} className="h-9 text-sm mt-0.5" />
-                {errors.companyName && <p className="text-[10px] text-red-600 mt-0.5">{errors.companyName.message}</p>}
+                  disabled={isLoading} className="h-10 text-sm mt-1 border-gray-200 w-full min-w-0" />
+                {errors.companyName && <p className="text-xs text-red-600 mt-1">{errors.companyName.message}</p>}
               </div>
 
               <div>
-                <Label htmlFor="companyLegalId" className="text-xs font-medium">RCCM *</Label>
+                <Label htmlFor="companyLegalId" className="text-sm font-medium text-[#374151]">RCCM *</Label>
                 <Input id="companyLegalId" placeholder="CI-ABJ-XX-XXXX-BXX-XXXXX" {...register('companyLegalId')}
-                  disabled={isLoading} className="h-9 text-sm mt-0.5" />
-                {errors.companyLegalId && <p className="text-[10px] text-red-600 mt-0.5">{errors.companyLegalId.message}</p>}
-                <p className="text-[10px] text-[#6b7280] mt-0.5">Numéro RCCM de l&apos;entreprise</p>
+                  disabled={isLoading} className="h-10 text-sm mt-1 border-gray-200 w-full min-w-0" />
+                {errors.companyLegalId && <p className="text-xs text-red-600 mt-1">{errors.companyLegalId.message}</p>}
+                <p className="text-xs text-[#6b7280] mt-1">Numéro RCCM de l&apos;entreprise</p>
               </div>
 
               <div>
-                <Label htmlFor="password" className="text-xs font-medium">Mot de passe *</Label>
+                <Label htmlFor="password" className="text-sm font-medium text-[#374151]">Mot de passe *</Label>
                 <Input id="password" type="password" placeholder="••••••••" {...register('password')}
-                  disabled={isLoading} className="h-9 text-sm mt-0.5" />
-                {errors.password && <p className="text-[10px] text-red-600 mt-0.5">{errors.password.message}</p>}
-                <p className="text-[10px] text-[#6b7280] mt-0.5">Min. 8 caractères</p>
+                  disabled={isLoading} className="h-10 text-sm mt-1 border-gray-200 w-full min-w-0" />
+                {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
+                <p className="text-xs text-[#6b7280] mt-1">Minimum 8 caractères</p>
               </div>
 
               <div>
-                <Label htmlFor="confirmPassword" className="text-xs font-medium">Confirmer *</Label>
+                <Label htmlFor="confirmPassword" className="text-sm font-medium text-[#374151]">Confirmer le mot de passe *</Label>
                 <Input id="confirmPassword" type="password" placeholder="••••••••" {...register('confirmPassword')}
-                  disabled={isLoading} className="h-9 text-sm mt-0.5" />
-                {errors.confirmPassword && <p className="text-[10px] text-red-600 mt-0.5">{errors.confirmPassword.message}</p>}
+                  disabled={isLoading} className="h-10 text-sm mt-1 border-gray-200 w-full min-w-0" />
+                {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword.message}</p>}
               </div>
 
               <Button type="submit" disabled={isLoading}
-                className="w-full h-9 bg-[#e76f51] hover:bg-[#d45a3f] text-white text-sm font-semibold">
+                className="w-full h-11 bg-[#226D68] hover:bg-[#1a5a55] text-white text-sm font-semibold mt-2">
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
-                    Inscription...
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Création en cours...
                   </span>
                 ) : (
                   <>
@@ -218,27 +262,24 @@ export default function RegisterCompany() {
               </Button>
             </form>
 
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-[10px] text-[#6b7280] text-center mb-2">Vous avez déjà un compte ?</p>
-              <div className="flex gap-2">
-                <Link to="/login" className="flex-1">
-                  <Button variant="outline" className="w-full h-8 text-xs border-[#e76f51] text-[#e76f51] hover:bg-[#FDF2F0]">
-                    <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />Se connecter
-                  </Button>
-                </Link>
-                <Link to="/register/candidat" className="flex-1">
-                  <Button variant="outline" className="w-full h-8 text-xs border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3]">
-                    Candidat
-                  </Button>
-                </Link>
-              </div>
+            <p className="text-center text-sm text-[#6b7280] mt-6">
+              Vous avez déjà un compte ?{' '}
+              <Link to={ROUTES.LOGIN} className="font-medium text-[#226D68] hover:underline">
+                Se connecter
+              </Link>
+            </p>
+
+            <div className="mt-6 pt-6 border-t border-gray-200 flex justify-center gap-4">
+              <Link to={ROUTES.REGISTER_CANDIDAT} className="text-sm text-[#226D68] hover:underline">
+                Je suis candidat
+              </Link>
+              <Link to={ROUTES.HOME} className="text-sm text-[#6b7280] hover:underline">
+                Retour à l&apos;accueil
+              </Link>
             </div>
-          </CardContent>
-        </Card>
-        <p className="text-center mt-4 text-[10px] text-[#6b7280]">
-          <Link to="/" className="text-[#226D68] hover:underline">Retour à l&apos;accueil</Link>
-        </p>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

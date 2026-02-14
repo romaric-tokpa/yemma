@@ -13,6 +13,7 @@ export const registerCandidatSchema = z.object({
   confirmPassword: z.string().min(8, "La confirmation du mot de passe est requise"),
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères"),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  acceptCGU: z.boolean().refine((val) => val === true, { message: "Vous devez accepter les CGU et la politique de confidentialité" }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Les mots de passe ne correspondent pas",
   path: ["confirmPassword"],
