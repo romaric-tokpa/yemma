@@ -49,9 +49,9 @@ export default function PublicNavbar({ variant = 'light' }) {
         <div className="flex justify-between items-center h-14 md:h-16">
           <Link to={ROUTES.HOME} className="flex items-center gap-2">
             <img
-              src="/logo-search.png"
-              alt="Yemma Solutions - Recherche"
-              className="w-9 h-9 object-contain"
+              src="/logo-icon.svg"
+              alt="Yemma Solutions"
+              className="w-9 h-9 object-contain shrink-0"
             />
             <span className={`text-base xs:text-lg font-bold ${logoColor}`}>
               <span className="text-[#226D68]">Yemma</span>

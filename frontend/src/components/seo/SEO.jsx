@@ -2,6 +2,8 @@ import { Helmet } from 'react-helmet-async'
 
 const SITE_URL = 'https://yemma-solutions.com'
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`
+const OG_IMAGE_WIDTH = 1200
+const OG_IMAGE_HEIGHT = 630
 
 /**
  * Composant SEO pour les meta tags dynamiques par page.

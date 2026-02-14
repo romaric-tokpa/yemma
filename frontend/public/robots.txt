@@ -4,6 +4,7 @@
 
 User-agent: *
 Allow: /
+Allow: /candidat
 Allow: /contact
 Allow: /register/
 Allow: /login
