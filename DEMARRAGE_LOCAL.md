@@ -41,8 +41,9 @@ docker-compose -f docker-compose.dev.yml up -d postgres redis notification auth
 # 3. Démarrer Candidate (pour l'onboarding CV et le profil)
 docker-compose -f docker-compose.dev.yml up -d candidate
 
-# 4. (Optionnel) Démarrer Document pour l'upload du CV après parsing
-docker-compose -f docker-compose.dev.yml up -d document
+# 4. (Recommandé) Démarrer Document + MinIO pour l'upload de CV et photos de profil
+# Le service Document nécessite MinIO (stockage S3). MinIO démarre automatiquement avec document.
+docker-compose -f docker-compose.dev.yml up -d minio document
 ```
 
 Ou en une seule commande (Auth + Candidate + Document + dépendances) :
@@ -69,7 +70,29 @@ curl -s http://localhost:8001/health
 # Candidate (port 8002)
 curl -s http://localhost:8002/health
 # doit retourner du JSON (ex: {"status":"healthy","service":"candidate-service",...})
+
+# Document (port 8003) - nécessite MinIO pour les uploads
+curl -s http://localhost:8003/health
+# doit retourner du JSON (ex: {"status":"healthy","service":"document-service",...})
 ```
+
+### Diagnostic : erreurs 500 sur le service Document (photos, CV)
+
+Si vous obtenez des erreurs 500 sur `/api/v1/documents/candidate/...` ou `/api/v1/documents/upload/profile-photo` :
+
+**1. Vérifier que MinIO et Document sont démarrés :**
+```bash
+docker-compose -f docker-compose.dev.yml up -d minio document
+```
+
+**2. Vérifier les logs du service Document :**
+```bash
+docker-compose -f docker-compose.dev.yml logs document --tail=50
+```
+
+**3. Causes fréquentes :**
+- **MinIO non démarré** : le service Document a besoin de MinIO pour stocker les fichiers
+- **Table documents manquante** : redémarrer le service Document pour créer les tables
 
 ### Diagnostic : service Candidate qui crash (`ERR_CONNECTION_RESET`)
 

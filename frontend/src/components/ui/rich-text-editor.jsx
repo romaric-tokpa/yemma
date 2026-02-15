@@ -1,6 +1,6 @@
 import { useRef } from 'react'
-import ReactQuill from 'react-quill'
-import 'react-quill/dist/quill.snow.css'
+import ReactQuill from 'react-quill-new'
+import 'react-quill-new/dist/quill.snow.css'
 
 export function RichTextEditor({ value, onChange, placeholder, ...props }) {
   const quillRef = useRef(null)
@@ -19,7 +19,7 @@ export function RichTextEditor({ value, onChange, placeholder, ...props }) {
   const formats = [
     'header',
     'bold', 'italic', 'underline', 'strike',
-    'list', 'bullet',
+    'list',
     'color', 'background',
     'link'
   ]

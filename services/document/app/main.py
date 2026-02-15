@@ -79,7 +79,10 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 async def startup_event():
     """Initialisation au démarrage"""
     await init_db()
-    await init_storage()
+    try:
+        await init_storage()
+    except Exception as e:
+        logger.warning(f"Storage (MinIO) init failed - uploads will fail until MinIO is available: {e}")
 
 
 @app.get("/health", tags=["Health"])
