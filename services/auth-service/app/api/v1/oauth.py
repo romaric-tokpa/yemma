@@ -29,8 +29,8 @@ def _get_auth_base_url() -> str:
     """URL de base du service auth (pour les redirect_uri OAuth)"""
     if settings.AUTH_SERVICE_EXTERNAL_URL:
         return settings.AUTH_SERVICE_EXTERNAL_URL.rstrip("/")
-    return "http://localhost:8001"
-
+    import os
+    return os.getenv("BASE_URL", "http://localhost:8001")
 
 @router.get("/oauth/google")
 async def oauth_google_initiate(

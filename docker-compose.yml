@@ -334,11 +334,13 @@ services:
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: auth_db
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-auth:5432/auth_db
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres-auth:5432/${DB_NAME:-auth_db}
+      BASE_URL: "https://yemma-solutions.com"
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       OAUTH2_SECRET_KEY: ${OAUTH2_SECRET_KEY:-your-oauth2-secret-key-change-in-production}
+      OAUTH_REDIRECT_URI: "https://yemma-solutions.com/api/v1/auth/oauth/google/callback"
       CORS_ORIGINS: ${CORS_ORIGINS:-["https://yemma-solutions.com","https://www.yemma-solutions.com","http://localhost:3000","http://localhost:8000"]}
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -346,6 +348,12 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
       NOTIFICATION_SERVICE_URL: http://notification:8000
       FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: "https://yemma-solutions.com/api/v1/auth/oauth/google/callback"
+      FORWARDED_ALLOW_IPS: "*"
+      command: >
+        sh -c "cd /app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --forwarded-allow-ips='*'"
     networks:
       - yemma-network
     depends_on:
@@ -823,7 +831,7 @@ services:
       - auth
       - candidate
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:80/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
