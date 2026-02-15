@@ -50,8 +50,11 @@ export function SEO({
     ? [...new Set([...keywords.split(',').map(k => k.trim()), ...defaultKeywords])].join(', ')
     : defaultKeywords.join(', ')
 
+  const faviconDataUri = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExMCIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMTcwIiBmaWxsPSJub25lIiBzdHJva2U9IiMwRjVDNUUiIHN0cm9rZS13aWR0aD0iNDAiLz48cGF0aCBkPSJNMjkwIDExMCBBMTQwIDE0MCAwIDEgMCAyOTAgNDAyIEE5NSAxNDAgMCAxIDEgMjkwIDExMCIgZmlsbD0iI0YyOEMyOCIvPjwvc3ZnPg=='
+
   return (
     <Helmet>
+      <link rel="icon" type="image/svg+xml" href={faviconDataUri} />
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       <meta name="keywords" content={mergedKeywords} />

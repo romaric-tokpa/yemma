@@ -364,9 +364,17 @@
 /* Prevent horizontal scroll on mobile */
 html, body {
   overflow-x: hidden;
+  max-width: 100vw;
   -webkit-tap-highlight-color: transparent;
   -webkit-overflow-scrolling: touch;
   min-width: 280px; /* Évite le collapse sur très petits écrans */
+}
+
+/* Labels des checkboxes - textes longs passent à la ligne */
+label.cursor-pointer,
+[role="checkbox"] + label,
+.checkbox-label {
+  word-break: break-word;
 }
 @media (max-width: 1023px) {
   body { touch-action: pan-y pinch-zoom; }

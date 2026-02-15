@@ -1,23 +1,69 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/constants/routes'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, LogOut, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { authApiService } from '@/services/api'
 
 /**
  * Navbar publique uniforme pour toutes les pages landing (/, /candidat, /contact, /legal/*)
  * variant: "light" | "dark" - light pour fond clair, dark pour hero sombre (page Candidat)
+ * Affiche la session utilisateur (Dashboard, Déconnexion) si authentifié.
  */
 export default function PublicNavbar({ variant = 'light' }) {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [userRoles, setUserRoles] = useState([])
+  const [user, setUser] = useState(null)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 12)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (token) {
+          const u = await authApiService.getCurrentUser()
+          setUser(u)
+          setUserRoles(u?.roles || [])
+          setIsAuthenticated(true)
+        } else {
+          setIsAuthenticated(false)
+          setUser(null)
+          setUserRoles([])
+        }
+      } catch {
+        setIsAuthenticated(false)
+        setUser(null)
+        setUserRoles([])
+      }
+    }
+    checkAuth()
+  }, [])
+
+  const getDashboardLink = () => {
+    if (userRoles.includes('ROLE_CANDIDAT')) return '/candidate/dashboard'
+    if (userRoles.includes('ROLE_COMPANY_ADMIN') || userRoles.includes('ROLE_RECRUITER')) return '/company/dashboard'
+    if (userRoles.includes('ROLE_ADMIN') || userRoles.includes('ROLE_SUPER_ADMIN')) return '/admin/dashboard'
+    return '/login'
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('refresh_token')
+    setUserMenuOpen(false)
+    setMobileMenuOpen(false)
+    window.location.href = '/login'
+  }
+
+  const displayName = user?.first_name || user?.email?.split('@')[0] || 'Mon espace'
 
   const isDark = variant === 'dark'
   const navBg = isDark
@@ -70,24 +116,54 @@ export default function PublicNavbar({ variant = 'light' }) {
             </Link>
           </div>
           <div className="hidden md:flex items-center gap-4">
-            <Link to={hintLink} className={`text-sm transition-colors ${linkHint}`}>
-              {hintText}
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(ROUTES.LOGIN)}
-              className={`h-9 px-4 text-sm font-medium ${btnOutline}`}
-            >
-              Me connecter
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => navigate(registerRoute)}
-              className={`h-9 px-4 text-sm font-medium ${btnPrimary}`}
-            >
-              M&apos;inscrire
-            </Button>
+            {isAuthenticated ? (
+              <>
+                <Link to={getDashboardLink()} className={`text-sm font-medium transition-colors ${linkBase}`}>
+                  Mon espace
+                </Link>
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-[#E8F4F3] text-[#2C2C2C]'}`}
+                    aria-expanded={userMenuOpen}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-white/20' : 'bg-[#E8F4F3]'}`}>
+                      <User className="h-4 w-4" />
+                    </div>
+                    <span className="text-sm font-medium truncate max-w-[120px]">{displayName}</span>
+                  </button>
+                  {userMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} aria-hidden />
+                      <div className={`absolute right-0 top-full mt-1 py-2 min-w-[180px] rounded-lg shadow-lg z-50 ${isDark ? 'bg-[#252525] border border-white/10' : 'bg-white border border-gray-200'}`}>
+                        <div className={`px-3 py-2 border-b ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
+                          <p className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-[#2C2C2C]'}`}>{displayName}</p>
+                          {user?.email && <p className={`text-xs truncate ${isDark ? 'text-white/70' : 'text-[#6b7280]'}`}>{user.email}</p>}
+                        </div>
+                        <Link to={getDashboardLink()} onClick={() => setUserMenuOpen(false)} className={`block px-3 py-2 text-sm hover:bg-[#E8F4F3] ${isDark ? 'text-white hover:bg-white/10' : 'text-[#2C2C2C]'}`}>
+                          Mon espace
+                        </Link>
+                        <button onClick={handleLogout} className={`w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 ${isDark ? 'hover:bg-red-500/20' : ''}`}>
+                          <LogOut className="h-4 w-4" /> Déconnexion
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <Link to={hintLink} className={`text-sm transition-colors ${linkHint}`}>
+                  {hintText}
+                </Link>
+                <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.LOGIN)} className={`h-9 px-4 text-sm font-medium ${btnOutline}`}>
+                  Me connecter
+                </Button>
+                <Button size="sm" onClick={() => navigate(registerRoute)} className={`h-9 px-4 text-sm font-medium ${btnPrimary}`}>
+                  M&apos;inscrire
+                </Button>
+              </>
+            )}
           </div>
           <button
             className={`md:hidden p-2 -mr-2 ${iconColor}`}
@@ -110,27 +186,46 @@ export default function PublicNavbar({ variant = 'light' }) {
             Contactez-nous !
           </Link>
           <div className={`pt-3 ${mobileBorder} flex flex-col gap-2`}>
-            <Button
-              variant="outline"
-              size="sm"
-              className={isDark ? 'w-full border-white/40 text-white hover:bg-white/10' : 'w-full'}
-              onClick={() => {
-                navigate(ROUTES.LOGIN)
-                setMobileMenuOpen(false)
-              }}
-            >
-              Me connecter
-            </Button>
-            <Button
-              size="sm"
-              className={`w-full ${btnPrimary}`}
-              onClick={() => {
-                navigate(registerRoute)
-                setMobileMenuOpen(false)
-              }}
-            >
-              M&apos;inscrire
-            </Button>
+            {isAuthenticated ? (
+              <>
+                <div className={`px-3 py-2 ${isDark ? 'text-white/90' : 'text-[#6b7280]'}`}>
+                  <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#2C2C2C]'}`}>{displayName}</p>
+                  {user?.email && <p className="text-xs truncate">{user.email}</p>}
+                </div>
+                <Link to={getDashboardLink()} onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="outline" size="sm" className={isDark ? 'w-full border-white/40 text-white hover:bg-white/10' : 'w-full'}>
+                    Mon espace
+                  </Button>
+                </Link>
+                <Button variant="outline" size="sm" className="w-full text-red-600 border-red-200 hover:bg-red-50" onClick={() => { handleLogout(); setMobileMenuOpen(false) }}>
+                  <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={isDark ? 'w-full border-white/40 text-white hover:bg-white/10' : 'w-full'}
+                  onClick={() => {
+                    navigate(ROUTES.LOGIN)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  Me connecter
+                </Button>
+                <Button
+                  size="sm"
+                  className={`w-full ${btnPrimary}`}
+                  onClick={() => {
+                    navigate(registerRoute)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  M&apos;inscrire
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}

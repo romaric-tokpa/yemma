@@ -63,7 +63,7 @@ export default function PublicPageLayout({ children, title, subtitle, badge, her
         </section>
       )}
 
-      <main className="flex-1">
+      <main className="flex-1 w-full min-w-0">
         {children}
       </main>
 

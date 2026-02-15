@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     INTERNAL_SERVICE_SECRET: Optional[str] = None
 
     # Timeouts
-    HRFLOW_TIMEOUT: int = 60
+    HRFLOW_TIMEOUT: int = 120  # 2 minutes pour les gros CV
     PARSE_MAX_RETRIES: int = 3
 
     class Config:

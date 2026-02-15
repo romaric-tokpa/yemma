@@ -14,8 +14,8 @@ export default function RegisterChoice() {
         keywords="inscription candidat, inscription recruteur, créer compte emploi, plateforme recrutement inscription"
         canonical="/register/choice"
       />
-    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
+    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4 px-4 xs:px-5 overflow-x-hidden w-full max-w-[100vw]">
+      <div className="w-full max-w-2xl min-w-0">
         <div className="text-center mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] mb-1">
             <span className="text-[#226D68]">Yemma</span>

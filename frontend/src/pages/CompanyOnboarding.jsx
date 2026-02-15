@@ -302,7 +302,7 @@ export default function CompanyOnboarding() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[#226D68]" />
           <p className="text-sm text-[#2C2C2C]/70">Chargement...</p>
@@ -312,10 +312,10 @@ export default function CompanyOnboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8]">
+    <div className="min-h-screen bg-[#F4F6F8] overflow-x-hidden w-full max-w-[100vw]">
       {/* Header compact */}
       <header className="bg-white border-b border-[#e5e7eb] sticky top-0 z-40">
-        <div className="max-w-2xl mx-auto px-4 py-3">
+        <div className="max-w-2xl mx-auto px-4 xs:px-5 py-3 min-w-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link to="/company/dashboard" className="text-sm font-bold hover:opacity-80 transition-opacity">
@@ -349,7 +349,7 @@ export default function CompanyOnboarding() {
 
       {/* Stepper minimal */}
       <div className="border-b border-[#e5e7eb] bg-white/80">
-        <div className="max-w-2xl mx-auto px-4 py-2">
+        <div className="max-w-2xl mx-auto px-4 xs:px-5 py-2 min-w-0">
           <div className="flex gap-2">
             {STEPS.map((step, i) => {
               const isDone = currentStep > step.id
@@ -383,7 +383,7 @@ export default function CompanyOnboarding() {
       </div>
 
       {/* Contenu */}
-      <main className="max-w-2xl mx-auto px-4 py-5 sm:py-6">
+      <main className="max-w-2xl mx-auto px-4 xs:px-5 py-5 sm:py-6 min-w-0">
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="py-4 px-4 sm:px-5 bg-white border-b border-[#e5e7eb]">
             <CardTitle className="text-base font-semibold text-[#2C2C2C] font-[Poppins]">
@@ -419,7 +419,7 @@ export default function CompanyOnboarding() {
                         id="name"
                         {...register('name')}
                         placeholder="Ex: Acme SAS"
-                        className="h-9 text-sm"
+                        className="h-9 text-sm w-full min-w-0"
                       />
                       {errors.name && (
                         <p className="text-xs text-red-600">{errors.name.message}</p>
@@ -433,7 +433,7 @@ export default function CompanyOnboarding() {
                         id="legal_id"
                         {...register('legal_id')}
                         placeholder="CI-ABJ-2024-A-12345"
-                        className="h-9 text-sm"
+                        className="h-9 text-sm w-full min-w-0"
                       />
                       {errors.legal_id && (
                         <p className="text-xs text-red-600">{errors.legal_id.message}</p>
@@ -449,7 +449,7 @@ export default function CompanyOnboarding() {
                       id="adresse"
                       {...register('adresse')}
                       placeholder="123 Rue Example, 75001 Paris"
-                      className="h-9 text-sm"
+                      className="h-9 text-sm w-full min-w-0"
                     />
                     {errors.adresse && (
                       <p className="text-xs text-red-600">{errors.adresse.message}</p>
@@ -470,7 +470,7 @@ export default function CompanyOnboarding() {
                           id="contact_first_name"
                           {...register('contact_first_name')}
                           placeholder="Jean"
-                          className="h-9 text-sm"
+                          className="h-9 text-sm w-full min-w-0"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -481,7 +481,7 @@ export default function CompanyOnboarding() {
                           id="contact_last_name"
                           {...register('contact_last_name')}
                           placeholder="Dupont"
-                          className="h-9 text-sm"
+                          className="h-9 text-sm w-full min-w-0"
                         />
                       </div>
                     </div>
@@ -495,7 +495,7 @@ export default function CompanyOnboarding() {
                           type="email"
                           {...register('contact_email')}
                           placeholder="jean@entreprise.com"
-                          className="h-9 text-sm"
+                          className="h-9 text-sm w-full min-w-0"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -507,7 +507,7 @@ export default function CompanyOnboarding() {
                           type="tel"
                           {...register('contact_phone')}
                           placeholder="+225 07 12 34 56 78"
-                          className="h-9 text-sm"
+                          className="h-9 text-sm w-full min-w-0"
                         />
                       </div>
                     </div>
@@ -519,7 +519,7 @@ export default function CompanyOnboarding() {
                         id="contact_function"
                         {...register('contact_function')}
                         placeholder="DRH, Responsable Recrutement"
-                        className="h-9 text-sm"
+                        className="h-9 text-sm w-full min-w-0"
                       />
                     </div>
                   </div>
