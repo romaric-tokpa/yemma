@@ -46,7 +46,6 @@ async def init_db():
     async with engine.begin() as conn:
         # Import des modèles pour que SQLModel les enregistre
         from app.domain.models import Profile, Experience, Education, Certification, Skill, JobPreference
-
+        
         # Création des tables
         await conn.run_sync(SQLModel.metadata.create_all)
-
