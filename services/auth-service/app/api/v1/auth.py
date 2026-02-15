@@ -149,8 +149,8 @@ async def login(
     if not user:
         raise InvalidCredentialsError()
     
-    # Utilisateur OAuth uniquement : ne peut pas se connecter avec mot de passe
-    if user.hashed_password is None or user.oauth_provider:
+    # Utilisateur sans mot de passe (OAuth uniquement, jamais défini) : doit utiliser OAuth
+    if user.hashed_password is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Ce compte utilise une connexion Google ou LinkedIn. Utilisez le bouton correspondant pour vous connecter."
@@ -361,12 +361,9 @@ async def change_password(
             detail="Mot de passe actuel incorrect"
         )
 
-    # Mettre à jour le mot de passe
+    # Mettre à jour le mot de passe (sans toucher à oauth_provider/oauth_id)
+    # L'utilisateur garde les deux moyens de connexion : mot de passe ET Google/LinkedIn
     user.hashed_password = hash_password(request.new_password)
-    # Si c'était un compte OAuth, autoriser aussi la connexion par mot de passe
-    if user.oauth_provider:
-        user.oauth_provider = None
-        user.oauth_id = None
     await user_repo.update(user)
 
     return {"message": "Password changed successfully"}

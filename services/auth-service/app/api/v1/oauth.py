@@ -150,14 +150,12 @@ async def _oauth_google_callback_impl(code, state, error, session):
     if not user:
         existing = await user_repo.get_by_email(email)
         if existing:
-            if existing.hashed_password:
-                return RedirectResponse(
-                    url=f"{settings.FRONTEND_URL}/register/candidat?oauth_error=email_exists&message=exists_password"
-                )
-            # Lier le compte OAuth existant par email (même email, autre provider)
+            # Lier le compte OAuth à l'utilisateur existant (email/password ou OAuth)
+            # Même s'il a un mot de passe, on permet les deux moyens de connexion
             user = existing
-            user.oauth_provider = "google"
-            user.oauth_id = oauth_id
+            if user.oauth_provider != "google" or user.oauth_id != oauth_id:
+                user.oauth_provider = "google"
+                user.oauth_id = oauth_id
             user.first_name = user.first_name or first_name
             user.last_name = user.last_name or last_name
             await user_repo.update(user)
@@ -301,13 +299,12 @@ async def oauth_linkedin_callback(
     if not user:
         existing = await user_repo.get_by_email(email)
         if existing:
-            if existing.hashed_password:
-                return RedirectResponse(
-                    url=f"{settings.FRONTEND_URL}/register/candidat?oauth_error=email_exists&message=exists_password"
-                )
+            # Lier le compte OAuth à l'utilisateur existant (email/password ou OAuth)
+            # Même s'il a un mot de passe, on permet les deux moyens de connexion
             user = existing
-            user.oauth_provider = "linkedin"
-            user.oauth_id = oauth_id
+            if user.oauth_provider != "linkedin" or user.oauth_id != oauth_id:
+                user.oauth_provider = "linkedin"
+                user.oauth_id = oauth_id
             user.first_name = user.first_name or first_name
             user.last_name = user.last_name or last_name
             await user_repo.update(user)
