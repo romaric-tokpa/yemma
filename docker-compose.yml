@@ -823,7 +823,7 @@ services:
       - auth
       - candidate
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:80/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
