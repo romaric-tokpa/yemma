@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from botocore.exceptions import ClientError
 
-from app.domain.models import Document, DocumentType
+from app.domain.models import Document, DocumentType, DocumentStatus
 from app.domain.schemas import (
     DocumentResponse,
     DocumentUploadResponse,
@@ -95,7 +95,7 @@ async def upload_document(
         file_size=len(file_content),
         mime_type=mime_type,
         s3_key=s3_key,
-        status="uploaded"
+        status=DocumentStatus.UPLOADED
     )
     
     session.add(document)
@@ -294,7 +294,7 @@ async def upload_profile_photo(
             file_size=len(file_content),
             mime_type=mime_type,
             s3_key=s3_key,
-            status="uploaded"
+            status=DocumentStatus.UPLOADED
         )
 
         session.add(document)
@@ -318,9 +318,14 @@ async def upload_profile_photo(
         raise
     except Exception as e:
         logger.error(f"Error uploading profile photo: {type(e).__name__}: {str(e)}", exc_info=True)
+        err_msg = str(e)
+        if "MinIO" in err_msg or "S3" in err_msg or "bucket" in err_msg.lower() or "connection" in err_msg.lower():
+            detail = "Le stockage (MinIO) est indisponible. Vérifiez que MinIO est démarré (docker-compose up minio)."
+        else:
+            detail = f"Erreur lors du téléchargement de la photo: {err_msg}"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors du téléchargement de la photo: {str(e)}"
+            detail=detail
         )
 
 
@@ -360,6 +365,64 @@ async def view_document(
         expires_at=expires_at,
         expires_in_seconds=expiration_seconds
     )
+
+
+def _doc_to_response(doc) -> DocumentResponse:
+    """Convertit un Document en DocumentResponse, gérant les enums ou strings."""
+    doc_type = getattr(doc.document_type, 'value', doc.document_type) if doc.document_type else 'OTHER'
+    doc_status = getattr(doc.status, 'value', doc.status) if doc.status else 'uploaded'
+    return DocumentResponse(
+        id=doc.id,
+        candidate_id=doc.candidate_id,
+        document_type=doc_type if isinstance(doc_type, str) else str(doc_type),
+        original_filename=doc.original_filename or '',
+        file_size=doc.file_size or 0,
+        mime_type=doc.mime_type or 'application/octet-stream',
+        status=doc_status if isinstance(doc_status, str) else str(doc_status),
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+        deleted_at=doc.deleted_at
+    )
+
+
+# IMPORTANT: /candidate/{candidate_id} doit être défini AVANT /{document_id}
+# sinon FastAPI matche /candidate/10 avec /{document_id} (document_id="candidate")
+@router.get("/candidate/{candidate_id}", response_model=List[DocumentResponse])
+async def get_candidate_documents(
+    candidate_id: int,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Récupère tous les documents d'un candidat
+    
+    - **candidate_id**: ID du candidat (profile_id)
+    """
+    try:
+        statement = select(Document).where(
+            Document.candidate_id == candidate_id,
+            Document.deleted_at.is_(None)
+        ).order_by(Document.created_at.desc())
+        
+        result = await session.execute(statement)
+        documents = result.scalars().all()
+        
+        return [_doc_to_response(doc) for doc in documents]
+    except Exception as e:
+        logger.exception(f"Error fetching documents for candidate {candidate_id}: {e}")
+        err_msg = str(e)
+        if "does not exist" in err_msg.lower() or "relation" in err_msg.lower():
+            # Table inexistante : retourner liste vide pour ne pas bloquer le dashboard
+            logger.warning(f"Table documents inexistante, retour liste vide")
+            return []
+        if "connection" in err_msg.lower() or "connect" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Impossible de se connecter à la base de données. Vérifiez que PostgreSQL est démarré."
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des documents: {err_msg}"
+        )
 
 
 @router.get("/serve/{document_id}")
@@ -455,52 +518,6 @@ async def get_document(
         created_at=document.created_at,
         updated_at=document.updated_at
     )
-
-
-def _doc_to_response(doc) -> DocumentResponse:
-    """Convertit un Document en DocumentResponse, gérant les enums ou strings."""
-    doc_type = getattr(doc.document_type, 'value', doc.document_type) if doc.document_type else 'OTHER'
-    doc_status = getattr(doc.status, 'value', doc.status) if doc.status else 'uploaded'
-    return DocumentResponse(
-        id=doc.id,
-        candidate_id=doc.candidate_id,
-        document_type=doc_type if isinstance(doc_type, str) else str(doc_type),
-        original_filename=doc.original_filename or '',
-        file_size=doc.file_size or 0,
-        mime_type=doc.mime_type or 'application/octet-stream',
-        status=doc_status if isinstance(doc_status, str) else str(doc_status),
-        created_at=doc.created_at,
-        updated_at=doc.updated_at,
-        deleted_at=doc.deleted_at
-    )
-
-
-@router.get("/candidate/{candidate_id}", response_model=List[DocumentResponse])
-async def get_candidate_documents(
-    candidate_id: int,
-    session: AsyncSession = Depends(get_session)
-):
-    """
-    Récupère tous les documents d'un candidat
-    
-    - **candidate_id**: ID du candidat
-    """
-    try:
-        statement = select(Document).where(
-            Document.candidate_id == candidate_id,
-            Document.deleted_at.is_(None)
-        ).order_by(Document.created_at.desc())
-        
-        result = await session.execute(statement)
-        documents = result.scalars().all()
-        
-        return [_doc_to_response(doc) for doc in documents]
-    except Exception as e:
-        logger.exception(f"Error fetching documents for candidate {candidate_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la récupération des documents: {str(e)}"
-        )
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_200_OK)

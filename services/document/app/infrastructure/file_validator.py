@@ -85,7 +85,7 @@ class FileValidator:
         if mime_type != expected_mime:
             logger.warning(f"MIME type mismatch: detected={mime_type}, expected={expected_mime} for extension={extension}")
             # Pour les images, on accepte si le MIME type est valide même si l'extension ne correspond pas exactement
-            if mime_type in ['image/jpeg', 'image/png'] and extension in ['jpg', 'jpeg', 'png']:
+            if mime_type in ['image/jpeg', 'image/png', 'image/webp'] and extension in ['jpg', 'jpeg', 'png', 'webp']:
                 logger.info(f"Accepting image despite extension mismatch")
             else:
                 raise InvalidFileTypeError(cls.get_allowed_extensions())
@@ -129,6 +129,8 @@ class FileValidator:
             return 'image/jpeg'
         elif content.startswith(b'\x89\x50\x4E\x47'):
             return 'image/png'
+        elif content.startswith(b'RIFF') and len(content) >= 12 and content[8:12] == b'WEBP':
+            return 'image/webp'
         elif content.startswith(b'PK\x03\x04'):
             return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         else:
@@ -143,6 +145,7 @@ class FileValidator:
             'jpg': 'image/jpeg',
             'jpeg': 'image/jpeg',
             'png': 'image/png',
+            'webp': 'image/webp',
             'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         }
         return mapping.get(extension.lower(), 'application/octet-stream')

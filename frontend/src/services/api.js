@@ -288,11 +288,17 @@ export const authApiService = {
   },
 
   // Changer le mot de passe
-  changePassword: async (oldPassword, newPassword) => {
+  changePassword: async (currentPassword, newPassword) => {
     const response = await authApi.post('/api/v1/auth/change-password', {
-      old_password: oldPassword,
+      current_password: currentPassword,
       new_password: newPassword,
     })
+    return response.data
+  },
+
+  // Anonymiser / supprimer le compte (RGPD)
+  anonymizeAccount: async () => {
+    const response = await authApi.post('/api/v1/users/anonymize')
     return response.data
   },
 

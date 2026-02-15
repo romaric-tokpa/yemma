@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { 
   User, Edit, FileText, CheckCircle2, Clock, XCircle, 
   Briefcase, GraduationCap, Award, Code, MapPin, Star,
-  Plus, Trash2, Eye, Mail, Phone, Calendar, LogOut,
+  Plus, Trash2, Eye, EyeOff, Mail, Phone, Calendar, LogOut,
   Home, Settings, Menu, X, TrendingUp, FileCheck,
   Flag, Download, Image as ImageIcon, Loader2, Upload,
   Wrench, Sparkles, BarChart3, HelpCircle, Target, Search,
@@ -93,7 +93,149 @@ const generateCompanyLogoUrl = (companyName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(companyName || 'Company')}&size=100&background=e8f4f3&color=226D68&bold=true`
 }
 
-const VALID_TABS = ['dashboard', 'profile', 'situation', 'preferences', 'documents', 'experiences', 'educations', 'skills', 'certifications']
+// Composant page Paramètres (mot de passe + suppression compte)
+function SettingsPageContent({ onSuccess, onError }) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    if (newPassword.length < 8) {
+      onError('Le mot de passe doit contenir au moins 8 caractères.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      onError('Les mots de passe ne correspondent pas.')
+      return
+    }
+    try {
+      setChangingPassword(true)
+      await authApiService.changePassword(currentPassword, newPassword)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      onSuccess('Mot de passe modifié avec succès.')
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message
+      onError(typeof detail === 'string' ? detail : 'Erreur lors du changement de mot de passe.')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'SUPPRIMER') {
+      onError('Tapez SUPPRIMER pour confirmer la suppression.')
+      return
+    }
+    try {
+      setDeletingAccount(true)
+      await authApiService.anonymizeAccount()
+      authApiService.logout()
+      if (typeof window !== 'undefined') window.location.href = '/login'
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message
+      onError(typeof detail === 'string' ? detail : 'Erreur lors de la suppression du compte.')
+    } finally {
+      setDeletingAccount(false)
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Changement de mot de passe */}
+      <section className="rounded-xl border border-gray-200 bg-white shadow-sm p-4 sm:p-6">
+        <h3 className="text-sm font-semibold text-[#2C2C2C] mb-3">Changer le mot de passe</h3>
+        <form onSubmit={handleChangePassword} className="space-y-3 max-w-md">
+          <div>
+            <Label htmlFor="current-password">Mot de passe actuel</Label>
+            <p className="text-xs text-muted-foreground mb-1">Inscrit avec Google ou LinkedIn ? Laissez vide pour définir un mot de passe.</p>
+            <div className="relative">
+              <Input
+                id="current-password"
+                type={showCurrentPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="pr-10"
+                placeholder="••••••••"
+              />
+              <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6b7280] hover:text-[#226D68]">
+                {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="new-password">Nouveau mot de passe</Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="pr-10"
+                placeholder="••••••••"
+                minLength={8}
+              />
+              <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#6b7280] hover:text-[#226D68]">
+                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">Minimum 8 caractères</p>
+          </div>
+          <div>
+            <Label htmlFor="confirm-password">Confirmer le nouveau mot de passe</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+          <Button type="submit" disabled={changingPassword} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
+            {changingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            {changingPassword ? 'Modification...' : 'Modifier le mot de passe'}
+          </Button>
+        </form>
+      </section>
+
+      {/* Suppression du compte */}
+      <section className="rounded-xl border border-red-200 bg-red-50/30 p-4 sm:p-6">
+        <h3 className="text-sm font-semibold text-red-600 mb-2">Zone de danger</h3>
+        <p className="text-sm text-[#6b7280] mb-3">
+          La suppression de votre compte est irréversible. Toutes vos données personnelles seront anonymisées conformément au RGPD.
+        </p>
+        <div className="space-y-2 max-w-md">
+          <Label htmlFor="delete-confirm">Pour confirmer, tapez <strong>SUPPRIMER</strong></Label>
+          <Input
+            id="delete-confirm"
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="SUPPRIMER"
+            className="border-red-200 focus-visible:ring-red-500"
+          />
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleDeleteAccount}
+            disabled={deletingAccount || deleteConfirmText !== 'SUPPRIMER'}
+          >
+            {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            {deletingAccount ? 'Suppression...' : 'Supprimer mon compte'}
+          </Button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+const VALID_TABS = ['dashboard', 'profile', 'situation', 'preferences', 'documents', 'experiences', 'educations', 'skills', 'certifications', 'settings']
 
 export default function CandidateDashboard() {
   const navigate = useNavigate()
@@ -299,7 +441,9 @@ export default function CandidateDashboard() {
           setDocuments(docs || [])
         } catch (docErr) {
           if (docErr.response?.status === 500) {
-            console.warn('Service documents temporairement indisponible. Réessayez plus tard.')
+            const detail = docErr.response?.data?.detail
+            const msg = typeof detail === 'string' ? detail : 'Service documents temporairement indisponible.'
+            setToast({ message: msg, type: 'error' })
           } else {
             console.error('Error loading documents:', docErr)
           }
@@ -632,6 +776,9 @@ export default function CandidateDashboard() {
 
           {/* User menu */}
           <div className="flex items-center gap-1 shrink-0">
+            <Link to="/candidate/dashboard/settings" className="p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors" title="Paramètres">
+              <Settings className="h-5 w-5" />
+            </Link>
             <Link to="/contact" className="p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors" title="Aide">
               <HelpCircle className="h-5 w-5" />
             </Link>
@@ -700,7 +847,15 @@ export default function CandidateDashboard() {
             </nav>
           </div>
           <div className="flex-1" />
-          <div className="p-4 border-t border-gray-100">
+          <div className="p-4 border-t border-gray-100 space-y-1">
+            <Link
+              to="/candidate/dashboard/settings"
+              onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-[#E8F4F3] text-sm text-[#6b7280] hover:text-[#226D68] transition-colors"
+            >
+              <Settings className="h-4 w-4" />
+              Paramètres
+            </Link>
             <Link to="/contact" className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-[#E8F4F3] text-sm text-[#6b7280] hover:text-[#226D68] transition-colors">
               <HelpCircle className="h-4 w-4" />
               Besoin d&apos;aide ?
@@ -718,7 +873,7 @@ export default function CandidateDashboard() {
         {/* Main */}
         <div className="flex-1 min-w-0">
           <main id="dashboard-main" className="flex-1 overflow-y-auto min-w-0 bg-[#F4F6F8]" aria-label="Contenu du profil">
-            <div className="max-w-4xl mx-auto px-4 py-6 lg:px-8 safe-x">
+            <div className="max-w-4xl mx-auto px-4 py-6 pb-24 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
           {/* Vue Dashboard (style capture) */}
           {activeTab === 'dashboard' && (
             <>
@@ -1320,16 +1475,26 @@ export default function CandidateDashboard() {
                     </Button>
                   }
                 />
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  <div className="p-4 sm:p-6">
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="p-4 sm:p-6 min-w-0">
                       {experiences.length > 0 ? (
-                        <div className="space-y-4">
-                          {experiences.map((exp, index) => {
+                        <div className="space-y-4 min-w-0">
+                          {[...experiences]
+                            .sort((a, b) => {
+                              const getSortDate = (exp) => {
+                                if (exp.is_current) return new Date()
+                                if (exp.end_date) return new Date(exp.end_date)
+                                if (exp.start_date) return new Date(exp.start_date)
+                                return new Date(0)
+                              }
+                              return getSortDate(b).getTime() - getSortDate(a).getTime()
+                            })
+                            .map((exp, index) => {
                             const defaultCompanyLogo = generateCompanyLogoUrl(exp.company_name)
                             const displayCompanyLogo = exp.company_logo_url || defaultCompanyLogo
                             
                             return (
-                              <div key={exp.id} className="rounded-xl border border-gray-100 bg-[#F4F6F8]/30 hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5">
+                              <div key={exp.id} className="w-full min-w-0 rounded-xl border border-gray-100 bg-[#F4F6F8]/30 hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5">
                                   <div className="flex gap-4 items-start">
                                     <div className="relative shrink-0">
                                       <img
@@ -1411,13 +1576,13 @@ export default function CandidateDashboard() {
 
                                       {/* Description */}
                                       {exp.description && (
-                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3]">
+                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3] min-w-0">
                                           <div className="flex items-center gap-1 mb-1">
                                             <div className="w-1 h-1 rounded-full bg-[#226D68]"></div>
                                             <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Description</p>
                                           </div>
                                           <div 
-                                            className="text-xs text-gray-700 rich-text-content leading-relaxed"
+                                            className="text-xs text-gray-700 rich-text-content leading-relaxed break-words"
                                             dangerouslySetInnerHTML={{ __html: exp.description }}
                                           />
                                         </div>
@@ -1425,13 +1590,13 @@ export default function CandidateDashboard() {
 
                                       {/* Réalisations */}
                                       {exp.achievements && (
-                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3]">
+                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3] min-w-0">
                                           <div className="flex items-center gap-1 mb-1">
                                             <div className="w-1 h-1 rounded-full bg-[#226D68]"></div>
                                             <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Réalisations</p>
                                           </div>
                                           <div 
-                                            className="text-xs text-gray-700 rich-text-content leading-relaxed"
+                                            className="text-xs text-gray-700 rich-text-content leading-relaxed break-words"
                                             dangerouslySetInnerHTML={{ __html: exp.achievements }}
                                           />
                                         </div>
@@ -1489,7 +1654,10 @@ export default function CandidateDashboard() {
                     {educations.length > 0 ? (
                       <div className="space-y-4">
                         {[...educations]
-                          .sort((a, b) => (b.graduation_year || 0) - (a.graduation_year || 0))
+                          .sort((a, b) => {
+                            const getYear = (edu) => Number(edu.graduation_year) || Number(edu.start_year) || 0
+                            return getYear(b) - getYear(a)
+                          })
                           .map((edu) => {
                             const duration = edu.start_year && edu.graduation_year 
                               ? edu.graduation_year - edu.start_year 
@@ -1780,7 +1948,7 @@ export default function CandidateDashboard() {
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-sm text-[#2C2C2C] truncate mb-1">
+                                        <h4 className="font-medium text-sm text-[#2C2C2C] break-words mb-1">
                                           {skill.name}
                                         </h4>
                                         {skill.level && (
@@ -1857,10 +2025,10 @@ export default function CandidateDashboard() {
                               {softSkills.map((skill) => (
                                 <div
                                   key={skill.id}
-                                  className="group relative bg-[#E8F4F3]/50 border border-[#E8F4F3] rounded-xl px-4 py-2.5 hover:border-[#226D68]/50 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
+                                  className="group relative bg-[#E8F4F3]/50 border border-[#E8F4F3] rounded-xl px-4 py-2.5 hover:border-[#226D68]/50 hover:shadow-sm transition-all duration-200 flex items-center gap-2 min-w-0"
                                 >
                                   <Sparkles className="h-4 w-4 text-[#226D68] shrink-0" />
-                                  <span className="font-medium text-sm text-[#2C2C2C]">
+                                  <span className="font-medium text-sm text-[#2C2C2C] break-words min-w-0">
                                     {skill.name}
                                   </span>
                                   <div className="flex items-center gap-0.5 ml-1 shrink-0">
@@ -1914,7 +2082,7 @@ export default function CandidateDashboard() {
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-sm text-[#2C2C2C] truncate mb-1">
+                                        <h4 className="font-medium text-sm text-[#2C2C2C] break-words mb-1">
                                           {skill.name}
                                         </h4>
                                         {skill.level && (
@@ -2378,6 +2546,19 @@ export default function CandidateDashboard() {
                   </div>
                 </div>
               </TabsContent>
+
+              {/* Onglet Paramètres */}
+              <TabsContent value="settings" className="mt-3">
+                <SectionHeader
+                  title="Paramètres du compte"
+                  subtitle="Modifiez votre mot de passe ou supprimez votre compte"
+                  icon={Settings}
+                />
+                <SettingsPageContent
+                  onSuccess={(msg) => setToast({ message: msg, type: 'success' })}
+                  onError={(msg) => setToast({ message: msg, type: 'error' })}
+                />
+              </TabsContent>
             </Tabs>
           </>
           )}
@@ -2452,7 +2633,6 @@ export default function CandidateDashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
               <p className="font-medium text-gray-anthracite mb-2">Récapitulatif de votre profil</p>
               <ul className="space-y-1 text-muted-foreground">
@@ -2482,9 +2662,7 @@ export default function CandidateDashboard() {
                 </li>
               </ul>
             </div>
-
-              Consultez les documents suivants avant d’accepter&nbsp;:
-            </p>
+            <p className="text-sm text-muted-foreground">Consultez les documents suivants avant d&apos;accepter&nbsp;:</p>
             <ul className="text-sm space-y-1.5">
               <li>
                 <a
@@ -3368,13 +3546,26 @@ function EducationForm({ profileId, education, onSuccess, onCancel, onError }) {
         </div>
         <div>
           <Label htmlFor="level">Niveau <span className="text-red-500">*</span></Label>
-          <Input
+          <select
             id="level"
             value={formData.level}
             onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-            placeholder="Bac, Bac+2, Bac+5, etc."
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             required
-          />
+          >
+            <option value="">Sélectionner un niveau</option>
+            {formData.level && !['Non spécifié', 'CAP/BEP', 'Bac', 'Bac+2', 'Bac+3', 'Bac+4', 'Bac+5', 'Bac+8'].includes(formData.level) && (
+              <option value={formData.level}>{formData.level}</option>
+            )}
+            <option value="Non spécifié">Non spécifié</option>
+            <option value="CAP/BEP">CAP/BEP</option>
+            <option value="Bac">Bac</option>
+            <option value="Bac+2">Bac+2</option>
+            <option value="Bac+3">Bac+3 (Licence)</option>
+            <option value="Bac+4">Bac+4</option>
+            <option value="Bac+5">Bac+5 (Master)</option>
+            <option value="Bac+8">Bac+8 (Doctorat)</option>
+          </select>
         </div>
       </div>
       <DialogFooter className="pt-4 border-t border-neutral-100">
@@ -3596,8 +3787,8 @@ function SkillForm({ profileId, skill, onSuccess, onCancel, onError }) {
           <Label htmlFor="skillType">Type de compétence <span className="text-red-500">*</span></Label>
           <select
             id="skillType"
-            value={formData.skillType}
-            onChange={(e) => setFormData({ ...formData, skillType: e.target.value, level: e.target.value === 'SOFT' ? null : formData.level })}
+            value={formData.skillType || 'TECHNICAL'}
+            onChange={(e) => setFormData({ ...formData, skillType: e.target.value, level: e.target.value === 'SOFT' ? '' : (formData.level || 'BEGINNER') })}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             required
           >
@@ -3626,7 +3817,7 @@ function SkillForm({ profileId, skill, onSuccess, onCancel, onError }) {
               <Label htmlFor="level">Niveau <span className="text-red-500">*</span></Label>
               <select
                 id="level"
-                value={formData.level}
+                value={formData.level || 'BEGINNER'}
                 onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required

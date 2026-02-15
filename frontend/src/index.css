@@ -411,6 +411,18 @@ label.cursor-pointer,
 /* Styles pour le contenu HTML formaté (rich text) */
 .rich-text-content {
   color: inherit;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.rich-text-content p,
+.rich-text-content ul,
+.rich-text-content ol,
+.rich-text-content li,
+.rich-text-content span,
+.rich-text-content div {
+  max-width: 100%;
 }
 
 .rich-text-content ul,

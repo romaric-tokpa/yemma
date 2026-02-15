@@ -64,8 +64,10 @@ class PasswordResetConfirm(BaseModel):
 
 
 class PasswordChange(BaseModel):
-    """Schéma pour le changement de mot de passe"""
-    current_password: str
+    """Schéma pour le changement de mot de passe.
+    current_password peut être vide pour les utilisateurs OAuth (Google, LinkedIn)
+    qui n'ont pas encore défini de mot de passe."""
+    current_password: str = ""  # Vide accepté pour OAuth
     new_password: str = Field(..., min_length=8)
 
 
