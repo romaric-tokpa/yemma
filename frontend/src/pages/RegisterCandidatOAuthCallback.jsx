@@ -1,10 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { authApiService } from '@/services/api'
 import { ROUTES } from '@/constants/routes'
 import { candidateApi } from '@/services/api'
 import { Loader2, AlertCircle } from 'lucide-react'
+
+/**
+ * Extrait les tokens depuis l'URL (query params ou hash fragment).
+ * Certains providers OAuth utilisent #access_token=... au lieu de ?access_token=...
+ */
+function getTokensFromUrl() {
+  // 1. Paramètres de requête (?access_token=...&refresh_token=...)
+  const params = new URLSearchParams(window.location.search)
+  let accessToken = params.get('access_token')
+  let refreshToken = params.get('refresh_token')
+
+  // 2. Fallback : fragment hash (#access_token=...&refresh_token=...)
+  if (!accessToken && window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    accessToken = hashParams.get('access_token')
+    refreshToken = hashParams.get('refresh_token')
+  }
+
+  return { accessToken, refreshToken }
+}
 
 /**
  * Page de callback OAuth : reçoit les tokens depuis l'URL,
@@ -14,14 +34,23 @@ export default function RegisterCandidatOAuthCallback() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [error, setError] = useState(null)
+  const processedRef = useRef(false)
 
   useEffect(() => {
-    const accessToken = searchParams.get('access_token')
-    const refreshToken = searchParams.get('refresh_token')
+    if (processedRef.current) return
+    processedRef.current = true
+
+    const { accessToken, refreshToken } = getTokensFromUrl()
 
     if (accessToken) {
+      // Sauvegarder les tokens (clé auth_token utilisée par l'API)
       localStorage.setItem('auth_token', accessToken)
-      if (refreshToken) localStorage.setItem('refresh_token', refreshToken)
+      if (refreshToken) {
+        localStorage.setItem('refresh_token', refreshToken)
+      }
+
+      // Nettoyer l'URL des tokens (sécurité : éviter fuite via referrer)
+      window.history.replaceState({}, document.title, window.location.pathname)
 
       const loadUserAndRedirect = async () => {
         try {
@@ -55,8 +84,10 @@ export default function RegisterCandidatOAuthCallback() {
         setError('Un compte avec cet email existe déjà. Connectez-vous avec votre mot de passe.')
       } else if (oauthError === 'cancelled') {
         navigate('/register/candidat', { replace: true })
-      } else {
+      } else if (oauthError) {
         setError('Une erreur est survenue lors de la connexion. Veuillez réessayer.')
+      } else {
+        setError('Aucun token reçu. Veuillez réessayer la connexion.')
       }
     }
   }, [navigate, searchParams])
