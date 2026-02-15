@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link, useParams, useSearchParams } from 'react-router-dom'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { 
   User, Edit, FileText, CheckCircle2, Clock, XCircle, 
   Briefcase, GraduationCap, Award, Code, MapPin, Star,
   Plus, Trash2, Eye, Mail, Phone, Calendar, LogOut,
-  Home, Settings, Menu, X, TrendingUp, Users, FileCheck,
+  Home, Settings, Menu, X, TrendingUp, FileCheck,
   Flag, Download, Image as ImageIcon, Loader2, Upload,
-  Wrench, Sparkles, BarChart3
+  Wrench, Sparkles, BarChart3, HelpCircle, Target, Search,
+  Save
 } from 'lucide-react'
 import { candidateApi, authApiService, documentApi } from '../services/api'
 import { Button } from '../components/ui/button'
@@ -23,6 +27,8 @@ import { Textarea } from '../components/ui/textarea'
 import { RichTextEditor } from '../components/ui/rich-text-editor'
 import { SearchableSelect } from '../components/ui/searchable-select'
 import { SECTORS_FR } from '../data/sectors'
+import { COUNTRIES_FR } from '../data/countries'
+import { getApiErrorDetail } from '../utils/apiError'
 import {
   experienceToApiPayload,
   educationToApiPayload,
@@ -31,21 +37,69 @@ import {
   jobPreferencesToApiPayload,
 } from '../utils/profilePayloads'
 import { formatDateTime } from '../utils/dateUtils'
+import SupportWidget from '../components/candidate/SupportWidget'
 
-// Générer un avatar par défaut basé sur les initiales
+// Charte graphique Yemma (landing)
+const CHARTE = {
+  vert: '#226D68',
+  vertClair: '#E8F4F3',
+  coral: '#e76f51',
+  texte: '#2C2C2C',
+  fond: '#F4F6F8',
+}
+
+const profileEditSchema = z.object({
+  firstName: z.string().min(2, 'Le prénom doit contenir au moins 2 caractères'),
+  lastName: z.string().min(2, 'Le nom doit contenir au moins 2 caractères'),
+  phone: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  nationality: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  country: z.string().optional(),
+  profileTitle: z.string().optional(),
+  professionalSummary: z.string().optional(),
+  sector: z.string().optional(),
+  mainJob: z.string().optional(),
+  totalExperience: z.number().min(0).optional(),
+})
+
+/** En-tête de section redesigné (charte landing) */
+const SectionHeader = ({ title, subtitle, icon: Icon, action }) => (
+  <div className="mb-6 sm:mb-8">
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <div className="flex items-start gap-3">
+        {Icon && (
+          <div className="p-2.5 rounded-xl bg-[#E8F4F3] shrink-0">
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-[#226D68]" />
+          </div>
+        )}
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] font-heading tracking-tight">{title}</h1>
+          {subtitle && <p className="mt-1 text-sm sm:text-base text-[#6b7280] leading-relaxed max-w-2xl">{subtitle}</p>}
+        </div>
+      </div>
+      {action && <div className="shrink-0 sm:mt-0">{action}</div>}
+    </div>
+  </div>
+)
+
 const generateAvatarUrl = (firstName, lastName) => {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U'
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=200&background=random&color=fff&bold=true`
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=200&background=226D68&color=fff&bold=true`
 }
 
-// Générer un avatar par défaut pour les logos d'entreprises
 const generateCompanyLogoUrl = (companyName) => {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(companyName || 'Company')}&size=100&background=random&color=fff&bold=true`
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(companyName || 'Company')}&size=100&background=e8f4f3&color=226D68&bold=true`
 }
+
+const VALID_TABS = ['dashboard', 'profile', 'situation', 'preferences', 'documents', 'experiences', 'educations', 'skills', 'certifications']
 
 export default function CandidateDashboard() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { tab } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -56,7 +110,7 @@ export default function CandidateDashboard() {
   const [skills, setSkills] = useState([])
   const [jobPreferences, setJobPreferences] = useState(null)
   const [documents, setDocuments] = useState([])
-  const [activeTab, setActiveTab] = useState('profile')
+  const [activeTab, setActiveTab] = useState('dashboard')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   
   // États pour les modales
@@ -100,6 +154,29 @@ export default function CandidateDashboard() {
   // Guide de complétion du profil (visible quand < 100%)
   const [showCompletionGuide, setShowCompletionGuide] = useState(false)
   const completionGuideRef = useRef(null)
+  // Mode édition du profil (intégré dans l'onglet Profil)
+  const [profileEditMode, setProfileEditMode] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
+
+  const profileForm = useForm({
+    resolver: zodResolver(profileEditSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      phone: '',
+      dateOfBirth: '',
+      nationality: '',
+      address: '',
+      city: '',
+      country: '',
+      profileTitle: '',
+      professionalSummary: '',
+      sector: '',
+      mainJob: '',
+      totalExperience: 0,
+    },
+  })
+  const { register: regProfile, handleSubmit: handleProfileSubmit, formState: { errors: profileErrors }, setValue: setProfileValue, control: profileControl } = profileForm
 
   useEffect(() => {
     if (showCompletionGuide && completionGuideRef.current) {
@@ -115,14 +192,45 @@ export default function CandidateDashboard() {
 
   useEffect(() => {
     loadProfile()
-    // Définir l'onglet actif selon l'URL ou le hash
-    const hash = location.hash.replace('#', '')
-    if (hash && ['profile', 'experiences', 'educations', 'certifications', 'skills', 'preferences', 'documents'].includes(hash)) {
-      setActiveTab(hash)
+  }, [])
+
+  // Synchroniser activeTab avec l'URL (route /candidate/dashboard/:tab)
+  useEffect(() => {
+    const urlTab = tab || 'dashboard'
+    // "situation" affiche le contenu "preferences"
+    const resolvedTab = urlTab === 'situation' ? 'preferences' : urlTab
+    if (VALID_TABS.includes(urlTab) || urlTab === 'situation') {
+      setActiveTab(resolvedTab)
     } else {
-      setActiveTab('profile') // Par défaut, afficher le profil
+      setActiveTab('dashboard')
+      if (tab) navigate('/candidate/dashboard', { replace: true })
     }
-  }, [location])
+  }, [tab, navigate])
+
+  // Mode édition profil : synchronisé avec ?edit=1 sur l'onglet profile
+  useEffect(() => {
+    if (tab === 'profile') {
+      setProfileEditMode(searchParams.get('edit') === '1')
+    }
+  }, [tab, searchParams])
+
+  // Remplir le formulaire profil quand le profil est chargé et qu'on est en mode édition
+  useEffect(() => {
+    if (!profile || !profileEditMode) return
+    setProfileValue('firstName', profile.first_name || '')
+    setProfileValue('lastName', profile.last_name || '')
+    setProfileValue('phone', profile.phone || '')
+    setProfileValue('dateOfBirth', profile.date_of_birth ? profile.date_of_birth.split('T')[0] : '')
+    setProfileValue('nationality', profile.nationality || '')
+    setProfileValue('address', profile.address || '')
+    setProfileValue('city', profile.city || '')
+    setProfileValue('country', profile.country || '')
+    setProfileValue('profileTitle', profile.profile_title || '')
+    setProfileValue('professionalSummary', profile.professional_summary || '')
+    setProfileValue('sector', profile.sector || '')
+    setProfileValue('mainJob', profile.main_job || '')
+    setProfileValue('totalExperience', profile.total_experience ?? 0)
+  }, [profile, profileEditMode, setProfileValue])
 
   const [photoError, setPhotoError] = useState(false)
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null)
@@ -164,8 +272,9 @@ export default function CandidateDashboard() {
         } else {
           setCurrentPhotoUrl(null)
         }
-      } catch {
+      } catch (err) {
         setCurrentPhotoUrl(null)
+        if (err.response?.status !== 500) console.warn('Documents non chargés pour la photo:', err.message)
       }
     }
     loadPhotoUrl()
@@ -189,7 +298,11 @@ export default function CandidateDashboard() {
           const docs = await documentApi.getCandidateDocuments(profileData.id)
           setDocuments(docs || [])
         } catch (docErr) {
-          console.error('Error loading documents:', docErr)
+          if (docErr.response?.status === 500) {
+            console.warn('Service documents temporairement indisponible. Réessayez plus tard.')
+          } else {
+            console.error('Error loading documents:', docErr)
+          }
           setDocuments([])
         }
       }
@@ -211,9 +324,41 @@ export default function CandidateDashboard() {
         setToast({ message: 'Impossible de joindre le serveur. Vérifiez votre connexion.', type: 'error' })
         return
       }
-      setToast({ message: 'Erreur lors du chargement du profil.', type: 'error' })
+      const detail = error.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : 'Erreur lors du chargement du profil.'
+      setToast({ message: msg, type: 'error' })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const onProfileFormSubmit = async (data) => {
+    if (!profile?.id) return
+    try {
+      setSavingProfile(true)
+      await candidateApi.updateProfile(profile.id, {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        phone: data.phone || null,
+        date_of_birth: data.dateOfBirth ? `${data.dateOfBirth}T00:00:00` : null,
+        nationality: data.nationality || null,
+        address: data.address || null,
+        city: data.city || null,
+        country: data.country || null,
+        profile_title: data.profileTitle || null,
+        professional_summary: data.professionalSummary || null,
+        sector: data.sector || null,
+        main_job: data.mainJob || null,
+        total_experience: data.totalExperience ?? null,
+      })
+      setToast({ message: 'Profil enregistré.', type: 'success' })
+      setProfileEditMode(false)
+      navigate('/candidate/dashboard/profile', { replace: true })
+      await loadProfile()
+    } catch (err) {
+      setToast({ message: getApiErrorDetail(err, "Erreur lors de l'enregistrement."), type: 'error' })
+    } finally {
+      setSavingProfile(false)
     }
   }
 
@@ -223,7 +368,10 @@ export default function CandidateDashboard() {
       const docs = await documentApi.getCandidateDocuments(profile.id)
       setDocuments(docs || [])
     } catch (error) {
-      console.error('Error loading documents:', error)
+      if (error.response?.status === 500) {
+        setToast({ message: 'Service documents temporairement indisponible.', type: 'error' })
+      }
+      setDocuments([])
     }
   }
 
@@ -431,400 +579,533 @@ export default function CandidateDashboard() {
     ? currentPhotoUrl 
     : defaultAvatar
 
-  // Navigation principale : 7 sections (sidebar = menu compte)
+  // Navigation principale (style Freelance Republik)
   const navItems = [
-    { id: 'profile', label: 'Identité', icon: User },
+    { id: 'dashboard', label: 'Mon dashboard', icon: Home },
+    { id: 'profile', label: 'Mon profil', icon: User },
+    { id: 'situation', label: 'Ma situation', icon: Search },
+    { id: 'preferences', label: 'Préférences emploi', icon: Target },
+    { id: 'documents', label: 'Mon CV', icon: FileText },
     { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
     { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
-    { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
     { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
-    { id: 'preferences', label: 'Recherche', icon: MapPin },
-    { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
+    { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
   ]
 
+  // Checklist complétion (alignée BRIEF)
+  const completionChecklist = [
+    { key: 'preferences', label: 'Préférences emploi', done: !!(jobPreferences?.desired_positions?.length && jobPreferences?.contract_types?.length && jobPreferences?.availability) },
+    { key: 'photo', label: 'Photo de profil', done: !!(currentPhotoUrl && !currentPhotoUrl.includes('ui-avatars.com')) },
+    { key: 'summary', label: 'Description', done: !!(profile?.professional_summary && profile.professional_summary.length >= 300) },
+    { key: 'skills', label: 'Compétences clés', done: skills.filter(s => s.skill_type === 'TECHNICAL').length > 0 },
+    { key: 'skills_any', label: 'Compétences', done: skills.length > 0 },
+    { key: 'experiences', label: 'Expériences', done: experiences.length > 0 },
+    { key: 'educations', label: 'Formations', done: educations.length > 0 },
+  ]
+
+  const cvDoc = documents?.find(d => d.document_type === 'CV')
+  const minCompletionForSubmit = 80
+
   return (
-    <div className="h-screen bg-gray-light flex overflow-hidden max-h-[100dvh] max-h-screen safe-top safe-bottom">
-      <a href="#dashboard-main" className="absolute left-[-9999px] top-2 z-[100] px-3 py-2 bg-primary text-white rounded-md font-medium text-sm focus:left-2 focus:inline-block focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+    <div className="min-h-screen flex flex-col bg-[#F4F6F8]">
+      <a href="#dashboard-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:px-3 focus:py-2 focus:bg-[#226D68] focus:text-white focus:rounded-md">
         Aller au contenu principal
       </a>
-      {/* Sidebar compacte et professionnelle */}
-      <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50
-        bg-card border-r border-border shadow-xl lg:shadow-none
-        transition-[transform,width] duration-300 ease-out
-        flex flex-col safe-left
-        ${sidebarOpen
-          ? 'w-[min(240px,75vw)] sm:w-56 translate-x-0 lg:w-56'
-          : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16 lg:min-w-[4rem]'
-        }
-      `}
-        aria-label="Menu principal"
-        aria-hidden={!sidebarOpen}
-      >
-        {/* Header Sidebar compact */}
-        <div className="h-12 border-b border-border flex items-center justify-between px-3 shrink-0 safe-top bg-[#E8F4F3]/30">
-          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'justify-center w-full'}`}>
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#226D68] shrink-0">
-              <Users className="w-3.5 h-3.5 text-white" />
+
+      {/* Top bar - Logo, progression, user */}
+      <header className="sticky top-0 z-30 bg-white border-b border-gray-100 safe-top">
+        <div className="flex items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <img src="/favicon.ico" alt="Yemma Solutions" className="h-8 w-8 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/logo-icon.svg' }} />
+          </Link>
+
+          {/* Barre de progression - compacte et élégante */}
+          <div className="flex-1 min-w-0 max-w-xs sm:max-w-sm mx-2 sm:mx-4">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <Progress value={completionPercentage} className="h-2 rounded-full bg-gray-100 [&>div]:bg-[#226D68]" />
+              </div>
+              <span className="text-sm font-semibold text-[#2C2C2C] shrink-0 tabular-nums">{Math.round(completionPercentage)}%</span>
             </div>
-            {sidebarOpen && (
-              <span className="font-bold text-sm text-gray-900">Yemma</span>
-            )}
+            <p className="text-[10px] text-[#6b7280] mt-0.5 truncate">Profil complété</p>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            className="h-7 w-7 shrink-0 hover:bg-muted"
-            title={sidebarOpen ? 'Réduire' : 'Agrandir'}
-          >
-            {sidebarOpen ? <X className="w-3.5 h-3.5" /> : <Menu className="w-3.5 h-3.5" />}
-          </Button>
-        </div>
 
-        {/* Espace flexible */}
-        <div className="flex-1" />
-
-        {/* Footer Sidebar compact */}
-        <div className="border-t border-border p-2 space-y-1.5 shrink-0 safe-bottom">
-          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'justify-center'} p-1.5 rounded-lg hover:bg-muted/50 transition-colors`}>
-            <div className="relative shrink-0">
-              <img
-                src={displayPhoto}
-                alt={`Photo de profil de ${fullName}`}
-                className="w-8 h-8 rounded-lg object-cover border border-border"
-                onError={(e) => {
-                  if (!photoError && e.target.src !== defaultAvatar) {
-                    setPhotoError(true)
-                    e.target.src = defaultAvatar
-                  } else if (e.target.src !== defaultAvatar) {
-                    e.target.src = defaultAvatar
-                  }
-                }}
-                onLoad={() => {
-                  if (photoError && currentPhotoUrl) {
-                    setPhotoError(false)
-                  }
-                }}
-              />
-              {profile?.status && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card"
-                  style={{ 
-                    backgroundColor: profile.status === 'VALIDATED' ? '#22c55e' : 
-                                  profile.status === 'REJECTED' ? '#ef4444' : 
-                                  profile.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8'
-                  }}
-                />
+          {/* User menu */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Link to="/contact" className="p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors" title="Aide">
+              <HelpCircle className="h-5 w-5" />
+            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-[#E8F4F3] transition-colors"
+                aria-expanded={userMenuOpen}
+              >
+                <img src={displayPhoto} alt="" className="w-9 h-9 rounded-full object-cover border-2 border-[#E8F4F3]" onError={(e) => { e.target.src = defaultAvatar }} />
+              </button>
+              {userMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} aria-hidden />
+                  <div className="absolute right-0 top-full mt-2 py-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                    <div className="px-4 py-3 bg-[#F4F6F8]/50 border-b border-gray-100">
+                      <p className="font-semibold text-sm text-[#2C2C2C] truncate">{fullName}</p>
+                      <p className="text-xs text-[#6b7280] truncate mt-0.5">{profile?.email}</p>
+                    </div>
+                    <Button variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-50 rounded-none h-10 px-4" onClick={handleLogout}>
+                      <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
-            {sidebarOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-gray-900">{fullName}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{profile.email}</p>
-              </div>
-            )}
           </div>
-          <Button
-            variant="ghost"
-            className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'} text-red-600 hover:text-red-700 hover:bg-red-50 h-8 text-xs px-2`}
-            onClick={handleLogout}
-            title={!sidebarOpen ? 'Déconnexion' : ''}
-          >
-            <LogOut className="w-3.5 h-3.5 shrink-0" />
-            {sidebarOpen && <span className="ml-1.5">Déconnexion</span>}
-          </Button>
         </div>
-      </aside>
+      </header>
 
-      {/* Overlay pour mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <div className="flex flex-1">
+        {/* Sidebar gauche - fond blanc (style capture) */}
+        <aside className={`
+          fixed lg:static inset-y-0 left-0 z-40 w-64 flex flex-col
+          bg-white border-r border-gray-100 shadow-sm
+          transition-transform duration-300 lg:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
+          <div className="p-4 border-b border-gray-100">
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-gray-100 text-[#2C2C2C]">
+              <X className="h-5 w-5" />
+            </button>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6b7280] mt-4 mb-3">Navigation</p>
+            <nav className="space-y-0.5">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const path = item.id === 'dashboard' ? '/candidate/dashboard' : `/candidate/dashboard/${item.id}`
+                const isActive = activeTab === item.id || (item.id === 'situation' && activeTab === 'preferences')
+                return (
+                  <Link
+                    key={item.id}
+                    to={path}
+                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-colors ${
+                      isActive ? 'bg-[#E8F4F3] text-[#226D68]' : 'text-[#2C2C2C] hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                    {item.count != null && item.count > 0 && (
+                      <span className="ml-auto text-xs text-[#6b7280]">{item.count}</span>
+                    )}
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+          <div className="flex-1" />
+          <div className="p-4 border-t border-gray-100">
+            <Link to="/contact" className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-[#E8F4F3] text-sm text-[#6b7280] hover:text-[#226D68] transition-colors">
+              <HelpCircle className="h-4 w-4" />
+              Besoin d&apos;aide ?
+            </Link>
+          </div>
+        </aside>
 
-      {/* Bouton menu mobile flottant (visible quand sidebar fermée sur mobile) */}
-      {!sidebarOpen && (
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setSidebarOpen(true)}
-          className="fixed bottom-4 left-4 z-50 lg:hidden h-12 w-12 rounded-full shadow-lg bg-white border-[#226D68] hover:bg-[#E8F4F3]"
-          aria-label="Ouvrir le menu"
-        >
-          <Menu className="h-5 w-5 text-[#226D68]" />
-        </Button>
-      )}
+        {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+        {!sidebarOpen && (
+          <Button variant="outline" size="icon" onClick={() => setSidebarOpen(true)} className="fixed bottom-4 left-4 z-50 lg:hidden h-12 w-12 rounded-full shadow-lg bg-white border-[#226D68]">
+            <Menu className="h-5 w-5 text-[#226D68]" />
+          </Button>
+        )}
 
-      {/* Main Content */}
-      <main id="dashboard-main" className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-light min-w-0" aria-label="Contenu du profil">
-        <div className="container mx-auto px-4 py-3 sm:px-5 md:px-6 lg:px-8 max-w-7xl safe-x">
-          {/* Alerte statut IN_REVIEW compacte */}
-          {profile?.status === 'IN_REVIEW' && (
-            <div className="mb-3 rounded-lg border-l-3 border-l-amber-500 bg-amber-50/80 p-2.5 flex items-start gap-2" role="status">
-              <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-amber-900 text-xs mb-0.5">Profil en cours de validation</p>
-                <p className="text-[10px] text-amber-800">Notre équipe examine votre dossier. Vous serez contacté prochainement.</p>
+        {/* Main */}
+        <div className="flex-1 min-w-0">
+          <main id="dashboard-main" className="flex-1 overflow-y-auto min-w-0 bg-[#F4F6F8]" aria-label="Contenu du profil">
+            <div className="max-w-4xl mx-auto px-4 py-6 lg:px-8 safe-x">
+          {/* Vue Dashboard (style capture) */}
+          {activeTab === 'dashboard' && (
+            <>
+              {/* Hero accueil */}
+              <div className="mb-8">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2C2C] font-heading tracking-tight">
+                  Bonjour, {profile?.first_name || 'Candidat'}
+                </h1>
+                <p className="text-[#6b7280] mt-2 max-w-2xl">
+                  Complétez votre profil pour accéder à la validation. Une fois validé, vous entrez dans la CVthèque et devenez visible auprès des recruteurs.
+                </p>
               </div>
-            </div>
+
+              {profile?.status === 'IN_REVIEW' && (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 flex items-start gap-3" role="status">
+                  <div className="p-2 bg-amber-100 rounded-lg shrink-0">
+                    <Clock className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-900">Profil en cours de validation</p>
+                    <p className="text-sm text-amber-800 mt-0.5">Notre équipe examine votre dossier. Vous serez contacté prochainement.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Carte complétion - design épuré */}
+              <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="relative w-20 h-20">
+                      <svg className="w-20 h-20 -rotate-90" viewBox="0 0 36 36">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#E8F4F3" strokeWidth="3" />
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#226D68" strokeWidth="3" strokeDasharray={`${completionPercentage}, 100`} strokeLinecap="round" />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-[#226D68] font-heading">{Math.round(completionPercentage)}%</span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[#2C2C2C]">Complétion du profil</p>
+                      <p className="text-sm text-[#6b7280] mt-0.5">{minCompletionForSubmit}% minimum pour soumettre</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {completionChecklist.map((item) => (
+                        <span key={item.key} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${item.done ? 'bg-[#E8F4F3] text-[#226D68]' : 'bg-gray-100 text-[#6b7280]'}`}>
+                          {item.done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
+                    {profile?.status === 'DRAFT' && (
+                      <Button
+                        onClick={() => setShowSubmitConsentModal(true)}
+                        disabled={!canSubmit}
+                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white font-semibold"
+                      >
+                        <FileCheck className="mr-2 h-4 w-4" />
+                        Soumettre mon profil
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grille de sections - cartes redesignées */}
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
+                {[
+                  { id: 'situation', icon: Search, label: 'Ma situation', value: jobPreferences?.availability || 'À compléter', desc: 'Disponibilité et préférences', action: () => setShowPreferencesDialog(true), done: !!jobPreferences?.availability },
+                  { id: 'cv', icon: FileText, label: 'Mon CV', value: cvDoc ? `Importé le ${new Date(cvDoc.created_at).toLocaleDateString('fr-FR')}` : 'À uploader', desc: 'CV à jour pour la validation', action: () => setShowDocumentDialog(true), done: !!cvDoc },
+                  { id: 'experiences', icon: Briefcase, label: 'Expériences', value: experiences.length, desc: 'Parcours professionnel', action: () => navigate('/candidate/dashboard/experiences'), done: experiences.length > 0 },
+                  { id: 'educations', icon: GraduationCap, label: 'Formations', value: educations.length, desc: 'Diplômes et parcours', action: () => navigate('/candidate/dashboard/educations'), done: educations.length > 0 },
+                  { id: 'skills', icon: Code, label: 'Compétences', value: skills.length, desc: 'Techniques et transversales', action: () => navigate('/candidate/dashboard/skills'), done: skills.length > 0 },
+                  { id: 'certifications', icon: Award, label: 'Certifications', value: certifications.length, desc: 'Certifications et attestations', action: () => navigate('/candidate/dashboard/certifications'), done: certifications.length > 0 },
+                ].map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={item.action}
+                      className="group text-left rounded-xl border border-gray-200 bg-white p-5 hover:border-[#226D68]/40 hover:shadow-md transition-all duration-200"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${item.done ? 'bg-[#E8F4F3]' : 'bg-gray-100 group-hover:bg-[#E8F4F3]'}`}>
+                          <Icon className={`h-6 w-6 ${item.done ? 'text-[#226D68]' : 'text-[#6b7280] group-hover:text-[#226D68]'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-[#2C2C2C] text-sm mb-1">{item.label}</p>
+                          <p className={`text-xs font-medium mb-1 ${item.done ? 'text-[#226D68]' : 'text-amber-600'}`}>
+                            {typeof item.value === 'number' ? item.value : item.value}
+                          </p>
+                          <p className="text-xs text-[#6b7280]">{item.desc}</p>
+                          <span className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[#226D68] opacity-0 group-hover:opacity-100 transition-opacity">
+                            {item.done ? 'Modifier' : 'Compléter'} →
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
           )}
 
-          {/* Header principal compact */}
-          <div className="mb-3">
-            <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-              {/* Bandeau de statut */}
+          {/* Contenu des onglets (profile, experiences, etc.) - masqué en vue dashboard */}
+          {activeTab !== 'dashboard' && (
+          <>
+          {/* Bandeau profil (visible hors dashboard) */}
+          <div className="mb-6">
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
               <div 
-                className="h-0.5"
+                className="h-1"
                 style={{
                   backgroundColor: profile?.status === 'VALIDATED' ? '#22c55e' : 
                                   profile?.status === 'REJECTED' ? '#ef4444' : 
                                   profile?.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8'
                 }}
               />
-              
-              <CardContent className="p-3">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  {/* Informations candidat compactes */}
-                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+              <div className="p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="relative shrink-0">
                       <img
                         src={displayPhoto}
-                        alt={`Photo de profil de ${fullName}`}
-                        className="w-12 h-12 rounded-lg object-cover border-2"
-                        style={{ borderColor: 'rgba(34, 109, 104, 0.2)' }}
-                        onError={(e) => {
-                          if (!photoError && e.target.src !== defaultAvatar) {
-                            setPhotoError(true)
-                            e.target.src = defaultAvatar
-                          } else if (e.target.src !== defaultAvatar) {
-                            e.target.src = defaultAvatar
-                          }
-                        }}
-                        onLoad={() => {
-                          if (photoError && currentPhotoUrl) {
-                            setPhotoError(false)
-                          }
-                        }}
+                        alt=""
+                        className="w-14 h-14 rounded-full object-cover border-2 border-[#E8F4F3]"
+                        onError={(e) => { e.target.src = defaultAvatar }}
                       />
                       {profile?.status && (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-card"
-                          style={{ 
-                            backgroundColor: profile.status === 'VALIDATED' ? '#22c55e' : 
-                                          profile.status === 'REJECTED' ? '#ef4444' : 
-                                          profile.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8'
-                          }}
+                        <div 
+                          className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white"
+                          style={{ backgroundColor: profile.status === 'VALIDATED' ? '#22c55e' : profile.status === 'REJECTED' ? '#ef4444' : profile.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8' }}
                         />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <h1 className="text-base font-semibold text-gray-900 truncate">{fullName}</h1>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h1 className="text-lg font-semibold text-[#2C2C2C] truncate">{fullName}</h1>
                         {getStatusBadge(profile.status)}
                       </div>
                       {profile.profile_title && (
-                        <p className="text-xs text-gray-700 font-medium mb-0.5 truncate">{profile.profile_title}</p>
+                        <p className="text-sm text-[#226D68] font-medium mt-0.5 truncate">{profile.profile_title}</p>
                       )}
-                      <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground">
-                        {profile.email && (
-                          <span className="flex items-center gap-1 truncate">
-                            <Mail className="h-2.5 w-2.5" />
-                            <span className="truncate">{profile.email}</span>
-                          </span>
-                        )}
-                        {profile.phone && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-2.5 w-2.5" />
-                              <span>{profile.phone}</span>
-                            </span>
-                          </>
-                        )}
+                      <div className="flex items-center gap-2 flex-wrap mt-1 text-xs text-[#6b7280]">
+                        {profile.email && <span className="flex items-center gap-1 truncate"><Mail className="h-3 w-3 shrink-0" />{profile.email}</span>}
+                        {profile.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" />{profile.phone}</span>}
                       </div>
                     </div>
                   </div>
-
-                  {/* Actions compactes */}
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {profile.status === 'DRAFT' && (
-                      <Button 
-                        size="sm"
-                        className="text-white h-8 px-3 text-xs flex items-center gap-1.5 bg-[#226D68] hover:bg-[#1a5a55] shadow-sm"
-                        onClick={() => setShowSubmitConsentModal(true)}
-                        disabled={!canSubmit}
-                      >
-                        <FileCheck className="w-3.5 h-3.5" />
-                        <span>Soumettre</span>
+                      <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white" onClick={() => setShowSubmitConsentModal(true)} disabled={!canSubmit}>
+                        <FileCheck className="w-4 h-4 mr-1.5" /> Soumettre
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (completionPercentage < 100 && profile.status === 'DRAFT') {
-                          setShowCompletionGuide(true)
-                        } else {
-                          navigate('/profile/edit')
-                        }
-                      }}
-                      className="h-8 px-3 text-xs border hover:bg-muted"
-                    >
-                      <Edit className="w-3.5 h-3.5 mr-1" />
-                      Modifier
+                    <Button variant="outline" size="sm" onClick={() => { completionPercentage < 100 && profile.status === 'DRAFT' ? setShowCompletionGuide(true) : navigate('/candidate/dashboard/profile?edit=1') }} className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3]">
+                      <Edit className="w-4 h-4 mr-1.5" /> Modifier
                     </Button>
                   </div>
                 </div>
-
-                {/* Barre de progression compacte */}
-                <div className="mt-3 pt-3 border-t border-border">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <TrendingUp className="h-3 w-3 text-[#226D68]" />
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Complétion</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
-                      {canSubmit && (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                      )}
-                    </div>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-medium text-[#6b7280]">Complétion</span>
+                    <span className="text-sm font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
                   </div>
-                  <Progress 
-                    value={completionPercentage} 
-                    className="h-2 rounded-full bg-muted"
-                  />
-                  {!canSubmit && profile.status === 'DRAFT' && (
-                    <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
-                      <Clock className="h-2.5 w-2.5" />
-                      <span>Complétez à 80% minimum pour soumettre</span>
-                    </p>
-                  )}
-                  {/* Guide de complétion (affiché quand < 100%, au clic sur Modifier) */}
+                  <Progress value={completionPercentage} className="h-2 rounded-full bg-gray-100 [&>div]:bg-[#226D68]" />
                   {completionPercentage < 100 && profile.status === 'DRAFT' && (
-                    <div ref={completionGuideRef} className="mt-2.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-between h-7 text-[10px] text-muted-foreground hover:text-[#226D68] hover:bg-[#E8F4F3]/50"
-                        onClick={() => setShowCompletionGuide(!showCompletionGuide)}
-                      >
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" />
-                          Comment compléter mon profil à 100 % ?
-                        </span>
-                        <span className="text-muted-foreground">{showCompletionGuide ? '−' : '+'}</span>
+                    <Button variant="ghost" size="sm" className="w-full justify-between mt-2 text-xs text-[#6b7280] hover:text-[#226D68] hover:bg-[#E8F4F3]/50" onClick={() => setShowCompletionGuide(!showCompletionGuide)}>
+                      <span className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" />Comment compléter à 100 % ?</span>
+                      {showCompletionGuide ? '−' : '+'}
+                    </Button>
+                  )}
+                  {showCompletionGuide && completionPercentage < 100 && profile.status === 'DRAFT' && (
+                    <div ref={completionGuideRef} className="mt-3 p-4 rounded-xl bg-[#E8F4F3]/50 border border-[#226D68]/20 text-sm space-y-2">
+                      <p className="font-semibold text-[#226D68]">Pour soumettre :</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-[#6b7280]">
+                        <li>Profil ≥ 80 %, CV uploadé, CGU/RGPD cochées</li>
+                        <li>Au moins 1 expérience, 1 formation, 1 compétence technique</li>
+                      </ul>
+                      <Button size="sm" className="mt-2 bg-[#226D68] hover:bg-[#1a5a55] text-white" onClick={() => { setShowCompletionGuide(false); navigate('/candidate/dashboard/profile?edit=1') }}>
+                        <Edit className="h-3.5 w-3.5 mr-1.5" /> Modifier mon profil
                       </Button>
-                      {showCompletionGuide && (
-                        <div className="mt-1.5 p-2.5 rounded-lg bg-[#E8F4F3]/40 border border-[#226D68]/20 text-[11px] space-y-2">
-                          <p className="font-semibold text-[#226D68]">Pour soumettre :</p>
-                          <ul className="list-disc list-inside space-y-0.5 text-gray-700">
-                            <li>Profil ≥ 80 %, CV uploadé, cases CGU/RGPD cochées</li>
-                            <li>Au moins 1 expérience, 1 formation, 1 compétence technique</li>
-                          </ul>
-                          <p className="font-semibold text-[#226D68] pt-1">Où remplir :</p>
-                          <ul className="list-disc list-inside space-y-0.5 text-gray-700">
-                            <li>Identité : nom, email, téléphone, adresse</li>
-                            <li>Profil pro : titre, résumé (≥ 300 caractères), secteur, métier</li>
-                            <li>Expériences, Formations, Compétences</li>
-                            <li>Documents : CV · Recherche : type de contrat, disponibilité</li>
-                          </ul>
-                          <p className="text-[10px] text-muted-foreground pt-1">
-                            Soumis → un admin Yemma vous contactera pour un entretien.
-                          </p>
-                          <Button
-                            size="sm"
-                            className="mt-1.5 h-7 text-xs bg-[#226D68] hover:bg-[#1a5a55] text-white"
-                            onClick={() => {
-                              setShowCompletionGuide(false)
-                              navigate('/profile/edit')
-                            }}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Modifier mon profil
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
-          {/* Barre d'onglets compacte - responsive avec scroll horizontal sur mobile */}
-          <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); navigate({ hash: `#${value}` }) }} className="w-full">
-            <div className="relative">
-              {/* Indicateur de scroll gauche */}
-              <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-gray-light to-transparent z-10 pointer-events-none sm:hidden" />
-              {/* Indicateur de scroll droite */}
-              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-gray-light to-transparent z-10 pointer-events-none sm:hidden" />
-
-              <TabsList className="w-full justify-start h-auto p-0.5 bg-[#E8F4F3]/30 border border-border rounded-lg overflow-x-auto scrollbar-hide flex-nowrap touch-pan-x">
-                {navItems.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <TabsTrigger
-                      key={item.id}
-                      value={item.id}
-                      className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-2 sm:py-1.5 text-[11px] sm:text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all hover:bg-muted data-[state=active]:hover:bg-[#1a5a55] min-h-[40px] sm:min-h-0"
-                    >
-                      <Icon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
-                      <span className="whitespace-nowrap hidden xs:inline sm:inline">{item.label}</span>
-                      {item.count != null && item.count > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-0.5 sm:ml-1 h-4 px-1 text-[10px] font-medium data-[state=active]:bg-white/20 data-[state=active]:text-white"
-                        >
-                          {item.count}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  )
-                })}
-              </TabsList>
-            </div>
+          {/* Barre d'onglets - sections détaillées */}
+          <Tabs value={activeTab} onValueChange={(v) => navigate(`/candidate/dashboard/${v}`)} className="w-full">
+            <TabsList className="w-full justify-start h-auto p-1 bg-gray-100/80 border border-gray-200 rounded-xl overflow-x-auto flex-wrap gap-1">
+              {[
+                { id: 'profile', label: 'Profil', icon: User },
+                { id: 'preferences', label: 'Préférences', icon: Target },
+                { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
+                { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
+                { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
+                { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
+                { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
+              ].map((item) => {
+                const Icon = item.icon
+                return (
+                  <TabsTrigger
+                    key={item.id}
+                    value={item.id}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white rounded-lg transition-colors"
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {item.label}
+                    {item.count != null && item.count > 0 && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{item.count}</Badge>}
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
 
               {/* Contenu des onglets */}
               <TabsContent value="profile" className="mt-3">
-                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
-                        <div className="p-1 bg-[#226D68] rounded">
-                          <User className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span>Identité</span>
-                      </CardTitle>
-                      <Button 
+                <SectionHeader
+                  title="Mon profil"
+                  subtitle="Identité, contact et parcours. Un profil complet facilite votre validation par nos experts RH avant d'entrer dans la CVthèque."
+                  icon={User}
+                  action={
+                    profileEditMode ? (
+                      <Button
                         size="sm"
-                        variant="ghost"
+                        variant="outline"
+                        onClick={() => { setProfileEditMode(false); navigate('/candidate/dashboard/profile') }}
+                        className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]"
+                      >
+                        Annuler
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => {
                           if (completionPercentage < 100 && profile.status === 'DRAFT') {
                             setShowCompletionGuide(true)
                           } else {
-                            navigate('/profile/edit')
+                            navigate('/candidate/dashboard/profile?edit=1')
                           }
                         }}
-                        className="h-7 px-2.5 text-xs hover:bg-[#E8F4F3] hover:text-[#226D68]"
+                        className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] hover:text-[#1a5a55]"
                       >
-                        <Edit className="h-3 w-3 mr-1" />
+                        <Edit className="h-4 w-4 mr-2" />
                         Modifier
                       </Button>
+                    )
+                  }
+                />
+                {profileEditMode ? (
+                <form onSubmit={handleProfileSubmit(onProfileFormSubmit)} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-4 sm:p-6 space-y-5">
+                    {/* Photo */}
+                    <div className="flex items-center gap-4">
+                      <div className="relative shrink-0">
+                        <img src={displayPhoto} alt="Photo de profil" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-[#226D68]/20" onError={(e) => { setPhotoError(true); e.target.src = defaultAvatar }} />
+                        {uploadingPhoto && <span className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center"><Loader2 className="w-6 h-6 text-white animate-spin" aria-hidden /></span>}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Label htmlFor="photo-edit-profile" className="text-xs font-medium text-[#6b7280] block mb-1">Photo de profil</Label>
+                        <label htmlFor="photo-edit-profile">
+                          <span className="inline-flex items-center justify-center rounded-md border border-neutral-200 h-9 px-3 text-xs font-medium cursor-pointer hover:bg-[#E8F4F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68]/30">
+                            {uploadingPhoto ? 'Chargement...' : 'Changer la photo'}
+                          </span>
+                        </label>
+                        <input id="photo-edit-profile" type="file" accept="image/*" className="sr-only" disabled={uploadingPhoto} onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file || !profile?.id) return
+                          if (!file.type.startsWith('image/')) { setToast({ message: 'Sélectionnez une image (JPG, PNG).', type: 'error' }); return }
+                          if (file.size > 5 * 1024 * 1024) { setToast({ message: 'La photo ne doit pas dépasser 5 Mo.', type: 'error' }); return }
+                          try {
+                            setUploadingPhoto(true)
+                            const uploadResult = await documentApi.uploadProfilePhoto(file, profile.id)
+                            let serveUrl = uploadResult.serve_url
+                            if (serveUrl?.startsWith('/')) serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
+                            else if (uploadResult.id) serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
+                            await candidateApi.updateProfile(profile.id, { photo_url: serveUrl })
+                            setCurrentPhotoUrl(serveUrl)
+                            setPhotoError(false)
+                            await loadProfile()
+                            setToast({ message: 'Photo mise à jour.', type: 'success' })
+                          } catch { setToast({ message: 'Erreur lors de l\'upload.', type: 'error' }) }
+                          finally { setUploadingPhoto(false); e.target.value = '' }
+                        }} />
+                        <p className="text-xs text-[#6b7280] mt-1">JPG, PNG · max 5 Mo</p>
+                      </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-2.5">
-                    <div className="space-y-2.5">
-                      {/* Photo de profil et informations principales */}
-                      <div className="flex flex-col sm:flex-row gap-2.5 items-start pb-2.5 border-b border-[#E8F4F3]">
+                    {/* Identité */}
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-[#226D68]" /> Identité</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="firstName" className="text-xs">Prénom <span className="text-red-500">*</span></Label>
+                          <Input id="firstName" {...regProfile('firstName')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Prénom" />
+                          {profileErrors.firstName && <p className="text-xs text-red-600">{profileErrors.firstName.message}</p>}
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="lastName" className="text-xs">Nom <span className="text-red-500">*</span></Label>
+                          <Input id="lastName" {...regProfile('lastName')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Nom" />
+                          {profileErrors.lastName && <p className="text-xs text-red-600">{profileErrors.lastName.message}</p>}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="dateOfBirth" className="text-xs">Date de naissance</Label>
+                          <Input id="dateOfBirth" type="date" {...regProfile('dateOfBirth')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="nationality" className="text-xs">Nationalité</Label>
+                          <Controller name="nationality" control={profileControl} render={({ field }) => (
+                            <SearchableSelect id="nationality" options={COUNTRIES_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir une nationalité" className="h-9 text-sm" />
+                          )} />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="phone" className="text-xs">Téléphone</Label>
+                        <Input id="phone" {...regProfile('phone')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="+33 6 00 00 00 00" />
+                      </div>
+                    </div>
+                    {/* Adresse */}
+                    <div className="space-y-3 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#226D68]" /> Adresse</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="city" className="text-xs">Ville</Label>
+                          <Input id="city" {...regProfile('city')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Ville" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="country" className="text-xs">Pays</Label>
+                          <Controller name="country" control={profileControl} render={({ field }) => (
+                            <SearchableSelect id="country" options={COUNTRIES_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir un pays" className="h-9 text-sm" />
+                          )} />
+                        </div>
+                      </div>
+                    </div>
+                    {/* Profil professionnel */}
+                    <div className="space-y-3 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 text-[#226D68]" /> Profil professionnel</p>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="profileTitle" className="text-xs">Titre du profil</Label>
+                        <Input id="profileTitle" {...regProfile('profileTitle')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Ex. Ingénieur Génie Civil" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="sector" className="text-xs">Secteur d&apos;activité</Label>
+                          <Controller name="sector" control={profileControl} render={({ field }) => (
+                            <SearchableSelect id="sector" options={SECTORS_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir un secteur" className="h-9 text-sm" />
+                          )} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="mainJob" className="text-xs">Poste principal</Label>
+                          <Input id="mainJob" {...regProfile('mainJob')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Ex. Chef de chantier" />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="totalExperience" className="text-xs">Années d&apos;expérience</Label>
+                        <Input id="totalExperience" type="number" min={0} {...regProfile('totalExperience', { valueAsNumber: true })} className="h-9 text-sm w-24 rounded-xl border-neutral-200" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="professionalSummary" className="text-xs">Résumé professionnel</Label>
+                        <Textarea id="professionalSummary" {...regProfile('professionalSummary')} rows={4} className="resize-none text-sm min-h-[80px] w-full min-w-0 rounded-xl border-neutral-200" placeholder="Décrivez votre parcours et vos compétences..." />
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t border-gray-100">
+                      <Button type="button" variant="outline" size="sm" onClick={() => { setProfileEditMode(false); navigate('/candidate/dashboard/profile') }} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">Annuler</Button>
+                      <Button type="submit" disabled={savingProfile} size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
+                        {savingProfile ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden /> Enregistrement...</> : <><Save className="w-4 h-4 mr-2" aria-hidden /> Enregistrer</>}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+                ) : (
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-4 sm:p-6">
+                    <div className="space-y-6">
+                      {/* Hero identité */}
+                      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start pb-6 border-b border-gray-100">
                         <div className="relative group self-center sm:self-start">
                           <span className="sr-only">Photo de profil</span>
                           <img
                             src={displayPhoto}
                             alt={`Photo de profil de ${fullName}`}
-                            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 flex-shrink-0 shadow-sm"
-                            style={{ borderColor: 'rgba(34, 109, 104, 0.3)' }}
+                            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 flex-shrink-0 shadow-md"
+                            style={{ borderColor: 'rgba(34, 109, 104, 0.25)' }}
                             onError={(e) => {
                               if (!photoError && e.target.src !== defaultAvatar) {
                                 setPhotoError(true)
@@ -904,26 +1185,26 @@ export default function CandidateDashboard() {
                           </label>
                         </div>
                         <div className="flex-1 min-w-0 w-full sm:w-auto text-center sm:text-left">
-                          <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-0.5 truncate">{fullName}</h3>
+                          <h3 className="text-lg sm:text-xl font-bold text-[#2C2C2C] mb-1 truncate">{fullName}</h3>
                           {profile.profile_title && (
-                            <p className="text-xs font-medium text-[#226D68] mb-1.5 truncate">{profile.profile_title}</p>
+                            <p className="text-sm font-semibold text-[#226D68] mb-3 truncate">{profile.profile_title}</p>
                           )}
-                          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 justify-center sm:justify-start">
+                          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 justify-center sm:justify-start">
                             {profile.email && (
-                              <div className="flex items-center gap-1 text-[10px] text-gray-600 justify-center sm:justify-start">
-                                <Mail className="h-3 w-3 text-[#226D68] flex-shrink-0" />
+                              <div className="flex items-center gap-2 text-sm text-[#6b7280] justify-center sm:justify-start">
+                                <Mail className="h-4 w-4 text-[#226D68] flex-shrink-0" />
                                 <span className="truncate">{profile.email}</span>
                               </div>
                             )}
                             {profile.phone && (
-                              <div className="flex items-center gap-1 text-[10px] text-gray-600 justify-center sm:justify-start">
-                                <Phone className="h-3 w-3 text-[#226D68] flex-shrink-0" />
+                              <div className="flex items-center gap-2 text-sm text-[#6b7280] justify-center sm:justify-start">
+                                <Phone className="h-4 w-4 text-[#226D68] flex-shrink-0" />
                                 <span className="truncate">{profile.phone}</span>
                               </div>
                             )}
                             {(profile.city || profile.country) && (
-                              <div className="flex items-center gap-1 text-[10px] text-gray-600 justify-center sm:justify-start">
-                                <MapPin className="h-3 w-3 text-[#226D68] flex-shrink-0" />
+                              <div className="flex items-center gap-2 text-sm text-[#6b7280] justify-center sm:justify-start">
+                                <MapPin className="h-4 w-4 text-[#226D68] flex-shrink-0" />
                                 <span className="truncate">{[profile.city, profile.country].filter(Boolean).join(', ')}</span>
                               </div>
                             )}
@@ -931,142 +1212,130 @@ export default function CandidateDashboard() {
                         </div>
                       </div>
 
-                      {/* Informations détaillées - Design compact avec cartes */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {/* Informations détaillées - Bento grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {profile.date_of_birth && (
-                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
-                            <div className="flex items-center gap-1.5">
-                              <div className="p-0.5 bg-[#226D68] rounded">
-                                <Calendar className="h-2.5 w-2.5 text-white" />
+                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                                <Calendar className="h-4 w-4 text-[#226D68]" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Date de naissance</p>
-                                <p className="text-xs font-semibold text-gray-900 truncate">{new Date(profile.date_of_birth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                <p className="text-xs text-[#6b7280] font-medium">Date de naissance</p>
+                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{new Date(profile.date_of_birth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                               </div>
                             </div>
-                          </Card>
+                          </div>
                         )}
                         {profile.nationality && (
-                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
-                            <div className="flex items-center gap-1.5">
-                              <div className="p-0.5 bg-[#226D68] rounded">
-                                <Flag className="h-2.5 w-2.5 text-white" />
+                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                                <Flag className="h-4 w-4 text-[#226D68]" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Nationalité</p>
-                                <p className="text-xs font-semibold text-gray-900 truncate">{profile.nationality}</p>
+                                <p className="text-xs text-[#6b7280] font-medium">Nationalité</p>
+                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{profile.nationality}</p>
                               </div>
                             </div>
-                          </Card>
+                          </div>
                         )}
                         {profile.sector && (
-                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
-                            <div className="flex items-center gap-1.5">
-                              <div className="p-0.5 bg-[#226D68] rounded">
-                                <Briefcase className="h-2.5 w-2.5 text-white" />
+                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                                <Briefcase className="h-4 w-4 text-[#226D68]" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Secteur d'activité</p>
-                                <p className="text-xs font-semibold text-gray-900 truncate">{profile.sector}</p>
+                                <p className="text-xs text-[#6b7280] font-medium">Secteur d&apos;activité</p>
+                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{profile.sector}</p>
                               </div>
                             </div>
-                          </Card>
+                          </div>
                         )}
                         {profile.main_job && (
-                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
-                            <div className="flex items-center gap-1.5">
-                              <div className="p-0.5 bg-[#226D68] rounded">
-                                <Briefcase className="h-2.5 w-2.5 text-white" />
+                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                                <Briefcase className="h-4 w-4 text-[#226D68]" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Métier principal</p>
-                                <p className="text-xs font-semibold text-gray-900 truncate">{profile.main_job}</p>
+                                <p className="text-xs text-[#6b7280] font-medium">Métier principal</p>
+                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{profile.main_job}</p>
                               </div>
                             </div>
-                          </Card>
+                          </div>
                         )}
                         {profile.total_experience !== undefined && (
-                          <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 p-2">
-                            <div className="flex items-center gap-1.5">
-                              <div className="p-0.5 bg-[#226D68] rounded">
-                                <TrendingUp className="h-2.5 w-2.5 text-white" />
+                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                                <TrendingUp className="h-4 w-4 text-[#226D68]" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider font-medium">Expérience</p>
-                                <p className="text-xs font-semibold text-gray-900">{profile.total_experience} an{profile.total_experience > 1 ? 's' : ''}</p>
+                                <p className="text-xs text-[#6b7280] font-medium">Expérience</p>
+                                <p className="text-sm font-semibold text-[#2C2C2C]">{profile.total_experience} an{profile.total_experience > 1 ? 's' : ''}</p>
                               </div>
                             </div>
-                          </Card>
+                          </div>
                         )}
                       </div>
 
                       {/* Résumé professionnel */}
                       {profile.professional_summary && (
-                        <div className="pt-2 border-t border-[#E8F4F3]">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <div className="p-0.5 bg-[#226D68] rounded">
-                              <FileText className="h-2.5 w-2.5 text-white" />
+                        <div className="pt-6 border-t border-gray-100">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                              <FileText className="h-4 w-4 text-[#226D68]" />
                             </div>
-                            <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wider">
+                            <h4 className="text-sm font-semibold text-[#2C2C2C]">
                               Résumé professionnel
                             </h4>
                           </div>
                           <div 
-                            className="text-xs text-gray-700 leading-relaxed rich-text-content"
+                            className="text-sm text-[#6b7280] leading-relaxed rich-text-content"
                             dangerouslySetInnerHTML={{ __html: profile.professional_summary }}
                           />
                         </div>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
+                )}
               </TabsContent>
 
               <TabsContent value="experiences" className="mt-3">
-                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
-                        <div className="p-1 bg-[#226D68] rounded">
-                          <Briefcase className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span>Expériences</span>
-                        {experiences.length > 0 && (
-                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium bg-[#E8F4F3] text-[#226D68]">
-                            {experiences.length}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setEditingExperience(null)
-                          setShowExperienceDialog(true)
-                        }}
-                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Ajouter
-                      </Button>
-                    </div>
-                  </CardHeader>
-                    <CardContent className="p-3">
+                <SectionHeader
+                  title="Mes expériences"
+                  subtitle="Parlez de vos expériences professionnelles. Elles renforcent votre crédibilité auprès des recruteurs une fois votre profil validé."
+                  icon={Briefcase}
+                  action={
+                    <Button
+                      size="sm"
+                      onClick={() => { setEditingExperience(null); setShowExperienceDialog(true) }}
+                      className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ajouter
+                    </Button>
+                  }
+                />
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-4 sm:p-6">
                       {experiences.length > 0 ? (
-                        <div className="space-y-2.5">
+                        <div className="space-y-4">
                           {experiences.map((exp, index) => {
                             const defaultCompanyLogo = generateCompanyLogoUrl(exp.company_name)
                             const displayCompanyLogo = exp.company_logo_url || defaultCompanyLogo
                             
                             return (
-                              <Card key={exp.id} className="rounded-lg border border-border hover:border-[#226D68]/50 hover:shadow-md transition-all border-l-3 border-l-[#226D68] group bg-gradient-to-r from-white to-[#E8F4F3]/20">
-                                <CardContent className="p-2.5">
-                                  <div className="flex gap-2.5 items-start">
-                                    {/* Logo entreprise */}
+                              <div key={exp.id} className="rounded-xl border border-gray-100 bg-[#F4F6F8]/30 hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5">
+                                  <div className="flex gap-4 items-start">
                                     <div className="relative shrink-0">
                                       <img
                                         src={displayCompanyLogo}
                                         alt={`Logo de ${exp.company_name}`}
-                                        className="w-10 h-10 rounded-lg object-cover border-2 border-[#E8F4F3] shadow-sm"
+                                        className="w-12 h-12 rounded-xl object-cover border-2 border-[#E8F4F3] shadow-sm"
                                         onError={(e) => {
                                           if (e.target.src !== defaultCompanyLogo) {
                                             e.target.src = defaultCompanyLogo
@@ -1080,11 +1349,10 @@ export default function CandidateDashboard() {
                                     
                                     {/* Contenu principal */}
                                     <div className="flex-1 min-w-0">
-                                      {/* En-tête avec titre et actions */}
-                                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                                      <div className="flex items-start justify-between gap-2 mb-2">
                                         <div className="flex-1 min-w-0">
-                                          <h4 className="font-bold text-xs text-gray-900 truncate mb-0.5 leading-tight">{exp.position}</h4>
-                                          <p className="text-xs font-semibold text-[#226D68] truncate mb-1">{exp.company_name}</p>
+                                          <h4 className="font-bold text-sm sm:text-base text-[#2C2C2C] truncate mb-0.5 leading-tight">{exp.position}</h4>
+                                          <p className="text-sm font-semibold text-[#226D68] truncate mb-2">{exp.company_name}</p>
                                           
                                           {/* Métadonnées compactes */}
                                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
@@ -1180,63 +1448,46 @@ export default function CandidateDashboard() {
                                       )}
                                     </div>
                                   </div>
-                                </CardContent>
-                              </Card>
+                              </div>
                             )
                           })}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/30">
-                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
-                            <Briefcase className="h-5 w-5 text-[#226D68]" />
+                        <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
+                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
+                            <Briefcase className="h-10 w-10 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune expérience</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Au moins une expérience requise pour soumettre</p>
+                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune expérience</p>
+                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Au moins une expérience requise pour soumettre votre profil à la validation.</p>
                           <Button 
                             size="sm"
-                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
                             onClick={() => setShowExperienceDialog(true)}
                           >
-                            <Plus className="h-3 w-3 mr-1" />
+                            <Plus className="h-4 w-4 mr-2" />
                             Ajouter une expérience
                           </Button>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="educations" className="mt-4">
-                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
-                        <div className="p-1 bg-[#226D68] rounded">
-                          <GraduationCap className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span>Formations & Diplômes</span>
-                        {educations.length > 0 && (
-                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium">
-                            {educations.length}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setEditingEducation(null)
-                          setShowEducationDialog(true)
-                        }}
-                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Ajouter
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-3">
+                <SectionHeader
+                  title="Mes formations"
+                  subtitle="Diplômes et parcours académique. Au moins une formation est requise pour soumettre votre profil à la validation."
+                  icon={GraduationCap}
+                  action={
+                    <Button size="sm" onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
+                      <Plus className="h-4 w-4 mr-2" /> Ajouter
+                    </Button>
+                  }
+                />
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-4 sm:p-6">
                     {educations.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         {[...educations]
                           .sort((a, b) => (b.graduation_year || 0) - (a.graduation_year || 0))
                           .map((edu) => {
@@ -1245,152 +1496,106 @@ export default function CandidateDashboard() {
                               : null
                             
                             return (
-                              <Card 
-                                key={edu.id} 
-                                className="rounded-lg border border-border bg-card shadow-sm hover:shadow-md transition-all border-l-3 border-l-[#226D68] group"
+                              <div
+                                key={edu.id}
+                                className="rounded-xl border border-gray-100 bg-[#F4F6F8] hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5"
                               >
-                                <CardContent className="p-2.5">
-                                  <div className="flex items-start justify-between gap-2.5">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-start gap-2">
-                                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#226D68] to-[#1a5a55] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                                          <GraduationCap className="h-3.5 w-3.5 text-white" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="font-semibold text-xs text-gray-900 mb-0.5 group-hover:text-[#226D68] transition-colors truncate">
-                                            {edu.diploma}
-                                          </h4>
-                                          <p className="text-xs font-medium text-gray-700 truncate mb-1">{edu.institution}</p>
-                                          
-                                          {/* Métadonnées compactes */}
-                                          <div className="flex flex-wrap items-center gap-1.5">
-                                            {edu.level && (
-                                              <Badge 
-                                                variant="secondary" 
-                                                className="bg-[#E8F4F3] text-[#1a5a55] border-[#B8DDD9] text-[10px] font-medium px-1.5 py-0 h-4"
-                                              >
-                                                {edu.level}
-                                              </Badge>
-                                            )}
-                                            {edu.country && (
-                                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                                <MapPin className="h-2.5 w-2.5 text-[#226D68]" />
-                                                <span>{edu.country}</span>
-                                              </div>
-                                            )}
+                                <div className="flex items-start justify-between gap-2.5">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-[#E8F4F3] flex items-center justify-center shrink-0 shadow-sm">
+                                        <GraduationCap className="h-5 w-5 text-[#226D68]" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-sm sm:text-base text-[#2C2C2C] mb-0.5 group-hover:text-[#226D68] transition-colors truncate">
+                                          {edu.diploma}
+                                        </h4>
+                                        <p className="text-sm font-medium text-[#6b7280] truncate mb-2">{edu.institution}</p>
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          {edu.level && (
+                                            <Badge variant="secondary" className="bg-[#E8F4F3] text-[#1a5a55] border-[#B8DDD9] text-[10px] font-medium px-1.5 py-0 h-4">
+                                              {edu.level}
+                                            </Badge>
+                                          )}
+                                          {edu.country && (
                                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                              <Calendar className="h-2.5 w-2.5 text-[#226D68]" />
-                                              <span>
-                                                {edu.start_year 
-                                                  ? `${edu.start_year} - ${edu.graduation_year}` 
-                                                  : edu.graduation_year}
-                                              </span>
-                                              {duration && duration > 0 && (
-                                                <span className="text-muted-foreground">• {duration} an{duration > 1 ? 's' : ''}</span>
-                                              )}
+                                              <MapPin className="h-2.5 w-2.5 text-[#226D68]" />
+                                              <span>{edu.country}</span>
                                             </div>
+                                          )}
+                                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                            <Calendar className="h-2.5 w-2.5 text-[#226D68]" />
+                                            <span>
+                                              {edu.start_year ? `${edu.start_year} - ${edu.graduation_year}` : edu.graduation_year}
+                                            </span>
+                                            {duration && duration > 0 && (
+                                              <span className="text-muted-foreground"> • {duration} an{duration > 1 ? 's' : ''}</span>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
                                     </div>
-
-                                    {/* Actions compactes - toujours visible sur mobile */}
-                                    <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setEditingEducation(edu)
-                                          setShowEducationDialog(true)
-                                        }}
-                                        className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
-                                      >
-                                        <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleDeleteEducation(edu.id)}
-                                        className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
-                                      >
-                                        <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
-                                      </Button>
-                                    </div>
                                   </div>
-                                </CardContent>
-                              </Card>
+                                  <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                    <Button variant="ghost" size="sm" onClick={() => { setEditingEducation(edu); setShowEducationDialog(true) }} className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]">
+                                      <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteEducation(edu.id)} className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50">
+                                      <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
                             )
                           })}
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-border bg-[#E8F4F3]/30">
-                        <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
-                          <GraduationCap className="h-5 w-5 text-[#226D68]" />
+                      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
+                        <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
+                          <GraduationCap className="h-10 w-10 text-[#226D68]" />
                         </div>
-                        <h3 className="text-xs font-semibold text-gray-900 mb-0.5">Aucune formation</h3>
-                        <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">
-                          Au moins une formation requise pour soumettre
-                        </p>
+                        <h3 className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune formation</h3>
+                        <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Au moins une formation requise pour soumettre votre profil à la validation.</p>
                         <Button 
                           size="sm"
-                          onClick={() => {
-                            setEditingEducation(null)
-                            setShowEducationDialog(true)
-                          }}
-                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 px-3 text-xs"
+                          onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }}
+                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
                         >
-                          <Plus className="h-3.5 w-3.5 mr-1.5" />
+                          <Plus className="h-4 w-4 mr-2" />
                           Ajouter une formation
                         </Button>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="certifications" className="mt-3">
-                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
-                        <div className="p-1 bg-[#226D68] rounded">
-                          <Award className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span>Certifications</span>
-                        {certifications.length > 0 && (
-                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium bg-[#E8F4F3] text-[#226D68]">
-                            {certifications.length}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      <Button 
-                        size="sm"
-                        onClick={() => {
-                          setEditingCertification(null)
-                          setShowCertificationDialog(true)
-                        }}
-                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Ajouter
-                      </Button>
-                    </div>
-                  </CardHeader>
-                    <CardContent className="p-2.5">
+                <SectionHeader
+                  title="Mes certifications"
+                  subtitle="Certifications et attestations. Optionnel mais valorisant pour votre profil dans la CVthèque."
+                  icon={Award}
+                  action={
+                    <Button size="sm" onClick={() => { setEditingCertification(null); setShowCertificationDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
+                      <Plus className="h-4 w-4 mr-2" /> Ajouter
+                    </Button>
+                  }
+                />
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-4 sm:p-6">
                       {certifications.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                           {certifications.map((cert) => (
-                            <Card key={cert.id} className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all group">
-                              <CardContent className="p-2">
-                                <div className="flex items-start justify-between gap-2">
+                            <div key={cert.id} className="rounded-xl border border-gray-100 bg-[#F4F6F8]/30 hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5">
+                                <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1 min-w-0">
-                                    <div className="flex items-start gap-2">
-                                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#226D68] to-[#1a5a55] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                                        <Award className="h-3 w-3 text-white" />
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-[#E8F4F3] flex items-center justify-center shrink-0 shadow-sm">
+                                        <Award className="h-5 w-5 text-[#226D68]" />
                                       </div>
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-semibold text-xs text-gray-900 truncate mb-0.5 group-hover:text-[#226D68] transition-colors">{cert.title}</h4>
-                                        <p className="text-[10px] font-medium text-gray-700 truncate mb-1">{cert.issuer}</p>
+                                        <h4 className="font-semibold text-sm sm:text-base text-[#2C2C2C] truncate mb-0.5 group-hover:text-[#226D68] transition-colors">{cert.title}</h4>
+                                        <p className="text-sm font-medium text-[#6b7280] truncate mb-2">{cert.issuer}</p>
                                         
                                         {/* Métadonnées compactes */}
                                         <div className="flex flex-wrap items-center gap-1">
@@ -1454,50 +1659,41 @@ export default function CandidateDashboard() {
                                     </Button>
                                   </div>
                                 </div>
-                              </CardContent>
-                            </Card>
+                            </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/30">
-                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
-                            <Award className="h-5 w-5 text-[#226D68]" />
+                        <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
+                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
+                            <Award className="h-10 w-10 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucune certification</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Optionnel</p>
+                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune certification</p>
+                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Optionnel mais valorisant pour votre profil dans la CVthèque.</p>
                           <Button 
                             size="sm"
-                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
                             onClick={() => setShowCertificationDialog(true)}
                           >
-                            <Plus className="h-3 w-3 mr-1" />
+                            <Plus className="h-4 w-4 mr-2" />
                             Ajouter une certification
                           </Button>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="skills" className="mt-3">
-                {/* Header compact */}
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                    <Code className="h-3.5 w-3.5 text-[#226D68]" />
-                    Mes Compétences
-                  </h2>
-                  <Button 
-                    size="sm"
-                    onClick={() => {
-                      setEditingSkill(null)
-                      setShowSkillDialog(true)
-                    }}
-                    className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs shrink-0"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Ajouter
-                  </Button>
-                </div>
+                <SectionHeader
+                  title="Mes compétences"
+                  subtitle="Compétences techniques et transversales. Un profil complet augmente vos chances d'être contacté par les recruteurs."
+                  icon={Code}
+                  action={
+                    <Button size="sm" onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
+                      <Plus className="h-4 w-4 mr-2" /> Ajouter
+                    </Button>
+                  }
+                />
 
                 {/* Liste des compétences */}
                 {(() => {
@@ -1538,69 +1734,53 @@ export default function CandidateDashboard() {
                   
                   if (skills.length === 0) {
                     return (
-                      <Card className="rounded-lg border-2 border-dashed border-border bg-[#E8F4F3]/30">
-                        <CardContent className="p-8">
-                          <div className="flex flex-col items-center justify-center text-center">
-                            <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
-                              <Code className="h-5 w-5 text-[#226D68]" />
-                            </div>
-                            <p className="text-xs font-semibold text-gray-900 mb-0.5">
-                              Aucune compétence
-                            </p>
-                            <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">
-                              Au moins une compétence technique requise pour soumettre
-                            </p>
-                            <Button 
-                              size="sm"
-                              onClick={() => {
-                                setEditingSkill(null)
-                                setShowSkillDialog(true)
-                              }}
-                              className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Ajouter ma première compétence
-                            </Button>
+                      <div className="rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20 p-12 sm:p-16">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
+                            <Code className="h-10 w-10 text-[#226D68]" />
                           </div>
-                        </CardContent>
-                      </Card>
+                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune compétence</p>
+                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Au moins une compétence technique requise pour soumettre votre profil.</p>
+                          <Button 
+                            size="sm"
+                            onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }}
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Ajouter ma première compétence
+                          </Button>
+                        </div>
+                      </div>
                     )
                   }
                   
                   return (
-                    <div className="space-y-2.5">
+                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <div className="space-y-6 p-4 sm:p-6">
                       {/* Compétences Techniques */}
                       {technicalSkills.length > 0 && (
-                        <Card className="rounded-lg border border-border border-l-3 border-l-[#226D68] bg-card shadow-sm">
-                          <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b py-2 px-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                <div className="p-1 bg-[#226D68] rounded">
-                                  <Code className="h-3 w-3 text-white" />
-                                </div>
-                                <div>
-                                  <CardTitle className="text-xs font-semibold text-gray-900">
-                                    Compétences techniques
-                                  </CardTitle>
-                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                    {technicalSkills.length} compétence{technicalSkills.length > 1 ? 's' : ''}
-                                  </p>
-                                </div>
-                              </div>
+                        <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 overflow-hidden">
+                          <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-[#E8F4F3]/30">
+                            <div className="p-2 bg-[#226D68] rounded-lg">
+                              <Code className="h-4 w-4 text-white" />
                             </div>
-                          </CardHeader>
-                          <CardContent className="p-2.5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <div>
+                              <h3 className="text-sm font-semibold text-[#2C2C2C]">Compétences techniques</h3>
+                              <p className="text-xs text-[#6b7280]">{technicalSkills.length} compétence{technicalSkills.length > 1 ? 's' : ''}</p>
+                            </div>
+                          </div>
+                          <div className="p-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {technicalSkills.map((skill) => {
                                 const levelColors = getLevelColor(skill.level || 'BEGINNER')
                                 return (
                                   <div
                                     key={skill.id}
-                                    className="group relative bg-card border border-border rounded-lg p-2 hover:border-[#226D68] hover:shadow-sm transition-all duration-200"
+                                    className="group relative bg-white border border-gray-100 rounded-xl p-4 hover:border-[#E8F4F3] hover:shadow-md transition-all duration-200"
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-xs text-gray-900 truncate mb-1">
+                                        <h4 className="font-medium text-sm text-[#2C2C2C] truncate mb-1">
                                           {skill.name}
                                         </h4>
                                         {skill.level && (
@@ -1656,39 +1836,31 @@ export default function CandidateDashboard() {
                                 )
                               })}
                             </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+                        </div>
                       )}
 
                       {/* Soft Skills */}
                       {softSkills.length > 0 && (
-                        <Card className="rounded-lg border border-border border-l-3 border-l-[#226D68] bg-card shadow-sm">
-                          <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b py-2 px-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                <div className="p-1 bg-[#226D68] rounded">
-                                  <Sparkles className="h-3 w-3 text-white" />
-                                </div>
-                                <div>
-                                  <CardTitle className="text-xs font-semibold text-gray-900">
-                                    Soft Skills
-                                  </CardTitle>
-                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                    {softSkills.length} compétence{softSkills.length > 1 ? 's' : ''}
-                                  </p>
-                                </div>
-                              </div>
+                        <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 overflow-hidden">
+                          <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-[#E8F4F3]/30">
+                            <div className="p-2 bg-[#226D68] rounded-lg">
+                              <Sparkles className="h-4 w-4 text-white" />
                             </div>
-                          </CardHeader>
-                          <CardContent className="p-2.5">
-                            <div className="flex flex-wrap gap-1.5">
+                            <div>
+                              <h3 className="text-sm font-semibold text-[#2C2C2C]">Soft Skills</h3>
+                              <p className="text-xs text-[#6b7280]">{softSkills.length} compétence{softSkills.length > 1 ? 's' : ''}</p>
+                            </div>
+                          </div>
+                          <div className="p-4">
+                            <div className="flex flex-wrap gap-2">
                               {softSkills.map((skill) => (
                                 <div
                                   key={skill.id}
-                                  className="group relative bg-gradient-to-br from-[#E8F4F3] to-white border border-[#B8DDD9] rounded-lg px-2 py-1.5 hover:border-[#226D68] hover:shadow-sm transition-all duration-200 flex items-center gap-1.5"
+                                  className="group relative bg-[#E8F4F3]/50 border border-[#E8F4F3] rounded-xl px-4 py-2.5 hover:border-[#226D68]/50 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
                                 >
-                                  <Sparkles className="h-3 w-3 text-[#226D68] shrink-0" />
-                                  <span className="font-medium text-xs text-gray-900">
+                                  <Sparkles className="h-4 w-4 text-[#226D68] shrink-0" />
+                                  <span className="font-medium text-sm text-[#2C2C2C]">
                                     {skill.name}
                                   </span>
                                   <div className="flex items-center gap-0.5 ml-1 shrink-0">
@@ -1715,42 +1887,34 @@ export default function CandidateDashboard() {
                                 </div>
                               ))}
                             </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+                        </div>
                       )}
 
                       {/* Outils & Logiciels */}
                       {toolSkills.length > 0 && (
-                        <Card className="rounded-lg border border-border border-l-3 border-l-[#226D68] bg-card shadow-sm">
-                          <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b py-2 px-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                <div className="p-1 bg-[#226D68] rounded">
-                                  <Wrench className="h-3 w-3 text-white" />
-                                </div>
-                                <div>
-                                  <CardTitle className="text-xs font-semibold text-gray-900">
-                                    Outils & Logiciels
-                                  </CardTitle>
-                                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                    {toolSkills.length} outil{toolSkills.length > 1 ? 's' : ''}
-                                  </p>
-                                </div>
-                              </div>
+                        <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 overflow-hidden">
+                          <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-[#E8F4F3]/30">
+                            <div className="p-2 bg-[#226D68] rounded-lg">
+                              <Wrench className="h-4 w-4 text-white" />
                             </div>
-                          </CardHeader>
-                          <CardContent className="p-2.5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <div>
+                              <h3 className="text-sm font-semibold text-[#2C2C2C]">Outils & Logiciels</h3>
+                              <p className="text-xs text-[#6b7280]">{toolSkills.length} outil{toolSkills.length > 1 ? 's' : ''}</p>
+                            </div>
+                          </div>
+                          <div className="p-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {toolSkills.map((skill) => {
                                 const levelColors = getLevelColor(skill.level || 'BEGINNER')
                                 return (
                                   <div
                                     key={skill.id}
-                                    className="group relative bg-card border border-border rounded-lg p-2 hover:border-purple-300 hover:shadow-sm transition-all duration-200"
+                                    className="group relative bg-white border border-gray-100 rounded-xl p-4 hover:border-[#E8F4F3] hover:shadow-md transition-all duration-200"
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-xs text-gray-900 truncate mb-1">
+                                        <h4 className="font-medium text-sm text-[#2C2C2C] truncate mb-1">
                                           {skill.name}
                                         </h4>
                                         {skill.level && (
@@ -1784,13 +1948,13 @@ export default function CandidateDashboard() {
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-purple-50 active:bg-purple-50"
+                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
                                           onClick={() => {
                                             setEditingSkill(skill)
                                             setShowSkillDialog(true)
                                           }}
                                         >
-                                          <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-purple-600" />
+                                          <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
                                         </Button>
                                         <Button
                                           variant="ghost"
@@ -1806,88 +1970,76 @@ export default function CandidateDashboard() {
                                 )
                               })}
                             </div>
-                          </CardContent>
-                        </Card>
+                          </div>
+                        </div>
                       )}
+                      </div>
                     </div>
                   )
                 })()}
               </TabsContent>
 
               <TabsContent value="preferences" className="mt-3">
-                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
-                        <div className="p-1 bg-[#226D68] rounded">
-                          <MapPin className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span>Recherche d'emploi</span>
-                      </CardTitle>
-                      <Button 
-                        size="sm"
-                        onClick={() => setShowPreferencesDialog(true)}
-                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
-                      >
-                        <Edit className="h-3 w-3" />
-                        Modifier
-                      </Button>
-                    </div>
-                  </CardHeader>
-                    <CardContent className="p-2.5">
+                <SectionHeader
+                  title="Ma situation"
+                  subtitle="Postes recherchés, types de contrat, localisation et disponibilité. Ces critères aident les recruteurs à vous trouver dans la CVthèque."
+                  icon={Search}
+                  action={
+                    <Button size="sm" onClick={() => setShowPreferencesDialog(true)} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
+                      <Edit className="h-4 w-4 mr-2" /> Modifier
+                    </Button>
+                  }
+                />
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-4 sm:p-6">
                       {jobPreferences ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           {/* Postes recherchés */}
                           {jobPreferences.desired_positions?.length > 0 && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
-                                <div className="flex items-center gap-1 mb-1.5">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <Briefcase className="h-2.5 w-2.5 text-white" />
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                                    <Briefcase className="h-4 w-4 text-[#226D68]" />
                                   </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Postes recherchés</p>
+                                  <p className="text-xs font-semibold text-[#6b7280]">Postes recherchés</p>
                                 </div>
-                                <div className="flex flex-wrap gap-0.5">
+                                <div className="flex flex-wrap gap-2">
                                   {jobPreferences.desired_positions.map((pos, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                    <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
                                       {pos}
                                     </Badge>
                                   ))}
                                 </div>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Types de contrat */}
                           {(jobPreferences.contract_types?.length > 0 || jobPreferences.contract_type) && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
-                                <div className="flex items-center gap-1 mb-1.5">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <FileText className="h-2.5 w-2.5 text-white" />
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                                    <FileText className="h-4 w-4 text-[#226D68]" />
                                   </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Type(s) de contrat</p>
+                                  <p className="text-xs font-semibold text-[#6b7280]">Type(s) de contrat</p>
                                 </div>
-                                <div className="flex flex-wrap gap-0.5">
+                                <div className="flex flex-wrap gap-2">
                                   {jobPreferences.contract_types?.length > 0
                                     ? jobPreferences.contract_types.map((type, idx) => (
-                                        <Badge key={idx} variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                        <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
                                           {type}
                                         </Badge>
                                       ))
-                                    : <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                    : <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
                                           {jobPreferences.contract_type}
                                         </Badge>
                                   }
                                 </div>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Secteurs ciblés */}
                           {jobPreferences.target_sectors?.length > 0 && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
                                 <div className="flex items-center gap-1 mb-1.5">
                                   <div className="p-0.5 bg-[#226D68] rounded">
                                     <TrendingUp className="h-2.5 w-2.5 text-white" />
@@ -1901,14 +2053,12 @@ export default function CandidateDashboard() {
                                     </Badge>
                                   ))}
                                 </div>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Localisation souhaitée */}
                           {jobPreferences.desired_location && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
                                 <div className="flex items-center gap-1 mb-1">
                                   <div className="p-0.5 bg-[#226D68] rounded">
                                     <MapPin className="h-2.5 w-2.5 text-white" />
@@ -1916,14 +2066,12 @@ export default function CandidateDashboard() {
                                   <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Localisation</p>
                                 </div>
                                 <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.desired_location}</p>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Mobilité */}
                           {jobPreferences.mobility && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
                                 <div className="flex items-center gap-1 mb-1">
                                   <div className="p-0.5 bg-[#226D68] rounded">
                                     <MapPin className="h-2.5 w-2.5 text-white" />
@@ -1931,14 +2079,12 @@ export default function CandidateDashboard() {
                                   <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Mobilité</p>
                                 </div>
                                 <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.mobility}</p>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Disponibilité */}
                           {jobPreferences.availability && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
                                 <div className="flex items-center gap-1 mb-1">
                                   <div className="p-0.5 bg-[#226D68] rounded">
                                     <Calendar className="h-2.5 w-2.5 text-white" />
@@ -1955,14 +2101,12 @@ export default function CandidateDashboard() {
                                    jobPreferences.availability === 'negotiable' ? 'À négocier' :
                                    jobPreferences.availability}
                                 </p>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Télétravail */}
                           {jobPreferences.remote_preference && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
                                 <div className="flex items-center gap-1 mb-1">
                                   <div className="p-0.5 bg-[#226D68] rounded">
                                     <MapPin className="h-2.5 w-2.5 text-white" />
@@ -1976,14 +2120,12 @@ export default function CandidateDashboard() {
                                    jobPreferences.remote_preference === 'flexible' ? 'Flexible' :
                                    jobPreferences.remote_preference}
                                 </p>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Zones préférées */}
                           {jobPreferences.preferred_locations && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
                                 <div className="flex items-center gap-1 mb-1">
                                   <div className="p-0.5 bg-[#226D68] rounded">
                                     <MapPin className="h-2.5 w-2.5 text-white" />
@@ -1991,14 +2133,12 @@ export default function CandidateDashboard() {
                                   <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Zones préférées</p>
                                 </div>
                                 <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.preferred_locations}</p>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Prêt à déménager */}
                           {jobPreferences.willing_to_relocate && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all">
-                              <CardContent className="p-2">
+                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
                                 <div className="flex items-center gap-1 mb-1">
                                   <div className="p-0.5 bg-[#226D68] rounded">
                                     <MapPin className="h-2.5 w-2.5 text-white" />
@@ -2006,79 +2146,63 @@ export default function CandidateDashboard() {
                                   <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Mobilité</p>
                                 </div>
                                 <p className="font-semibold text-[10px] text-[#226D68] leading-tight">Prêt(e) à déménager</p>
-                              </CardContent>
-                            </Card>
+                            </div>
                           )}
                           
                           {/* Prétentions salariales */}
                           {(jobPreferences.salary_min || jobPreferences.salary_max) && (
-                            <Card className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-[#226D68]/5 to-[#E8F4F3]/20 hover:shadow-sm transition-all sm:col-span-2 lg:col-span-3">
-                              <CardContent className="p-2">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <TrendingUp className="h-2.5 w-2.5 text-white" />
-                                  </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Prétentions salariales</p>
+                            <div className="rounded-xl border border-gray-100 bg-[#E8F4F3]/30 p-4 hover:border-[#E8F4F3] transition-colors sm:col-span-2 lg:col-span-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="p-2 bg-[#226D68] rounded-lg">
+                                  <TrendingUp className="h-4 w-4 text-white" />
                                 </div>
-                                <p className="font-bold text-xs text-[#226D68]">
+                                <p className="text-xs font-semibold text-[#6b7280]">Prétentions salariales</p>
+                              </div>
+                              <p className="font-bold text-base text-[#226D68]">
                                   {jobPreferences.salary_min && jobPreferences.salary_max
                                     ? `${jobPreferences.salary_min.toLocaleString('fr-FR')} - ${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`
                                     : jobPreferences.salary_min
                                     ? `${jobPreferences.salary_min.toLocaleString('fr-FR')} CFA/mois`
                                     : `${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`}
-                                </p>
-                              </CardContent>
-                            </Card>
+                              </p>
+                            </div>
                           )}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-border bg-[#E8F4F3]/30">
-                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
-                            <MapPin className="h-5 w-5 text-[#226D68]" />
+                        <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
+                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
+                            <MapPin className="h-10 w-10 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Recherche non renseignée</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">Poste souhaité, type de contrat, disponibilité</p>
+                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Recherche non renseignée</p>
+                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Ces critères aident les recruteurs à vous trouver dans la CVthèque.</p>
                           <Button 
                             size="sm"
-                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
                             onClick={() => setShowPreferencesDialog(true)}
                           >
-                            <MapPin className="h-3.5 w-3.5 mr-1" />
+                            <MapPin className="h-4 w-4 mr-2" />
                             Remplir la recherche
                           </Button>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               {/* Onglet Documents */}
               <TabsContent value="documents" className="mt-3">
-                <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-                  <CardHeader className="bg-gradient-to-r from-[#E8F4F3]/50 to-transparent border-b border-border/50 py-2.5 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-xs font-semibold text-gray-900">
-                        <div className="p-1 bg-[#226D68] rounded">
-                          <FileText className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span>Documents</span>
-                        {documents.length > 0 && (
-                          <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-medium">
-                            {documents.length}
-                          </Badge>
-                        )}
-                      </CardTitle>
-                      <Button
-                        onClick={() => setShowDocumentDialog(true)}
-                        size="sm"
-                        className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs flex items-center gap-1 shadow-sm"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Ajouter
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-2.5">
+                <SectionHeader
+                  title="Mes documents"
+                  subtitle="Votre CV et les pièces justificatives. Un CV à jour renforce votre profil pour la validation par nos experts (objectif 48h)."
+                  icon={FileText}
+                  action={
+                    <Button size="sm" onClick={() => setShowDocumentDialog(true)} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
+                      <Plus className="h-4 w-4 mr-2" /> Ajouter
+                    </Button>
+                  }
+                />
+                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                  <div className="p-4 sm:p-6">
                     {(() => {
                       // Filtrer les documents qui sont des photos de profil et des logos d'entreprise
                       // On les exclut de la liste des documents car ils sont déjà affichés ailleurs
@@ -2093,7 +2217,7 @@ export default function CandidateDashboard() {
                       })
 
                       return filteredDocuments.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                           {filteredDocuments.map((doc) => {
                           const getDocumentTypeLabel = (type) => {
                             const labels = {
@@ -2156,17 +2280,16 @@ export default function CandidateDashboard() {
                           }
 
                             return (
-                              <Card key={doc.id} className="rounded-lg border border-border border-l-2 border-l-[#226D68] bg-gradient-to-r from-white to-[#E8F4F3]/20 hover:shadow-sm transition-all group">
-                                <CardContent className="p-2">
+                              <div key={doc.id} className="rounded-xl border border-gray-100 bg-[#F4F6F8]/30 hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-start gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#226D68] to-[#1a5a55] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                                          <FileText className="h-3 w-3 text-white" />
+                                        <div className="w-10 h-10 rounded-xl bg-[#E8F4F3] flex items-center justify-center shrink-0 shadow-sm">
+                                          <FileText className="h-5 w-5 text-[#226D68]" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                            <h4 className="font-semibold text-xs text-gray-900 truncate group-hover:text-[#226D68] transition-colors">{doc.original_filename}</h4>
+                                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            <h4 className="font-semibold text-sm text-[#2C2C2C] truncate group-hover:text-[#226D68] transition-colors">{doc.original_filename}</h4>
                                             <Badge variant="secondary" className={`text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium`}>
                                               {getDocumentTypeLabel(doc.document_type)}
                                             </Badge>
@@ -2230,33 +2353,34 @@ export default function CandidateDashboard() {
                                       </Button>
                                     </div>
                                   </div>
-                                </CardContent>
-                              </Card>
+                              </div>
                             )
                           })}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/30">
-                          <div className="p-2 bg-[#E8F4F3] rounded-full mb-2">
-                            <FileText className="h-5 w-5 text-[#226D68]" />
+                        <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
+                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
+                            <FileText className="h-10 w-10 text-[#226D68]" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-900 mb-0.5">Aucun document</p>
-                          <p className="text-[10px] text-muted-foreground mb-3 max-w-xs">CV obligatoire pour soumettre · PDF ou DOCX</p>
+                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Aucun document</p>
+                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Un CV à jour renforce votre profil pour la validation par nos experts (objectif 48h). PDF ou DOCX.</p>
                           <Button 
                             size="sm"
-                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-7 px-2.5 text-xs"
+                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
                             onClick={() => setShowDocumentDialog(true)}
                           >
-                            <Plus className="h-3 w-3 mr-1" />
+                            <Plus className="h-4 w-4 mr-2" />
                             Ajouter un document
                           </Button>
                         </div>
                       )
                     })()}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
+          </>
+          )}
 
           {/* Footer avec dates du profil */}
           {(profile?.created_at || profile?.updated_at || profile?.submitted_at) && (
@@ -2276,6 +2400,12 @@ export default function CandidateDashboard() {
           )}
         </div>
       </main>
+    </div>
+
+      {/* Popup flottant Expert Yemma - bas à droite */}
+      <SupportWidget floating />
+
+    </div>
 
       {/* Toast (succès / erreur) */}
       {toast && (
@@ -2292,13 +2422,13 @@ export default function CandidateDashboard() {
 
       {/* Modale de confirmation (suppression, déconnexion) */}
       <Dialog open={!!confirmDialog} onOpenChange={(open) => !open && setConfirmDialog(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{confirmDialog?.title}</DialogTitle>
-            <DialogDescription>{confirmDialog?.message}</DialogDescription>
+        <DialogContent className="max-w-sm border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-gray-anthracite font-heading font-semibold text-xl">{confirmDialog?.title}</DialogTitle>
+            <DialogDescription className="text-neutral-500 mt-1">{confirmDialog?.message}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDialog(null)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setConfirmDialog(null)} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">Annuler</Button>
             <Button
               variant={confirmDialog?.variant === 'danger' ? 'destructive' : 'default'}
               onClick={() => confirmDialog?.onConfirm?.()}
@@ -2311,13 +2441,13 @@ export default function CandidateDashboard() {
 
       {/* Modale consentement unique avant soumission du profil */}
       <Dialog open={showSubmitConsentModal} onOpenChange={(open) => { if (!submittingProfile) { setShowSubmitConsentModal(open); setSubmitError(null); if (!open) setConsentAccepted(false); } }}>
-        <DialogContent className="max-w-md rounded-[12px] border border-border border-l-4 border-l-primary shadow-xl">
-          <DialogHeader className="text-left">
-            <DialogTitle className="text-base font-semibold text-gray-anthracite flex items-center gap-2">
+        <DialogContent className="max-w-md border-l-4 border-l-[#226D68]">
+          <DialogHeader className="text-left border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-xl font-heading font-semibold text-gray-anthracite flex items-center gap-2">
               <FileCheck className="h-5 w-5 text-primary" />
               Accepter les conditions
             </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground mt-1">
+            <DialogDescription className="text-sm text-neutral-500 mt-1">
               Pour soumettre votre profil à la validation, vous devez lire et accepter les conditions d'utilisation.
             </DialogDescription>
           </DialogHeader>
@@ -2379,9 +2509,9 @@ export default function CandidateDashboard() {
                 </a>
               </li>
             </ul>
-            <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
+            <label className="flex items-start gap-3 cursor-pointer checkbox-label rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors">
               <Checkbox checked={consentAccepted} onCheckedChange={(v) => setConsentAccepted(!!v)} className="mt-0.5" />
-              <span className="text-sm text-gray-anthracite">
+              <span className="text-sm text-gray-anthracite break-words">
                 J’ai lu les conditions ci-dessus et j’accepte les <strong>CGU</strong>, la <strong>politique de confidentialité (RGPD)</strong> et j’autorise la <strong>vérification des informations</strong> de mon profil par l’équipe Yemma.
               </span>
             </label>
@@ -2394,7 +2524,7 @@ export default function CandidateDashboard() {
             )}
           </div>
           <DialogFooter className="flex-row gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => { setShowSubmitConsentModal(false); setConsentAccepted(false); setSubmitError(null); }} disabled={submittingProfile}>
+            <Button variant="outline" onClick={() => { setShowSubmitConsentModal(false); setConsentAccepted(false); setSubmitError(null); }} disabled={submittingProfile} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">
               Annuler
             </Button>
             <Button
@@ -2430,10 +2560,10 @@ export default function CandidateDashboard() {
 
       {/* Modale pour ajouter une expérience */}
       <Dialog open={showExperienceDialog} onOpenChange={setShowExperienceDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingExperience ? 'Modifier l\'expérience professionnelle' : 'Ajouter une expérience professionnelle'}</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-gray-anthracite font-heading font-semibold text-xl">{editingExperience ? 'Modifier l\'expérience professionnelle' : 'Ajouter une expérience professionnelle'}</DialogTitle>
+            <DialogDescription className="text-neutral-500 mt-1">
               {editingExperience ? 'Modifiez les informations de votre expérience professionnelle' : 'Remplissez les informations de votre expérience professionnelle'}
             </DialogDescription>
           </DialogHeader>
@@ -2457,10 +2587,10 @@ export default function CandidateDashboard() {
 
       {/* Modale pour ajouter une formation */}
       <Dialog open={showEducationDialog} onOpenChange={setShowEducationDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingEducation ? 'Modifier la formation' : 'Ajouter une formation'}</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-gray-anthracite font-heading font-semibold text-xl">{editingEducation ? 'Modifier la formation' : 'Ajouter une formation'}</DialogTitle>
+            <DialogDescription className="text-neutral-500 mt-1">
               {editingEducation ? 'Modifiez les informations de votre formation' : 'Remplissez les informations de votre formation'}
             </DialogDescription>
           </DialogHeader>
@@ -2484,10 +2614,10 @@ export default function CandidateDashboard() {
 
       {/* Modale pour ajouter une certification */}
       <Dialog open={showCertificationDialog} onOpenChange={setShowCertificationDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingCertification ? 'Modifier la certification' : 'Ajouter une certification'}</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-gray-anthracite font-heading font-semibold text-xl">{editingCertification ? 'Modifier la certification' : 'Ajouter une certification'}</DialogTitle>
+            <DialogDescription className="text-neutral-500 mt-1">
               {editingCertification ? 'Modifiez les informations de votre certification' : 'Remplissez les informations de votre certification'}
             </DialogDescription>
           </DialogHeader>
@@ -2511,10 +2641,10 @@ export default function CandidateDashboard() {
 
       {/* Modale pour ajouter une compétence */}
       <Dialog open={showSkillDialog} onOpenChange={setShowSkillDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingSkill ? 'Modifier la compétence' : 'Ajouter une compétence'}</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-gray-anthracite font-heading font-semibold text-xl">{editingSkill ? 'Modifier la compétence' : 'Ajouter une compétence'}</DialogTitle>
+            <DialogDescription className="text-neutral-500 mt-1">
               {editingSkill ? 'Modifiez les informations de votre compétence' : 'Ajoutez une nouvelle compétence à votre profil'}
             </DialogDescription>
           </DialogHeader>
@@ -2538,10 +2668,10 @@ export default function CandidateDashboard() {
 
       {/* Modale pour modifier les préférences */}
       <Dialog open={showPreferencesDialog} onOpenChange={setShowPreferencesDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Modifier les préférences</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-gray-anthracite font-heading font-semibold text-xl">Modifier les préférences</DialogTitle>
+            <DialogDescription className="text-neutral-500 mt-1">
               Définissez vos préférences de recherche d'emploi
             </DialogDescription>
           </DialogHeader>
@@ -2561,10 +2691,10 @@ export default function CandidateDashboard() {
 
       {/* Modale pour ajouter un document */}
       <Dialog open={showDocumentDialog} onOpenChange={setShowDocumentDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Ajouter un document</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="max-w-lg border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="text-gray-anthracite font-heading font-semibold text-xl">Ajouter un document</DialogTitle>
+            <DialogDescription className="text-neutral-500 mt-1">
               Téléchargez un document justificatif (PDF, JPG, PNG - max 10MB)
             </DialogDescription>
           </DialogHeader>
@@ -2576,7 +2706,7 @@ export default function CandidateDashboard() {
                 id="document-type"
                 value={selectedDocumentType}
                 onChange={(e) => setSelectedDocumentType(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-gray-anthracite placeholder:text-neutral-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68]/30 focus-visible:ring-offset-2 focus-visible:border-[#226D68] disabled:cursor-not-allowed disabled:opacity-50"
                 required
               >
                 <option value="CV">Curriculum Vitae</option>
@@ -2618,7 +2748,7 @@ export default function CandidateDashboard() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-4 border-t border-neutral-100">
             <Button 
               type="button" 
               variant="outline" 
@@ -2628,6 +2758,7 @@ export default function CandidateDashboard() {
                 setSelectedDocumentType('CV')
               }}
               disabled={uploadingDocument}
+              className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]"
             >
               Annuler
             </Button>
@@ -2635,7 +2766,7 @@ export default function CandidateDashboard() {
               type="button" 
               onClick={handleDocumentUpload}
               disabled={!selectedDocumentFile || uploadingDocument}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
             >
               {uploadingDocument ? (
                 <>
@@ -2655,17 +2786,17 @@ export default function CandidateDashboard() {
 
       {/* Modale de prévisualisation de document */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden border-l-4 border-l-[#226D68]">
+          <DialogHeader className="border-b border-neutral-100 pb-4 mb-4">
+            <DialogTitle className="flex items-center gap-2 text-gray-anthracite font-heading font-semibold text-xl">
+              <FileText className="h-5 w-5 text-[#226D68]" />
               {previewDocument?.original_filename || 'Document'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-neutral-500 mt-1">
               Prévisualisation du document
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-[60vh] bg-gray-100 rounded-lg overflow-hidden">
+          <div className="flex-1 min-h-[60vh] bg-[#F4F6F8] rounded-xl overflow-hidden">
             {previewDocument && (
               previewDocument.mime_type?.startsWith('image/') ? (
                 <img
@@ -2703,10 +2834,11 @@ export default function CandidateDashboard() {
               )
             )}
           </div>
-          <DialogFooter className="flex justify-between sm:justify-between">
+          <DialogFooter className="flex justify-between sm:justify-between pt-4 border-t border-neutral-100">
             <Button
               variant="outline"
               onClick={() => setShowPreviewDialog(false)}
+              className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]"
             >
               Fermer
             </Button>
@@ -2722,6 +2854,7 @@ export default function CandidateDashboard() {
                   document.body.removeChild(link)
                 }
               }}
+              className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
             >
               <Download className="h-4 w-4 mr-2" />
               Télécharger
@@ -3106,11 +3239,11 @@ function ExperienceForm({ profileId, experience, onSuccess, onCancel, onError })
           </div>
         </div>
       </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+      <DialogFooter className="pt-4 border-t border-neutral-100">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">
           Annuler
         </Button>
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
           {saving ? 'Enregistrement...' : (experience ? 'Modifier' : 'Ajouter')}
         </Button>
       </DialogFooter>
@@ -3244,11 +3377,11 @@ function EducationForm({ profileId, education, onSuccess, onCancel, onError }) {
           />
         </div>
       </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+      <DialogFooter className="pt-4 border-t border-neutral-100">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">
           Annuler
         </Button>
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
           {saving ? 'Enregistrement...' : (education ? 'Modifier' : 'Ajouter')}
         </Button>
       </DialogFooter>
@@ -3380,11 +3513,11 @@ function CertificationForm({ profileId, certification, onSuccess, onCancel, onEr
           />
         </div>
       </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+      <DialogFooter className="pt-4 border-t border-neutral-100">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">
           Annuler
         </Button>
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
           {saving ? 'Enregistrement...' : (certification ? 'Modifier' : 'Ajouter')}
         </Button>
       </DialogFooter>
@@ -3524,11 +3657,11 @@ function SkillForm({ profileId, skill, onSuccess, onCancel, onError }) {
           </div>
         )}
       </div>
-      <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={saving} className="w-full sm:w-auto">
+      <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-4 border-t border-neutral-100">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving} className="w-full sm:w-auto border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">
           Annuler
         </Button>
-        <Button type="submit" disabled={saving} className="w-full sm:w-auto">
+        <Button type="submit" disabled={saving} className="w-full sm:w-auto bg-[#226D68] hover:bg-[#1a5a55] text-white">
           {saving ? 'Enregistrement...' : (skill ? 'Modifier' : 'Ajouter')}
         </Button>
       </DialogFooter>
@@ -3672,7 +3805,7 @@ function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel, o
           id="remotePreference"
           value={formData.remotePreference}
           onChange={(e) => setFormData({ ...formData, remotePreference: e.target.value })}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="flex h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-gray-anthracite focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68]/30 focus-visible:border-[#226D68]"
         >
           <option value="onsite">Sur site uniquement</option>
           <option value="hybrid">Hybride (présentiel + télétravail)</option>
@@ -3710,7 +3843,7 @@ function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel, o
           id="availability"
           value={formData.availability}
           onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="flex h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-gray-anthracite focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68]/30 focus-visible:border-[#226D68]"
           required
         >
           <option value="">Sélectionnez...</option>
@@ -3757,11 +3890,11 @@ function PreferencesForm({ profileId, currentPreferences, onSuccess, onCancel, o
         </p>
       </div>
 
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+      <DialogFooter className="pt-4 border-t border-neutral-100">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">
           Annuler
         </Button>
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
           {saving ? 'Enregistrement...' : 'Enregistrer'}
         </Button>
       </DialogFooter>

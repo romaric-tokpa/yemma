@@ -23,8 +23,6 @@ const CandidatLanding = lazy(() => import('@/pages/CandidatLanding'))
 // Routes Candidat
 const CandidateOnboarding = lazy(() => import('@/pages/CandidateOnboarding'))
 const CandidateDashboard = lazy(() => import('@/pages/CandidateDashboard'))
-const EditProfile = lazy(() => import('@/pages/profile/EditProfile'))
-
 // Routes Entreprise
 const CompanyOnboarding = lazy(() => import('@/pages/CompanyOnboarding'))
 const CompanyDashboard = lazy(() => import('@/pages/CompanyDashboard'))
@@ -136,7 +134,15 @@ export default function AppRoutes() {
         }
       />
       
-      {/* Dashboard et profil */}
+      {/* Dashboard candidat - chaque section a sa route */}
+      <Route 
+        path="/candidate/dashboard/:tab" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+            <CandidateDashboard />
+          </AuthGuard>
+        } 
+      />
       <Route 
         path="/candidate/dashboard" 
         element={
@@ -145,11 +151,12 @@ export default function AppRoutes() {
           </AuthGuard>
         } 
       />
+      {/* Profil candidat : intégré au dashboard (redirection) */}
       <Route 
         path="/candidate/profile/edit" 
         element={
           <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
-            <EditProfile />
+            <Navigate to="/candidate/dashboard/profile?edit=1" replace />
           </AuthGuard>
         } 
       />
@@ -158,7 +165,7 @@ export default function AppRoutes() {
         path="/profile/edit" 
         element={
           <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
-            <Navigate to="/candidate/profile/edit" replace />
+            <Navigate to="/candidate/dashboard/profile?edit=1" replace />
           </AuthGuard>
         } 
       />

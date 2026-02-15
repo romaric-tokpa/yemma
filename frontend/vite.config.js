@@ -45,11 +45,12 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/v1/profiles': {
-        target: process.env.VITE_CANDIDATE_PROXY_TARGET || 'http://localhost:8002',
+        // Par défaut : nginx (8080) car les ports 8002/8010 peuvent ne pas être exposés sur l'hôte
+        target: process.env.VITE_CANDIDATE_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8080',
         changeOrigin: true,
       },
       '/api/v1/parse': {
-        target: process.env.VITE_PARSING_PROXY_TARGET || 'http://localhost:8010',
+        target: process.env.VITE_PARSING_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8080',
         changeOrigin: true,
       },
       '/api/v1/documents': {

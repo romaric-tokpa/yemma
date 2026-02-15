@@ -60,8 +60,10 @@ class HRFlowClient:
                 "sync_parsing_indexing": "1",  # Indexation synchrone
             }
 
-            # Headers sans Content-Type (requests le gère pour multipart)
+            # Headers : X-API-KEY requis, X-USER-EMAIL recommandé par l'API HRFlow
             headers = {"X-API-KEY": self.api_key}
+            if getattr(self.settings, "HRFLOW_USER_EMAIL", None):
+                headers["X-USER-EMAIL"] = self.settings.HRFLOW_USER_EMAIL
 
             response = requests.post(
                 url,
@@ -80,16 +82,33 @@ class HRFlowClient:
 
             result = response.json()
 
-            # Vérifier la structure de la réponse
+            # Vérifier la structure de la réponse HRFlow (data.profile ou data.parsing)
             if "data" not in result:
                 logger.error(f"[HRFlow] Unexpected response structure: {list(result.keys())}")
                 raise HRFlowError("Invalid HRFlow response: missing 'data' field")
 
-            profile_data = result["data"]
-            profile_key = profile_data.get("profile", {}).get("key")
+            data = result["data"]
+            # Structure API : data.profile (structuré) et data.parsing (brut)
+            # Le mapper attend {profile: {...}} avec experiences, educations, etc.
+            profile_obj = data.get("profile")
+            parsing_obj = data.get("parsing") or {}
+            if profile_obj:
+                # Enrichir profile avec parsing si experiences/educations manquants
+                profile_data = dict(profile_obj)
+                if not profile_data.get("experiences") and parsing_obj.get("experiences"):
+                    profile_data["experiences"] = parsing_obj["experiences"]
+                if not profile_data.get("educations") and parsing_obj.get("educations"):
+                    profile_data["educations"] = parsing_obj["educations"]
+                if not profile_data.get("skills") and parsing_obj.get("skills"):
+                    profile_data["skills"] = parsing_obj["skills"]
+                hrflow_data = {"profile": profile_data}
+            else:
+                hrflow_data = {"profile": parsing_obj if isinstance(parsing_obj, dict) else data}
+
+            profile_key = (hrflow_data.get("profile") or {}).get("key")
             logger.info(f"[HRFlow] Successfully parsed CV. Profile key: {profile_key}")
 
-            return profile_data
+            return hrflow_data
 
         except RequestException as e:
             logger.error(f"[HRFlow] Request error: {str(e)}")

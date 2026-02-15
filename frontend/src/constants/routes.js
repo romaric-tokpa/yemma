@@ -27,8 +27,9 @@ export const ROUTES = {
   ONBOARDING_STEP: (step) => `/onboarding/step${step}`,
   ONBOARDING_COMPLETE: '/onboarding/complete',
   CANDIDATE_DASHBOARD: '/candidate/dashboard',
-  CANDIDATE_PROFILE_EDIT: '/candidate/profile/edit',
-  PROFILE_EDIT: '/profile/edit', // Alias pour compatibilité
+  CANDIDATE_DASHBOARD_TAB: (tab) => `/candidate/dashboard/${tab}`,
+  CANDIDATE_PROFILE_EDIT: '/candidate/dashboard/profile?edit=1', // Intégré au dashboard
+  PROFILE_EDIT: '/profile/edit', // Alias → redirige vers dashboard
   
   // Routes entreprise
   COMPANY_ONBOARDING: '/company/onboarding',

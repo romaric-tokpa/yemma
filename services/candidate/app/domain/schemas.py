@@ -70,10 +70,10 @@ class ProfileResponse(ProfileBase):
     user_id: int
     email: EmailStr
     status: str
-    completion_percentage: float
+    completion_percentage: Optional[float] = 0.0  # Peut être NULL en base (données legacy)
     admin_score: Optional[float] = None
     photo_url: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None  # Peut être NULL en base (données legacy)
     updated_at: Optional[datetime] = None
     submitted_at: Optional[datetime] = None
     validated_at: Optional[datetime] = None
@@ -134,7 +134,7 @@ class ExperienceResponse(ExperienceCreate):
     """Schéma de réponse pour Experience"""
     id: int
     profile_id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None  # Peut être NULL en base (données legacy)
     
     class Config:
         from_attributes = True
@@ -158,7 +158,7 @@ class EducationResponse(EducationCreate):
     """Schéma de réponse pour Education"""
     id: int
     profile_id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None  # Peut être NULL en base (données legacy)
     
     class Config:
         from_attributes = True
@@ -182,7 +182,7 @@ class CertificationResponse(CertificationCreate):
     """Schéma de réponse pour Certification"""
     id: int
     profile_id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None  # Peut être NULL en base (données legacy)
     
     class Config:
         from_attributes = True
@@ -204,7 +204,7 @@ class SkillResponse(SkillCreate):
     """Schéma de réponse pour Skill"""
     id: int
     profile_id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None  # Peut être NULL en base (données legacy)
     
     class Config:
         from_attributes = True
@@ -235,7 +235,7 @@ class JobPreferenceResponse(JobPreferenceCreate):
     """Schéma de réponse pour JobPreference"""
     id: int
     profile_id: int
-    created_at: datetime
+    created_at: Optional[datetime] = None  # Peut être NULL en base (données legacy)
 
     class Config:
         from_attributes = True

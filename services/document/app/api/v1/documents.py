@@ -457,6 +457,24 @@ async def get_document(
     )
 
 
+def _doc_to_response(doc) -> DocumentResponse:
+    """Convertit un Document en DocumentResponse, gérant les enums ou strings."""
+    doc_type = getattr(doc.document_type, 'value', doc.document_type) if doc.document_type else 'OTHER'
+    doc_status = getattr(doc.status, 'value', doc.status) if doc.status else 'uploaded'
+    return DocumentResponse(
+        id=doc.id,
+        candidate_id=doc.candidate_id,
+        document_type=doc_type if isinstance(doc_type, str) else str(doc_type),
+        original_filename=doc.original_filename or '',
+        file_size=doc.file_size or 0,
+        mime_type=doc.mime_type or 'application/octet-stream',
+        status=doc_status if isinstance(doc_status, str) else str(doc_status),
+        created_at=doc.created_at,
+        updated_at=doc.updated_at,
+        deleted_at=doc.deleted_at
+    )
+
+
 @router.get("/candidate/{candidate_id}", response_model=List[DocumentResponse])
 async def get_candidate_documents(
     candidate_id: int,
@@ -467,29 +485,22 @@ async def get_candidate_documents(
     
     - **candidate_id**: ID du candidat
     """
-    statement = select(Document).where(
-        Document.candidate_id == candidate_id,
-        Document.deleted_at.is_(None)
-    ).order_by(Document.created_at.desc())
-    
-    result = await session.execute(statement)
-    documents = result.scalars().all()
-    
-    return [
-        DocumentResponse(
-            id=doc.id,
-            candidate_id=doc.candidate_id,
-            document_type=doc.document_type.value,
-            original_filename=doc.original_filename,
-            file_size=doc.file_size,
-            mime_type=doc.mime_type,
-            status=doc.status.value,
-            created_at=doc.created_at,
-            updated_at=doc.updated_at,
-            deleted_at=doc.deleted_at
+    try:
+        statement = select(Document).where(
+            Document.candidate_id == candidate_id,
+            Document.deleted_at.is_(None)
+        ).order_by(Document.created_at.desc())
+        
+        result = await session.execute(statement)
+        documents = result.scalars().all()
+        
+        return [_doc_to_response(doc) for doc in documents]
+    except Exception as e:
+        logger.exception(f"Error fetching documents for candidate {candidate_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la récupération des documents: {str(e)}"
         )
-        for doc in documents
-    ]
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_200_OK)

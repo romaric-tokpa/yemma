@@ -28,6 +28,7 @@ from app.domain.schemas import (
     ProfileSubmitRequest
 )
 from app.domain.onboarding_schemas import PartialProfileUpdateSchema
+from pydantic import ValidationError
 from app.core.exceptions import (
     ProfileNotFoundError, ProfileAlreadyExistsError,
     InvalidProfileStatusError, ProfileNotCompleteError
@@ -239,39 +240,85 @@ async def create_profile_from_cv(
     return response_data
 
 
+def _debug_log(location: str, message: str, data: dict, hypothesis_id: str):
+    import json
+    import time
+    payload = {"location": location, "message": message, "data": data, "hypothesisId": hypothesis_id, "timestamp": int(time.time() * 1000)}
+    # Envoyer via HTTP (accessible depuis Docker via host.docker.internal)
+    for url in ["http://host.docker.internal:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933", "http://127.0.0.1:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933"]:
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+            urllib.request.urlopen(req, timeout=1)
+            return
+        except Exception:
+            continue
+    try:
+        import os
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        for log_path in [os.path.join(base, ".cursor", "debug.log"), "/tmp/yemma_debug.log"]:
+            try:
+                with open(log_path, "a") as f:
+                    f.write(json.dumps(payload) + "\n")
+                return
+            except (OSError, IOError):
+                continue
+    except Exception:
+        pass
+
 @router.get("/me")
 async def get_my_profile(
     session: AsyncSession = Depends(get_session),
     current_user: Optional[TokenData] = Depends(get_current_user)
 ):
     """Récupère le profil de l'utilisateur connecté"""
+    # #region agent log
+    _debug_log("profiles.py:get_my_profile:entry", "GET /me called", {"current_user_is_none": current_user is None}, "H4")
+    # #endregion
     # Vérifier que current_user existe
     current_user = require_current_user(current_user)
-    
+    # #region agent log
+    _debug_log("profiles.py:get_my_profile:after_auth", "Auth OK", {"user_id": current_user.user_id}, "H4")
+    # #endregion
     try:
         # Charger directement le profil avec toutes ses relations en une seule requête
         profile = await ProfileRepository.get_by_user_id_with_relations(session, current_user.user_id)
+        # #region agent log
+        _debug_log("profiles.py:get_my_profile:profile_fetched", "Profile fetch result", {"has_profile": profile is not None, "user_id": current_user.user_id}, "H2")
+        # #endregion
         if not profile:
-            raise ProfileNotFoundError(str(current_user.user_id))
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail="Profil non trouvé. Complétez l'onboarding pour créer votre profil."
+            )
         
-        # Construire la réponse avec les relations
-        response_data = ProfileResponse.model_validate(profile).model_dump()
+        # Construire la réponse avec les relations (mode='json' pour sérialisation datetime correcte)
+        response_data = ProfileResponse.model_validate(profile).model_dump(mode="json")
         
         # Ajouter les relations
-        response_data["experiences"] = [ExperienceResponse.model_validate(exp).model_dump() for exp in profile.experiences]
-        response_data["educations"] = [EducationResponse.model_validate(edu).model_dump() for edu in profile.educations]
-        response_data["certifications"] = [CertificationResponse.model_validate(cert).model_dump() for cert in profile.certifications]
-        response_data["skills"] = [SkillResponse.model_validate(skill).model_dump() for skill in profile.skills]
+        response_data["experiences"] = [
+            ExperienceResponse.model_validate(exp).model_dump(mode="json") for exp in profile.experiences
+        ]
+        response_data["educations"] = [
+            EducationResponse.model_validate(edu).model_dump(mode="json") for edu in profile.educations
+        ]
+        response_data["certifications"] = [
+            CertificationResponse.model_validate(cert).model_dump(mode="json") for cert in profile.certifications
+        ]
+        response_data["skills"] = [
+            SkillResponse.model_validate(skill).model_dump(mode="json") for skill in profile.skills
+        ]
         if profile.job_preferences:
             try:
-                job_pref_dict = JobPreferenceResponse.model_validate(profile.job_preferences).model_dump()
+                job_pref_dict = JobPreferenceResponse.model_validate(profile.job_preferences).model_dump(mode="json")
                 response_data["job_preferences"] = job_pref_dict
             except Exception as job_pref_error:
                 logger.error(f"Error validating job_preferences for profile {profile.id}: {str(job_pref_error)}", exc_info=True)
                 # Si la validation échoue (colonnes manquantes, etc.), essayer de construire manuellement
+                ct = profile.job_preferences.contract_type
                 response_data["job_preferences"] = {
                     "desired_positions": profile.job_preferences.desired_positions or [],
-                    "contract_type": profile.job_preferences.contract_type,
+                    "contract_type": ct.value if hasattr(ct, "value") else ct,
                     "target_sectors": profile.job_preferences.target_sectors or [],
                     "desired_location": profile.job_preferences.desired_location,
                     "mobility": profile.job_preferences.mobility,
@@ -306,13 +353,22 @@ async def get_my_profile(
         })
         
         return response_data
-    except (ProfileNotFoundError, HTTPException):
+    except HTTPException:
         raise
+    except ValidationError as e:
+        logger.error(f"Validation error in get_my_profile: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Erreur de validation des données: {str(e)}"
+        )
     except Exception as e:
-        logger.error(f"Error in get_my_profile for user {current_user.user_id}: {str(e)}", exc_info=True)
+        # #region agent log
+        _debug_log("profiles.py:get_my_profile:exception", "Exception in get_my_profile", {"error_type": type(e).__name__, "error_msg": str(e)}, "H2")
+        # #endregion
+        logger.exception(f"Error in get_my_profile for user {current_user.user_id}: {e}")
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=str(e)
         )
 
 

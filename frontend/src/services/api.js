@@ -108,6 +108,11 @@ const createApiClient = (baseURL) => {
   client.interceptors.response.use(
     (response) => response,
     (error) => {
+      // #region agent log
+      if (error.response?.status === 500) {
+        fetch('http://127.0.0.1:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'api.js:interceptor', message: '500 from API', data: { url: error.config?.url, status: 500, detail: error.response?.data?.detail }, timestamp: Date.now(), hypothesisId: 'H1' }) }).catch(() => {})
+      }
+      // #endregion
       if (error.response?.status === 401) {
         const path = typeof window !== 'undefined' ? window.location.pathname : ''
         const isPublicAuthPage = path.startsWith('/login') || path.startsWith('/reset-password') || path.startsWith('/register')
@@ -197,6 +202,11 @@ parsingApiClient.interceptors.request.use((config) => {
 parsingApiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // #region agent log
+    if (error.response?.status === 500) {
+      fetch('http://127.0.0.1:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'api.js:parsingInterceptor', message: '500 from parse/cv', data: { url: error.config?.url, status: 500, detail: error.response?.data?.detail }, timestamp: Date.now(), hypothesisId: 'H3' }) }).catch(() => {})
+    }
+    // #endregion
     if (error.response?.status === 401) {
       localStorage.removeItem('auth_token')
       localStorage.removeItem('user')

@@ -15,9 +15,11 @@ import { getApiErrorDetail } from '@/utils/apiError'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { COUNTRIES_FR } from '@/data/countries'
 import { SECTORS_FR } from '@/data/sectors'
+import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Save, User, MapPin, Briefcase, Plus, Trash2, Edit,
   GraduationCap, Award, Code, FileText, Upload, Eye, Download,
+  LayoutDashboard,
 } from 'lucide-react'
 import {
   ExperienceForm,
@@ -26,6 +28,7 @@ import {
   SkillForm,
   PreferencesForm,
 } from '@/pages/CandidateDashboard'
+import SupportWidget from '@/components/candidate/SupportWidget'
 
 const profileSchema = z.object({
   firstName: z.string().min(2, 'Le prénom doit contenir au moins 2 caractères'),
@@ -80,7 +83,6 @@ export default function EditProfile() {
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [previewDocument, setPreviewDocument] = useState(null)
-
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 4000)
@@ -313,10 +315,10 @@ export default function EditProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center">
+      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
-          <p className="text-sm text-muted-foreground">Chargement...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#226D68]" aria-hidden />
+          <p className="text-sm text-[#6b7280]">Chargement de votre profil...</p>
         </div>
       </div>
     )
@@ -324,68 +326,174 @@ export default function EditProfile() {
 
   const displayPhoto = photoUrl && !photoError ? photoUrl : defaultAvatar(profile?.first_name, profile?.last_name)
 
-  return (
-    <div className="min-h-screen min-h-[100dvh] bg-gray-light safe-x safe-y">
-      <div className="max-w-2xl mx-auto px-4 py-5 xs:px-5 sm:px-6 sm:py-6 pb-8 md:pb-10 safe-bottom">
-        {/* En-tête compact */}
-        <div className="flex items-center gap-3 mb-5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/candidate/dashboard')}
-            className="shrink-0 text-gray-anthracite hover:bg-muted -ml-1 min-h-[2.75rem] sm:min-h-0 px-3 touch-target-min"
-            aria-label="Retour au dashboard"
-          >
-            <ArrowLeft className="w-4 h-4 sm:mr-1" />
-            <span className="hidden sm:inline">Retour</span>
-          </Button>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg sm:text-xl font-bold text-gray-anthracite truncate">Modifier mon profil</h1>
-            <p className="text-xs text-muted-foreground">Informations personnelles et professionnelles</p>
-          </div>
-        </div>
+  const navItems = [
+    { id: 'profil', label: 'Mon profil', icon: User },
+    { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
+    { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
+    { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
+    { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
+    { id: 'preferences', label: 'Préférences', icon: MapPin },
+    { id: 'documents', label: 'Documents', icon: FileText, count: filteredDocuments.length },
+  ]
 
-        {/* Onglets sections */}
-        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 -mx-1 px-1 scroll-tabs overscroll-x-contain" role="tablist" aria-label="Sections du profil">
-          {[
-            { id: 'profil', label: 'Profil', icon: User },
-            { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
-            { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
-            { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
-            { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
-            { id: 'preferences', label: 'Préférences', icon: MapPin },
-            { id: 'documents', label: 'Documents', icon: FileText, count: filteredDocuments.length },
-          ].map(({ id, label, icon: Icon, count }) => (
+  return (
+    <div className="min-h-screen min-h-[100dvh] bg-white flex overflow-x-hidden w-full max-w-[100vw]">
+      {/* Sidebar - style capture */}
+      <aside className="w-56 lg:w-64 hidden md:flex flex-col shrink-0 bg-white border-r border-[#e5e7eb]">
+        <div className="p-4 border-b border-[#e5e7eb]">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-full bg-[#226D68] flex items-center justify-center shrink-0">
+              <span className="text-white font-bold text-sm">Y</span>
+            </div>
+            <span className="text-lg font-bold">
+              <span className="text-[#226D68]">Yemma</span>
+              <span className="text-[#e76f51]">-Solutions</span>
+            </span>
+          </Link>
+        </div>
+        <nav className="flex-1 overflow-y-auto py-4 px-3">
+          <Link
+            to="/candidate/dashboard"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[#6b7280] hover:bg-[#E8F4F3] hover:text-[#226D68] transition-colors mb-2"
+          >
+            <LayoutDashboard className="w-5 h-5 shrink-0" />
+            <span>Mon dashboard</span>
+          </Link>
+          <p className="text-[10px] font-semibold text-[#9ca3af] uppercase tracking-wider px-3 mt-4 mb-2">
+            Informations
+          </p>
+          {navItems.map(({ id, label, icon: Icon, count }) => (
             <button
               key={id}
               type="button"
-              role="tab"
-              aria-selected={section === id}
               onClick={() => setSection(id)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-lg text-xs font-medium transition-colors min-h-[44px] sm:min-h-0 snap-start touch-target-min ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                 section === id
-                  ? 'bg-primary text-white'
-                  : 'bg-card border border-border text-gray-anthracite hover:bg-muted'
+                  ? 'bg-[#E8F4F3] text-[#226D68] font-medium'
+                  : 'text-[#6b7280] hover:bg-[#F4F6F8] hover:text-[#2C2C2C]'
               }`}
-              style={section === id ? { backgroundColor: '#226D68' } : {}}
             >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-              {count != null && count > 0 && <Badge variant={section === id ? 'secondary' : 'outline'} className="ml-0.5 h-4 px-1 text-[10px]">{count}</Badge>}
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="flex-1 text-left truncate">{label}</span>
+              {count != null && count > 0 && (
+                <Badge variant="outline" className="h-5 px-1.5 text-[10px] border-[#226D68]/30 text-[#226D68] shrink-0">
+                  {count}
+                </Badge>
+              )}
             </button>
           ))}
+        </nav>
+        <div className="p-3 border-t border-[#e5e7eb]">
+          <SupportWidget compact />
         </div>
+      </aside>
+
+      {/* Contenu principal */}
+      <main className="flex-1 min-w-0 flex flex-col overflow-x-hidden">
+        {/* Header mobile avec menu */}
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-[#e5e7eb]">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/candidate/dashboard')} className="text-[#2C2C2C]">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <span className="font-bold text-[#2C2C2C]">
+            <span className="text-[#226D68]">Yemma</span>
+            <span className="text-[#e76f51]">-Solutions</span>
+          </span>
+          <div className="w-9" />
+        </header>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 xs:px-5 sm:px-6 py-6 sm:py-8 min-w-0">
+            {/* En-tête section - style capture */}
+            <div className="mb-6">
+              <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide mb-1">
+                {section === 'profil' ? 'Mon profil' : navItems.find(n => n.id === section)?.label || section}
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2C2C] mb-1">
+                {section === 'profil'
+                  ? 'Modifiez les informations de votre profil'
+                  : section === 'experiences'
+                    ? 'Vos expériences professionnelles'
+                    : section === 'educations'
+                      ? 'Vos formations'
+                      : section === 'certifications'
+                        ? 'Vos certifications'
+                        : section === 'skills'
+                          ? 'Vos compétences'
+                          : section === 'preferences'
+                            ? 'Vos préférences de recherche'
+                            : section === 'documents'
+                              ? 'Vos documents'
+                              : 'Modifier mon profil'}
+              </h1>
+              <p className="text-sm text-[#6b7280]">
+                {section === 'profil'
+                  ? 'Mettez à jour votre profil pour rester visible dans la CVthèque. Un profil complet augmente vos chances d\'être contacté par les recruteurs.'
+                  : 'Complétez les informations qui seront visibles par les recruteurs dans la CVthèque.'}
+              </p>
+            </div>
+
+            {/* Bannière + photo - section profil uniquement */}
+            {section === 'profil' && (
+              <div className="relative rounded-xl overflow-hidden mb-6" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2744 50%, #2d1f1f 100%)' }}>
+                <div className="h-32 sm:h-40" />
+                <div className="absolute left-4 sm:left-6 bottom-0 translate-y-1/2 flex items-end gap-4">
+                  <div className="relative">
+                    <img
+                      src={displayPhoto}
+                      alt="Photo de profil"
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-white shadow-lg"
+                      onError={() => setPhotoError(true)}
+                    />
+                    {isUploadingPhoto && (
+                      <span className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-white animate-spin" aria-hidden />
+                      </span>
+                    )}
+                  </div>
+                  <div className="pb-2">
+                    <label htmlFor="photo-edit">
+                      <span className="inline-flex items-center justify-center rounded-md border border-white/30 bg-white/10 hover:bg-white/20 text-white text-sm font-medium h-9 px-4 cursor-pointer transition-colors">
+                        {isUploadingPhoto ? 'Chargement...' : 'Modifier'}
+                      </span>
+                    </label>
+                    <input
+                      id="photo-edit"
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={isUploadingPhoto}
+                      onChange={handlePhotoUpload}
+                    />
+                    <p className="text-xs text-white/70 mt-1">JPG, PNG · max 5 Mo</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Onglets mobiles */}
+            <div className="md:hidden flex gap-1.5 overflow-x-auto pb-2 mb-4 -mx-1 px-1 overscroll-x-contain" role="tablist">
+              {navItems.map(({ id, label, icon: Icon, count }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={section === id}
+                  onClick={() => setSection(id)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-medium transition-colors ${
+                    section === id ? 'bg-[#226D68] text-white' : 'bg-white border border-[#e5e7eb] text-[#2C2C2C]'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                  {count != null && count > 0 && <span className="opacity-80">({count})</span>}
+                </button>
+              ))}
+            </div>
 
         {section === 'profil' && (
-        <Card className="rounded-[12px] shadow-md border border-border border-l-4 border-l-primary bg-card overflow-hidden">
-          <CardHeader className="py-3 px-4 sm:px-5 bg-muted/30 border-b border-border">
-            <CardTitle className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
-              <User className="h-4 w-4 text-primary" />
-              Informations personnelles
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 xs:p-5 sm:p-5">
+        <Card className="rounded-xl shadow-sm border border-[#e5e7eb] bg-white overflow-hidden">
+          <CardContent className="p-4 xs:p-5 sm:p-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {/* Photo */}
               <div className="flex items-center gap-4">
@@ -425,26 +533,26 @@ export default function EditProfile() {
 
               {/* Identité */}
               <div className="space-y-3">
-                <p className="text-xs font-semibold text-gray-anthracite uppercase tracking-wide flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-primary" />
+                <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5 text-[#226D68]" />
                   Identité
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="firstName" className="text-xs">Prénom <span className="text-red-500">*</span></Label>
-                    <Input id="firstName" {...register('firstName')} className="h-9 text-sm" placeholder="Prénom" />
+                    <Input id="firstName" {...register('firstName')} className="h-9 text-sm w-full min-w-0" placeholder="Prénom" />
                     {errors.firstName && <p className="text-xs text-red-600">{errors.firstName.message}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="lastName" className="text-xs">Nom <span className="text-red-500">*</span></Label>
-                    <Input id="lastName" {...register('lastName')} className="h-9 text-sm" placeholder="Nom" />
+                    <Input id="lastName" {...register('lastName')} className="h-9 text-sm w-full min-w-0" placeholder="Nom" />
                     {errors.lastName && <p className="text-xs text-red-600">{errors.lastName.message}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="dateOfBirth" className="text-xs">Date de naissance <span className="text-red-500">*</span></Label>
-                    <Input id="dateOfBirth" type="date" {...register('dateOfBirth')} className="h-9 text-sm" />
+                    <Input id="dateOfBirth" type="date" {...register('dateOfBirth')} className="h-9 text-sm w-full min-w-0" />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="nationality" className="text-xs">Nationalité <span className="text-red-500">*</span></Label>
@@ -466,20 +574,20 @@ export default function EditProfile() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone" className="text-xs">Téléphone <span className="text-red-500">*</span></Label>
-                  <Input id="phone" {...register('phone')} className="h-9 text-sm" placeholder="+33 6 00 00 00 00" />
+                  <Input id="phone" {...register('phone')} className="h-9 text-sm w-full min-w-0" placeholder="+33 6 00 00 00 00" />
                 </div>
               </div>
 
               {/* Adresse (ville, pays) */}
-              <div className="space-y-3 pt-1 border-t border-border">
-                <p className="text-xs font-semibold text-gray-anthracite uppercase tracking-wide flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-primary" />
+              <div className="space-y-3 pt-4 border-t border-[#e5e7eb]">
+                <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-[#226D68]" />
                   Adresse
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="city" className="text-xs">Ville <span className="text-red-500">*</span></Label>
-                    <Input id="city" {...register('city')} className="h-9 text-sm" placeholder="Ville" />
+                    <Input id="city" {...register('city')} className="h-9 text-sm w-full min-w-0" placeholder="Ville" />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="country" className="text-xs">Pays <span className="text-red-500">*</span></Label>
@@ -502,9 +610,9 @@ export default function EditProfile() {
               </div>
 
               {/* Profil professionnel */}
-              <div className="space-y-3 pt-1 border-t border-border">
-                <p className="text-xs font-semibold text-gray-anthracite uppercase tracking-wide flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5 text-primary" />
+              <div className="space-y-3 pt-4 border-t border-[#e5e7eb]">
+                <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5">
+                  <Briefcase className="h-3.5 w-3.5 text-[#226D68]" />
                   Profil professionnel
                 </p>
                 <div className="space-y-1.5">
@@ -512,7 +620,7 @@ export default function EditProfile() {
                   <Input
                     id="profileTitle"
                     {...register('profileTitle')}
-                    className="h-9 text-sm"
+                    className="h-9 text-sm w-full min-w-0"
                     placeholder="Ex. Ingénieur Génie Civil"
                   />
                 </div>
@@ -536,7 +644,7 @@ export default function EditProfile() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="mainJob" className="text-xs">Poste principal <span className="text-red-500">*</span></Label>
-                    <Input id="mainJob" {...register('mainJob')} className="h-9 text-sm" placeholder="Ex. Chef de chantier" />
+                    <Input id="mainJob" {...register('mainJob')} className="h-9 text-sm w-full min-w-0" placeholder="Ex. Chef de chantier" />
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -555,20 +663,20 @@ export default function EditProfile() {
                     id="professionalSummary"
                     {...register('professionalSummary')}
                     rows={4}
-                    className="resize-none text-sm min-h-[80px]"
+                    className="resize-none text-sm min-h-[80px] w-full min-w-0"
                     placeholder="Décrivez votre parcours et vos compétences en quelques lignes..."
                   />
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t border-border">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t border-[#e5e7eb]">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => navigate('/candidate/dashboard')}
-                  className="border-border text-gray-anthracite hover:bg-muted"
+                  className="border-[#e5e7eb] text-[#2C2C2C] hover:bg-[#F4F6F8]"
                 >
                   Annuler
                 </Button>
@@ -576,7 +684,7 @@ export default function EditProfile() {
                   type="submit"
                   disabled={saving}
                   size="sm"
-                  className="bg-primary hover:bg-primary/90 text-white"
+                  className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
                 >
                   {saving ? (
                     <>
@@ -597,13 +705,13 @@ export default function EditProfile() {
         )}
 
         {section === 'experiences' && (
-          <Card className="rounded-[12px] shadow-md border border-border border-l-4 border-l-primary bg-card overflow-hidden">
-            <CardHeader className="py-3 px-4 sm:px-5 bg-muted/30 border-b border-border flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-primary" />
+          <Card className="rounded-xl shadow-sm border border-[#e5e7eb] bg-white overflow-hidden">
+            <CardHeader className="py-3 px-4 sm:px-5 bg-[#F4F6F8] border-b border-[#e5e7eb] flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-[#226D68]" />
                 Expériences professionnelles
               </CardTitle>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs" onClick={() => { setEditingExperience(null); setShowExperienceDialog(true) }}>
+              <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 text-xs" onClick={() => { setEditingExperience(null); setShowExperienceDialog(true) }}>
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Ajouter
               </Button>
@@ -632,13 +740,13 @@ export default function EditProfile() {
         )}
 
         {section === 'educations' && (
-          <Card className="rounded-[12px] shadow-md border border-border border-l-4 border-l-primary bg-card overflow-hidden">
-            <CardHeader className="py-3 px-4 sm:px-5 bg-muted/30 border-b border-border flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
-                <GraduationCap className="h-4 w-4 text-primary" />
+          <Card className="rounded-xl shadow-sm border border-[#e5e7eb] bg-white overflow-hidden">
+            <CardHeader className="py-3 px-4 sm:px-5 bg-[#F4F6F8] border-b border-[#e5e7eb] flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                <GraduationCap className="h-4 w-4 text-[#226D68]" />
                 Formations
               </CardTitle>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs" onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }}>
+              <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 text-xs" onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }}>
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Ajouter
               </Button>
@@ -667,13 +775,13 @@ export default function EditProfile() {
         )}
 
         {section === 'certifications' && (
-          <Card className="rounded-[12px] shadow-md border border-border border-l-4 border-l-primary bg-card overflow-hidden">
-            <CardHeader className="py-3 px-4 sm:px-5 bg-muted/30 border-b border-border flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
-                <Award className="h-4 w-4 text-primary" />
+          <Card className="rounded-xl shadow-sm border border-[#e5e7eb] bg-white overflow-hidden">
+            <CardHeader className="py-3 px-4 sm:px-5 bg-[#F4F6F8] border-b border-[#e5e7eb] flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                <Award className="h-4 w-4 text-[#226D68]" />
                 Certifications
               </CardTitle>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs" onClick={() => { setEditingCertification(null); setShowCertificationDialog(true) }}>
+              <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 text-xs" onClick={() => { setEditingCertification(null); setShowCertificationDialog(true) }}>
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Ajouter
               </Button>
@@ -702,13 +810,13 @@ export default function EditProfile() {
         )}
 
         {section === 'skills' && (
-          <Card className="rounded-[12px] shadow-md border border-border border-l-4 border-l-primary bg-card overflow-hidden">
-            <CardHeader className="py-3 px-4 sm:px-5 bg-muted/30 border-b border-border flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
-                <Code className="h-4 w-4 text-primary" />
+          <Card className="rounded-xl shadow-sm border border-[#e5e7eb] bg-white overflow-hidden">
+            <CardHeader className="py-3 px-4 sm:px-5 bg-[#F4F6F8] border-b border-[#e5e7eb] flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                <Code className="h-4 w-4 text-[#226D68]" />
                 Compétences
               </CardTitle>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs" onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }}>
+              <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 text-xs" onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }}>
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Ajouter
               </Button>
@@ -737,13 +845,13 @@ export default function EditProfile() {
         )}
 
         {section === 'preferences' && (
-          <Card className="rounded-[12px] shadow-md border border-border border-l-4 border-l-primary bg-card overflow-hidden">
-            <CardHeader className="py-3 px-4 sm:px-5 bg-muted/30 border-b border-border flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" />
+          <Card className="rounded-xl shadow-sm border border-[#e5e7eb] bg-white overflow-hidden">
+            <CardHeader className="py-3 px-4 sm:px-5 bg-[#F4F6F8] border-b border-[#e5e7eb] flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-[#226D68]" />
                 Préférences de recherche
               </CardTitle>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs" onClick={() => setShowPreferencesDialog(true)}>
+              <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 text-xs" onClick={() => setShowPreferencesDialog(true)}>
                 <Edit className="h-3.5 w-3.5 mr-1" />
                 Modifier
               </Button>
@@ -766,13 +874,13 @@ export default function EditProfile() {
         )}
 
         {section === 'documents' && (
-          <Card className="rounded-[12px] shadow-md border border-border border-l-4 border-l-primary bg-card overflow-hidden">
-            <CardHeader className="py-3 px-4 sm:px-5 bg-muted/30 border-b border-border flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
+          <Card className="rounded-xl shadow-sm border border-[#e5e7eb] bg-white overflow-hidden">
+            <CardHeader className="py-3 px-4 sm:px-5 bg-[#F4F6F8] border-b border-[#e5e7eb] flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#226D68]" />
                 Documents
               </CardTitle>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white h-8 text-xs" onClick={() => { setSelectedDocumentFile(null); setSelectedDocumentType('CV'); setShowDocumentDialog(true) }}>
+              <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8 text-xs" onClick={() => { setSelectedDocumentFile(null); setSelectedDocumentType('CV'); setShowDocumentDialog(true) }}>
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Ajouter
               </Button>
@@ -803,7 +911,9 @@ export default function EditProfile() {
             </CardContent>
           </Card>
         )}
-      </div>
+          </div>
+        </div>
+      </main>
 
       {/* Modales formulaire : charte unifiée (primary, gray-anthracite, rounded-12) */}
       <Dialog open={showExperienceDialog} onOpenChange={setShowExperienceDialog}>

@@ -203,7 +203,7 @@ export default function AcceptInvitation() {
   if (!token) {
     console.log('🔵 No token, showing error message')
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
+      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">Lien invalide</CardTitle>
@@ -223,7 +223,7 @@ export default function AcceptInvitation() {
   
   if (loadingInvitation) {
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
+      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
@@ -238,7 +238,7 @@ export default function AcceptInvitation() {
   
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
+      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
@@ -258,8 +258,8 @@ export default function AcceptInvitation() {
   console.log('Rendering AcceptInvitation form, invitationInfo:', invitationInfo, 'error:', error)
   
   return (
-    <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 relative">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
+      <Card className="w-full max-w-md min-w-0 overflow-hidden">
         <CardHeader className="text-center">
           <div className="w-16 h-16 bg-[#226D68]/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="h-8 w-8 text-[#226D68]" />
@@ -287,44 +287,46 @@ export default function AcceptInvitation() {
               </div>
             )}
             
-            <div className="space-y-2">
-              <Label htmlFor="first_name">
-                Prénom <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="first_name"
-                  type="text"
-                  placeholder="Votre prénom"
-                  {...register('first_name')}
-                  className="pl-10"
-                  disabled={loading || !invitationInfo}
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">
+                  Prénom <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="first_name"
+                    type="text"
+                    placeholder="Votre prénom"
+                    {...register('first_name')}
+                    className="pl-10 w-full min-w-0"
+                    disabled={loading || !invitationInfo}
+                  />
+                </div>
+                {errors.first_name && (
+                  <p className="text-sm text-destructive">{errors.first_name.message}</p>
+                )}
               </div>
-              {errors.first_name && (
-                <p className="text-sm text-destructive">{errors.first_name.message}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="last_name">
-                Nom <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="last_name"
-                  type="text"
-                  placeholder="Votre nom"
-                  {...register('last_name')}
-                  className="pl-10"
-                  disabled={loading || !invitationInfo}
-                />
+              
+              <div className="space-y-2">
+                <Label htmlFor="last_name">
+                  Nom <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="last_name"
+                    type="text"
+                    placeholder="Votre nom"
+                    {...register('last_name')}
+                    className="pl-10 w-full min-w-0"
+                    disabled={loading || !invitationInfo}
+                  />
+                </div>
+                {errors.last_name && (
+                  <p className="text-sm text-destructive">{errors.last_name.message}</p>
+                )}
               </div>
-              {errors.last_name && (
-                <p className="text-sm text-destructive">{errors.last_name.message}</p>
-              )}
             </div>
             
             <div className="space-y-2">
@@ -338,7 +340,7 @@ export default function AcceptInvitation() {
                   type="password"
                   placeholder="Minimum 8 caractères"
                   {...register('password')}
-                  className="pl-10"
+                  className="pl-10 w-full min-w-0"
                   disabled={loading || !invitationInfo}
                 />
               </div>
@@ -358,7 +360,7 @@ export default function AcceptInvitation() {
                   type="password"
                   placeholder="Répétez votre mot de passe"
                   {...register('confirm_password')}
-                  className="pl-10"
+                  className="pl-10 w-full min-w-0"
                   disabled={loading || !invitationInfo}
                 />
               </div>

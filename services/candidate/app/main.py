@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import logging
 
 from app.core.config import settings
+from app.core.exceptions import CandidateError
 from app.api.v1 import profiles, stats
 
 # Configuration du logging
@@ -38,10 +39,25 @@ app.include_router(stats.router, prefix="/api/v1", tags=["Stats"])
 app.include_router(profiles.router, prefix="/api/v1")
 
 
+def _debug_log(loc: str, msg: str, data: dict, hid: str):
+    import json, time
+    payload = {"location": loc, "message": msg, "data": data, "hypothesisId": hid, "timestamp": int(time.time() * 1000)}
+    for url in ["http://host.docker.internal:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933", "http://127.0.0.1:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933"]:
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+            urllib.request.urlopen(req, timeout=1)
+            return
+        except Exception:
+            continue
+
 # Gestionnaire d'erreurs global pour garantir que les headers CORS sont toujours envoyés
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Gestionnaire d'erreurs global qui garantit que les headers CORS sont envoyés"""
+    # #region agent log
+    _debug_log("main.py:global_exception_handler", "Unhandled exception", {"path": str(request.url.path), "error_type": type(exc).__name__, "error_msg": str(exc)}, "H2")
+    # #endregion
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     
     # Créer une réponse avec les headers CORS
@@ -53,7 +69,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
     
-    detail = f"Internal server error: {str(exc)}" if settings.DEBUG else "Internal server error"
+    detail = str(exc) if settings.DEBUG else "Internal server error"
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": detail},
@@ -94,6 +110,21 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors()},
+        headers=headers
+    )
+
+
+@app.exception_handler(CandidateError)
+async def candidate_error_handler(request: Request, exc: CandidateError):
+    """Gestionnaire pour les erreurs métier (404, 409, 400)"""
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin in settings.CORS_ORIGINS:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
         headers=headers
     )
 

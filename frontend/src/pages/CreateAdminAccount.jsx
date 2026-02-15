@@ -146,7 +146,7 @@ export default function CreateAdminAccount() {
 
   if (isValidatingToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 safe-x safe-y">
+      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md border border-border shadow-sm rounded-lg">
           <CardContent className="pt-5 pb-5 px-4">
             <div className="flex flex-col items-center justify-center space-y-2">
@@ -163,7 +163,7 @@ export default function CreateAdminAccount() {
 
   if (error && !tokenInfo) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 safe-x safe-y">
+      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md border border-red-200 shadow-sm rounded-lg bg-red-50/50">
           <CardHeader className="text-center pb-3">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-red-100">
@@ -189,7 +189,7 @@ export default function CreateAdminAccount() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 safe-x safe-y">
+      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md border border-green-200 shadow-sm rounded-lg bg-green-50/50">
           <CardContent className="pt-5 pb-5 px-4">
             <div className="flex flex-col items-center justify-center space-y-2">
@@ -208,8 +208,8 @@ export default function CreateAdminAccount() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 safe-x safe-y">
-      <Card className="w-full max-w-md border border-border shadow-sm rounded-lg bg-card">
+    <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
+      <Card className="w-full max-w-md min-w-0 overflow-hidden border border-border shadow-sm rounded-lg bg-card">
         <CardHeader className="text-center pb-2.5 px-4 pt-4">
           <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-[#226D68]/10">
             <Shield className="h-4 w-4 text-[#226D68]" />
@@ -252,14 +252,14 @@ export default function CreateAdminAccount() {
                 placeholder="admin@example.com"
                 {...register('email')}
                 disabled={true}
-                className="h-8 text-xs bg-[#E8F4F3] cursor-not-allowed"
+                className="h-8 text-xs bg-[#E8F4F3] cursor-not-allowed w-full min-w-0"
               />
               {errors.email && (
                 <p className="text-[9px] text-red-500">{errors.email.message}</p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label htmlFor="firstName" className="text-[10px]">Prénom <span className="text-red-500">*</span></Label>
                 <Input
@@ -267,7 +267,7 @@ export default function CreateAdminAccount() {
                   type="text"
                   placeholder="Jean"
                   {...register('firstName')}
-                  className="h-8 text-xs"
+                  className="h-8 text-xs w-full min-w-0"
                 />
                 {errors.firstName && (
                   <p className="text-[9px] text-red-500">{errors.firstName.message}</p>
@@ -281,7 +281,7 @@ export default function CreateAdminAccount() {
                   type="text"
                   placeholder="Dupont"
                   {...register('lastName')}
-                  className="h-8 text-xs"
+                  className="h-8 text-xs w-full min-w-0"
                 />
                 {errors.lastName && (
                   <p className="text-[9px] text-red-500">{errors.lastName.message}</p>
@@ -297,7 +297,7 @@ export default function CreateAdminAccount() {
                   type="password"
                   placeholder="••••••••"
                   {...register('password')}
-                  className="h-8 text-xs pr-8"
+                  className="h-8 text-xs pr-8 w-full min-w-0"
                   autoComplete="new-password"
                 />
                 <Lock className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
@@ -318,7 +318,7 @@ export default function CreateAdminAccount() {
                   type="password"
                   placeholder="••••••••"
                   {...register('confirmPassword')}
-                  className="h-8 text-xs pr-8"
+                  className="h-8 text-xs pr-8 w-full min-w-0"
                   autoComplete="new-password"
                 />
                 <Lock className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" />
