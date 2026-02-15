@@ -1095,18 +1095,18 @@ export default function CandidateOnboarding() {
                 {skills.map((skill, idx) => (
                   <div
                     key={skill.id}
-                    className="flex items-center gap-1.5 px-2 py-1 bg-[#E8F4F3] rounded-full group border border-[#226D68]/20"
+                    className="flex items-center gap-1.5 px-2 py-1 bg-[#E8F4F3] rounded-full group border border-[#226D68]/20 min-w-0 w-full sm:w-auto sm:flex-initial"
                   >
                     <Input
                       value={skill.name}
                       onChange={(e) => updateSkill(idx, 'name', e.target.value)}
-                      className="h-6 w-auto min-w-[80px] border-0 bg-transparent p-0 text-sm focus-visible:ring-0"
+                      className="h-6 flex-1 min-w-0 border-0 bg-transparent p-0 text-sm focus-visible:ring-0 placeholder:text-gray-500"
                       placeholder="Compétence"
                     />
                     <select
                       value={skill.skill_type}
                       onChange={(e) => updateSkill(idx, 'skill_type', e.target.value)}
-                      className="h-6 text-sm border-0 bg-transparent cursor-pointer text-[#226D68] font-medium"
+                      className="h-6 text-sm border-0 bg-transparent cursor-pointer text-[#226D68] font-medium shrink-0"
                     >
                       <option value="TECHNICAL">Technique</option>
                       <option value="SOFT">Soft Skill</option>
@@ -1114,7 +1114,7 @@ export default function CandidateOnboarding() {
                     </select>
                     <button
                       onClick={() => removeSkill(idx)}
-                      className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                     >
                       <Trash2 className="w-2.5 h-2.5" />
                     </button>

@@ -52,7 +52,10 @@ export default function SupportWidget({ compact = false, floating = false }) {
 
   if (floating) {
     return (
-      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+      <div
+        className="fixed right-4 z-40 flex flex-col items-end gap-2"
+        style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      >
         {/* Popup */}
         {isOpen && (
           <div
@@ -69,19 +72,19 @@ export default function SupportWidget({ compact = false, floating = false }) {
             <SupportContent compact />
           </div>
         )}
-        {/* Bouton flottant */}
+        {/* Bouton flottant - compact sur mobile */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border transition-all ${
+          className={`flex items-center gap-2 rounded-xl shadow-lg border transition-all ${
             isOpen
-              ? 'bg-[#226D68] text-white border-[#1a5a55]'
-              : 'bg-white text-[#2C2C2C] border-gray-200 hover:bg-[#E8F4F3] hover:border-[#226D68]/30'
+              ? 'bg-[#226D68] text-white border-[#1a5a55] px-4 py-3'
+              : 'bg-white text-[#2C2C2C] border-gray-200 hover:bg-[#E8F4F3] hover:border-[#226D68]/30 px-3 py-2.5 sm:px-4 sm:py-3'
           }`}
           aria-expanded={isOpen}
           aria-label={isOpen ? 'Fermer l\'accompagnement' : 'Ouvrir l\'accompagnement Expert Yemma'}
         >
           <MessageCircle className={`h-5 w-5 shrink-0 ${isOpen ? 'text-white' : 'text-[#226D68]'}`} />
-          <span className="text-sm font-medium">
+          <span className={`text-sm font-medium ${isOpen ? 'inline' : 'hidden sm:inline'}`}>
             {isOpen ? 'Fermer' : 'Expert Yemma'}
           </span>
         </button>

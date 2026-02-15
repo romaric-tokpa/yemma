@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/constants/routes'
-import { Menu, X, LogOut, User } from 'lucide-react'
+import { Menu, X, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { authApiService } from '@/services/api'
+import { authApiService, candidateApi, documentApi } from '@/services/api'
+import { generateAvatarUrl } from '@/utils/photoUtils'
 
 /**
  * Navbar publique uniforme pour toutes les pages landing (/, /candidat, /contact, /legal/*)
@@ -18,6 +19,8 @@ export default function PublicNavbar({ variant = 'light' }) {
   const [userRoles, setUserRoles] = useState([])
   const [user, setUser] = useState(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null)
+  const [photoError, setPhotoError] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 12)
@@ -48,6 +51,51 @@ export default function PublicNavbar({ variant = 'light' }) {
     checkAuth()
   }, [])
 
+  // Charger la photo de profil pour les candidats authentifiés
+  useEffect(() => {
+    const loadProfilePhoto = async () => {
+      if (!isAuthenticated || !userRoles.includes('ROLE_CANDIDAT')) {
+        setProfilePhotoUrl(null)
+        setPhotoError(false)
+        return
+      }
+      try {
+        const profile = await candidateApi.getMyProfile()
+        if (!profile?.id) {
+          setProfilePhotoUrl(null)
+          return
+        }
+        let photoUrl = profile.photo_url
+        if (photoUrl?.startsWith('/')) {
+          const match = photoUrl.match(/\/api\/v1\/documents\/serve\/(\d+)/)
+          if (match?.[1]) {
+            photoUrl = documentApi.getDocumentServeUrl(parseInt(match[1]))
+          }
+        }
+        if (photoUrl && !photoUrl.includes('ui-avatars.com') && photoUrl.trim() !== '') {
+          setProfilePhotoUrl(photoUrl)
+          setPhotoError(false)
+          return
+        }
+        const docs = await documentApi.getCandidateDocuments(profile.id)
+        const photoDoc = docs
+          ?.filter(doc =>
+            (doc.document_type === 'PROFILE_PHOTO' || doc.document_type === 'OTHER') && !doc.deleted_at
+          )
+          ?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+        if (photoDoc) {
+          setProfilePhotoUrl(documentApi.getDocumentServeUrl(photoDoc.id))
+          setPhotoError(false)
+        } else {
+          setProfilePhotoUrl(null)
+        }
+      } catch {
+        setProfilePhotoUrl(null)
+      }
+    }
+    loadProfilePhoto()
+  }, [isAuthenticated, userRoles])
+
   const getDashboardLink = () => {
     if (userRoles.includes('ROLE_CANDIDAT')) return '/candidate/dashboard'
     if (userRoles.includes('ROLE_COMPANY_ADMIN') || userRoles.includes('ROLE_RECRUITER')) return '/company/dashboard'
@@ -64,6 +112,8 @@ export default function PublicNavbar({ variant = 'light' }) {
   }
 
   const displayName = user?.first_name || user?.email?.split('@')[0] || 'Mon espace'
+  const defaultAvatar = generateAvatarUrl(user?.first_name || '', user?.last_name || '')
+  const displayPhoto = (profilePhotoUrl && !photoError) ? profilePhotoUrl : defaultAvatar
 
   const isDark = variant === 'dark'
   const navBg = isDark
@@ -127,9 +177,12 @@ export default function PublicNavbar({ variant = 'light' }) {
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-[#E8F4F3] text-[#2C2C2C]'}`}
                     aria-expanded={userMenuOpen}
                   >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-white/20' : 'bg-[#E8F4F3]'}`}>
-                      <User className="h-4 w-4" />
-                    </div>
+                    <img
+                      src={displayPhoto}
+                      alt=""
+                      className={`w-8 h-8 rounded-full object-cover border-2 shrink-0 ${isDark ? 'border-white/50' : 'border-[#E8F4F3]'}`}
+                      onError={() => setPhotoError(true)}
+                    />
                     <span className="text-sm font-medium truncate max-w-[120px]">{displayName}</span>
                   </button>
                   {userMenuOpen && (
@@ -188,9 +241,17 @@ export default function PublicNavbar({ variant = 'light' }) {
           <div className={`pt-3 ${mobileBorder} flex flex-col gap-2`}>
             {isAuthenticated ? (
               <>
-                <div className={`px-3 py-2 ${isDark ? 'text-white/90' : 'text-[#6b7280]'}`}>
-                  <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#2C2C2C]'}`}>{displayName}</p>
-                  {user?.email && <p className="text-xs truncate">{user.email}</p>}
+                <div className={`flex items-center gap-3 px-3 py-2 ${isDark ? 'text-white/90' : 'text-[#6b7280]'}`}>
+                  <img
+                    src={displayPhoto}
+                    alt=""
+                    className={`w-10 h-10 rounded-full object-cover border-2 shrink-0 ${isDark ? 'border-white/50' : 'border-[#E8F4F3]'}`}
+                    onError={() => setPhotoError(true)}
+                  />
+                  <div>
+                    <p className={`text-sm font-medium ${isDark ? 'text-white' : 'text-[#2C2C2C]'}`}>{displayName}</p>
+                    {user?.email && <p className="text-xs truncate">{user.email}</p>}
+                  </div>
                 </div>
                 <Link to={getDashboardLink()} onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="outline" size="sm" className={isDark ? 'w-full border-white/40 text-white hover:bg-white/10' : 'w-full'}>

@@ -351,15 +351,22 @@ async def change_password(
     if not user:
         raise UserNotFoundError(str(current_user.user_id))
 
-    # Vérifier le mot de passe actuel
-    if not verify_password(request.current_password, user.hashed_password):
+    # Vérifier le mot de passe actuel (sauf pour les utilisateurs OAuth qui n'en ont pas)
+    if user.oauth_provider:
+        # Utilisateur OAuth (Google, LinkedIn) : pas de mot de passe actuel, on définit directement le nouveau
+        pass
+    elif not user.hashed_password or not verify_password(request.current_password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect"
+            detail="Mot de passe actuel incorrect"
         )
 
     # Mettre à jour le mot de passe
     user.hashed_password = hash_password(request.new_password)
+    # Si c'était un compte OAuth, autoriser aussi la connexion par mot de passe
+    if user.oauth_provider:
+        user.oauth_provider = None
+        user.oauth_id = None
     await user_repo.update(user)
 
     return {"message": "Password changed successfully"}

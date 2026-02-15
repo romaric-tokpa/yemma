@@ -155,6 +155,7 @@ function SettingsPageContent({ onSuccess, onError }) {
         <form onSubmit={handleChangePassword} className="space-y-3 max-w-md">
           <div>
             <Label htmlFor="current-password">Mot de passe actuel</Label>
+            <p className="text-xs text-muted-foreground mb-1">Inscrit avec Google ou LinkedIn ? Laissez vide pour définir un mot de passe.</p>
             <div className="relative">
               <Input
                 id="current-password"
@@ -872,7 +873,7 @@ export default function CandidateDashboard() {
         {/* Main */}
         <div className="flex-1 min-w-0">
           <main id="dashboard-main" className="flex-1 overflow-y-auto min-w-0 bg-[#F4F6F8]" aria-label="Contenu du profil">
-            <div className="max-w-4xl mx-auto px-4 py-6 lg:px-8 safe-x">
+            <div className="max-w-4xl mx-auto px-4 py-6 pb-24 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
           {/* Vue Dashboard (style capture) */}
           {activeTab === 'dashboard' && (
             <>
@@ -1947,7 +1948,7 @@ export default function CandidateDashboard() {
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-sm text-[#2C2C2C] truncate mb-1">
+                                        <h4 className="font-medium text-sm text-[#2C2C2C] break-words mb-1">
                                           {skill.name}
                                         </h4>
                                         {skill.level && (
@@ -2024,10 +2025,10 @@ export default function CandidateDashboard() {
                               {softSkills.map((skill) => (
                                 <div
                                   key={skill.id}
-                                  className="group relative bg-[#E8F4F3]/50 border border-[#E8F4F3] rounded-xl px-4 py-2.5 hover:border-[#226D68]/50 hover:shadow-sm transition-all duration-200 flex items-center gap-2"
+                                  className="group relative bg-[#E8F4F3]/50 border border-[#E8F4F3] rounded-xl px-4 py-2.5 hover:border-[#226D68]/50 hover:shadow-sm transition-all duration-200 flex items-center gap-2 min-w-0"
                                 >
                                   <Sparkles className="h-4 w-4 text-[#226D68] shrink-0" />
-                                  <span className="font-medium text-sm text-[#2C2C2C]">
+                                  <span className="font-medium text-sm text-[#2C2C2C] break-words min-w-0">
                                     {skill.name}
                                   </span>
                                   <div className="flex items-center gap-0.5 ml-1 shrink-0">
@@ -2081,7 +2082,7 @@ export default function CandidateDashboard() {
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-sm text-[#2C2C2C] truncate mb-1">
+                                        <h4 className="font-medium text-sm text-[#2C2C2C] break-words mb-1">
                                           {skill.name}
                                         </h4>
                                         {skill.level && (
@@ -2632,7 +2633,6 @@ export default function CandidateDashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
               <p className="font-medium text-gray-anthracite mb-2">Récapitulatif de votre profil</p>
               <ul className="space-y-1 text-muted-foreground">
@@ -2662,9 +2662,7 @@ export default function CandidateDashboard() {
                 </li>
               </ul>
             </div>
-
-              Consultez les documents suivants avant d’accepter&nbsp;:
-            </p>
+            <p className="text-sm text-muted-foreground">Consultez les documents suivants avant d&apos;accepter&nbsp;:</p>
             <ul className="text-sm space-y-1.5">
               <li>
                 <a
