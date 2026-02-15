@@ -61,7 +61,7 @@ class UserRepository:
         """Récupère les rôles d'un utilisateur"""
         statement = (
             select(Role)
-            .join(UserRoleLink)
+            .join(UserRoleLink, UserRoleLink.role_id == Role.id)
             .where(UserRoleLink.user_id == user_id)
         )
         result = await self.session.execute(statement)

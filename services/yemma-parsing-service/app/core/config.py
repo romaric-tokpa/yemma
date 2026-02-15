@@ -14,10 +14,11 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    # HRFlow API
-    HRFLOW_API_KEY: str
-    HRFLOW_SOURCE_KEY: str
+    # HRFlow API (clé requise pour le parsing - placeholder en dev = erreur 502 explicite)
+    HRFLOW_API_KEY: str = ""
+    HRFLOW_SOURCE_KEY: str = ""
     HRFLOW_API_URL: str = "https://api.hrflow.ai/v1"
+    HRFLOW_USER_EMAIL: Optional[str] = None  # Requis par l'API parsing dans certains cas
 
     # Database (PostgreSQL)
     DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/yemma_candidate"

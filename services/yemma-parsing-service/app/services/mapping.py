@@ -270,9 +270,15 @@ def map_hrflow_experiences(hrflow_data: dict) -> List[ExperienceOutput]:
         if not company_name and not position:
             continue
 
-        # Dates
-        start_date = _parse_date(_get(exp, "start_date", "startDate", "date_start", "start", "from", "begin_date"))
-        end_date = _parse_date(_get(exp, "end_date", "endDate", "date_end", "end", "to", "until"))
+        # Dates (HRFlow peut retourner {iso8601, text, timestamp} ou une chaîne)
+        start_raw = _get(exp, "start_date", "startDate", "date_start", "start", "from", "begin_date")
+        end_raw = _get(exp, "end_date", "endDate", "date_end", "end", "to", "until")
+        if isinstance(start_raw, dict):
+            start_raw = start_raw.get("iso8601") or start_raw.get("text")
+        if isinstance(end_raw, dict):
+            end_raw = end_raw.get("iso8601") or end_raw.get("text")
+        start_date = _parse_date(start_raw)
+        end_date = _parse_date(end_raw)
         is_current = bool(_get(exp, "current", "is_current", "isCurrent", "ongoing", "present"))
 
         if is_current:
@@ -350,9 +356,15 @@ def map_hrflow_educations(hrflow_data: dict) -> List[EducationOutput]:
         if not institution and not diploma:
             continue
 
-        # Années
-        start_year = _parse_year(_get(edu, "start_date", "startDate", "year"))
-        end_year = _parse_year(_get(edu, "end_date", "endDate", "graduation_date", "graduation_year"))
+        # Années (HRFlow utilise date_start/date_end avec objet {iso8601, text, timestamp})
+        date_start_raw = _get(edu, "start_date", "startDate", "date_start")
+        date_end_raw = _get(edu, "end_date", "endDate", "graduation_date", "graduation_year", "date_end")
+        if isinstance(date_start_raw, dict):
+            date_start_raw = date_start_raw.get("iso8601") or date_start_raw.get("text")
+        if isinstance(date_end_raw, dict):
+            date_end_raw = date_end_raw.get("iso8601") or date_end_raw.get("text")
+        start_year = _parse_year(date_start_raw)
+        end_year = _parse_year(date_end_raw)
 
         if not end_year and start_year:
             end_year = start_year

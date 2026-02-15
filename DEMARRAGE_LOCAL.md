@@ -106,6 +106,22 @@ docker-compose -f docker-compose.dev.yml exec candidate ls -la /app/app/infrastr
 docker-compose -f docker-compose.dev.yml exec candidate ls -la /app/app/utils/hrflow_mapper.py
 ```
 
+### Effacer les données candidats (tests)
+
+Pour réinitialiser uniquement les données candidats en développement :
+
+```bash
+./scripts/wipe-candidate-data.sh
+```
+
+Options :
+- `--with-users` : supprime aussi les comptes candidats (auth)
+- `--with-es` : vide l'index Elasticsearch `certified_candidates`
+- `--all` : `--with-users` + `--with-es`
+- `-y` : confirmer sans demander
+
+Exécution directe (sans Docker) : `python3 scripts/wipe_candidate_data.py` (nécessite asyncpg, python-dotenv, httpx).
+
 ### Option sans Docker : lancer Auth avec uvicorn
 
 Si vous préférez lancer le service Auth sans Docker (avec une base PostgreSQL et Redis déjà en cours d'exécution) :

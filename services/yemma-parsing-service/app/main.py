@@ -96,12 +96,30 @@ async def root():
     }
 
 
+def _debug_log(loc: str, msg: str, data: dict, hid: str):
+    import json, time
+    payload = {"location": loc, "message": msg, "data": data, "hypothesisId": hid, "timestamp": int(time.time() * 1000)}
+    for url in ["http://host.docker.internal:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933", "http://127.0.0.1:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933"]:
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+            urllib.request.urlopen(req, timeout=1)
+            return
+        except Exception:
+            continue
+
 # Exception handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Handler global pour les exceptions non gérées."""
-    logger.error(f"Unhandled exception: {str(exc)}")
+    # #region agent log
+    path = getattr(getattr(request, "url", None), "path", "?") or "?"
+    _debug_log("parsing_main.py:global_exception_handler", "Unhandled exception", {"path": path, "error_type": type(exc).__name__, "error_msg": str(exc)}, "H3")
+    # #endregion
+    logger.exception("Unhandled exception")
+    detail = str(exc) if settings.DEBUG else "Internal server error"
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"}
+        content={"detail": detail},
+        media_type="application/json",
     )

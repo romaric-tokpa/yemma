@@ -304,6 +304,7 @@ services:
     volumes:
       - ./services/candidate:/app
       - ./services/shared:/shared
+      - ./.cursor:/app/.cursor:rw
       - /app/__pycache__
     networks:
       - yemma-network
@@ -331,6 +332,8 @@ services:
       context: ./services
       dockerfile: yemma-parsing-service/Dockerfile
     container_name: yemma-parsing
+    env_file:
+      - .env
     environment:
       # Application
       APP_NAME: yemma-parsing-service
@@ -340,6 +343,7 @@ services:
       # HRFlow API
       HRFLOW_API_KEY: ${HRFLOW_API_KEY:-your-hrflow-api-key}
       HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-ae16505f6f0eebe3abb79ad1bf83ec53b4886432}
+      HRFLOW_USER_EMAIL: ${HRFLOW_USER_EMAIL:-}
       HRFLOW_API_URL: ${HRFLOW_API_URL:-https://api.hrflow.ai/v1}
 
       # Database
@@ -355,6 +359,7 @@ services:
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key}
     volumes:
       - ./services/yemma-parsing-service:/app
+      - ./.cursor:/app/.cursor:rw
       - /app/__pycache__
     networks:
       - yemma-network
@@ -702,8 +707,8 @@ services:
 
   notification:
     build:
-      context: ./services/notification
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: notification/Dockerfile
     container_name: yemma-notification
     env_file:
       - .env
@@ -786,8 +791,8 @@ services:
 
   notification-worker:
     build:
-      context: ./services/notification
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: notification/Dockerfile
     container_name: yemma-notification-worker
     env_file:
       - .env

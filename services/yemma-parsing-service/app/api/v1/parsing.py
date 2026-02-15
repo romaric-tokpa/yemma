@@ -29,7 +29,51 @@ ALLOWED_CONTENT_TYPES = {
     "application/msword": "doc",
 }
 
+# Extension -> type MIME (fallback quand content_type = application/octet-stream)
+EXTENSION_TO_CONTENT_TYPE = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".doc": "application/msword",
+}
+
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+def _resolve_content_type(file: "UploadFile", content_type: str) -> str:
+    """Résout le content-type (fallback sur l'extension si application/octet-stream)."""
+    if content_type and content_type in ALLOWED_CONTENT_TYPES:
+        return content_type
+    filename = (file.filename or "").lower()
+    for ext, mime in EXTENSION_TO_CONTENT_TYPE.items():
+        if filename.endswith(ext):
+            return mime
+    return content_type or "application/octet-stream"
+
+
+def _debug_log(loc: str, msg: str, data: dict, hid: str):
+    import json
+    import time
+    payload = {"location": loc, "message": msg, "data": data, "hypothesisId": hid, "timestamp": int(time.time() * 1000)}
+    for url in ["http://host.docker.internal:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933", "http://127.0.0.1:7243/ingest/1bce2d70-be0c-458b-b590-abb89d1d3933"]:
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+            urllib.request.urlopen(req, timeout=1)
+            return
+        except Exception:
+            continue
+    try:
+        import os
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        for log_path in [os.path.join(base, ".cursor", "debug.log"), "/tmp/yemma_debug.log"]:
+            try:
+                with open(log_path, "a") as f:
+                    f.write(json.dumps(payload) + "\n")
+                return
+            except (OSError, IOError):
+                continue
+    except Exception:
+        pass
 
 
 @router.post(
@@ -51,9 +95,12 @@ async def parse_cv_sync(
     email_override: Optional[str] = Form(default=None, description="Email à utiliser pour le profil")
 ) -> ParsedCVResponse:
     """Parse un CV de manière synchrone."""
+    # #region agent log
+    _debug_log("parsing.py:parse_cv_sync:entry", "POST /cv called", {"filename": getattr(file, "filename", None)}, "H3")
+    # #endregion
 
-    # Validation du type de fichier
-    content_type = file.content_type or "application/octet-stream"
+    # Validation du type de fichier (fallback sur l'extension si content_type générique)
+    content_type = _resolve_content_type(file, file.content_type or "application/octet-stream")
     if content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=400,
@@ -77,6 +124,13 @@ async def parse_cv_sync(
 
     try:
         # Parser via HRFlow
+        from app.core.config import get_settings
+        _settings = get_settings()
+        if not _settings.HRFLOW_API_KEY or _settings.HRFLOW_API_KEY.strip() in ("", "your-hrflow-api-key"):
+            raise HTTPException(
+                status_code=503,
+                detail="Service de parsing non configuré. Définissez HRFLOW_API_KEY et HRFLOW_SOURCE_KEY dans .env"
+            )
         hrflow_client = get_hrflow_client()
         hrflow_data = hrflow_client.parse_cv(file_content, filename, content_type)
 
@@ -92,8 +146,13 @@ async def parse_cv_sync(
         raise HTTPException(status_code=502, detail=f"Erreur du service de parsing: {str(e)}")
 
     except Exception as e:
-        logger.error(f"[API] Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Erreur interne lors du parsing du CV")
+        # #region agent log
+        _debug_log("parsing.py:parse_cv_sync:exception", "Exception in parse_cv_sync", {"error_type": type(e).__name__, "error_msg": str(e)}, "H3")
+        # #endregion
+        logger.exception(f"[API] Unexpected error in parse_cv_sync: {e}")
+        from app.core.config import get_settings
+        detail = str(e) if get_settings().DEBUG else "Erreur interne lors du parsing du CV"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 @router.post(

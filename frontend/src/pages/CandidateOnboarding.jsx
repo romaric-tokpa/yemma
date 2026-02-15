@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import {
   FileText, Upload, Loader2, AlertCircle, CheckCircle2,
   ChevronDown, ChevronUp, Plus, Trash2, Briefcase, GraduationCap,
   Wrench, User, ArrowLeft, Save, Award, Settings, MapPin,
-  Check, Cloud
+  Check, Cloud, ArrowRight, FileCheck, ShieldCheck
 } from 'lucide-react'
 import { candidateApi, documentApi, parsingApi } from '@/services/api'
 import { SearchableSelect } from '@/components/ui/searchable-select'
@@ -27,42 +27,50 @@ import {
 const ACCEPT = '.pdf,.docx'
 const MAX_SIZE_MB = 10
 
-// Stepper compact et professionnel - Charte Yemma
+// Stepper style capture - 6 étapes, charte Yemma (#226D68)
 function OnboardingStepper({ currentStep }) {
   const steps = [
     { key: 'upload', label: 'CV', number: 1 },
-    { key: 'review', label: 'Vérifier', number: 2 },
-    { key: 'success', label: 'Terminé', number: 3 },
+    { key: 'review', label: 'Infos', number: 2 },
+    { key: 'review', label: 'Profil', number: 3 },
+    { key: 'review', label: 'Recherche', number: 4 },
+    { key: 'review', label: 'Mobilité', number: 5 },
+    { key: 'success', label: 'Photo', number: 6 },
   ]
-  const currentIndex = steps.findIndex(s => s.key === currentStep)
+  const currentIndex = currentStep === 'upload' ? 0 : currentStep === 'review' ? 1 : 5
+  const allComplete = currentStep === 'success'
   return (
-    <nav aria-label="Progression" className="w-full max-w-md mx-auto">
-      <ol className="flex items-center justify-between gap-0.5">
+    <nav aria-label="Progression" className="w-full max-w-2xl mx-auto px-2">
+      <ol className="flex items-center justify-between gap-0">
         {steps.map((s, i) => {
-          const isDone = currentIndex > i
-          const isActive = currentIndex === i
+          const isDone = allComplete || currentIndex > i
+          const isActive = !allComplete && currentIndex === i
+          const circleColor = isDone
+            ? 'bg-[#226D68] text-white'
+            : isActive
+            ? 'bg-[#226D68] text-white ring-2 ring-[#226D68]/30'
+            : 'bg-[#F4F6F8] text-[#6b7280]'
+          const labelColor = isActive ? 'text-[#226D68] font-semibold' : 'text-[#2C2C2C]'
           return (
-            <li key={s.key} className="flex items-center gap-1 flex-1 min-w-0">
-              <span
-                className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
-                  isDone 
-                    ? 'bg-[#226D68] text-white shadow-sm' 
-                    : isActive 
-                    ? 'bg-[#226D68] text-white ring-2 ring-[#226D68]/30 shadow-sm' 
-                    : 'bg-[#E8F4F3] text-gray-400'
-                }`}
-              >
-                {isDone ? <Check className="w-2.5 h-2.5" /> : s.number}
-              </span>
-              <span className={`text-[10px] truncate ${isActive ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>{s.label}</span>
-              {i < steps.length - 1 && (
-                <span 
-                  className={`flex-shrink-0 flex-1 h-px mx-1 hidden sm:block transition-colors ${
-                    isDone ? 'bg-[#226D68]' : 'bg-[#E8F4F3]'
-                  }`} 
-                  aria-hidden 
-                />
-              )}
+            <li key={`${s.key}-${i}`} className="flex items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center flex-1 min-w-0">
+                <div className="flex items-center w-full">
+                  <span
+                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${circleColor}`}
+                  >
+                    {isDone ? <Check className="w-4 h-4" strokeWidth={2.5} /> : s.number}
+                  </span>
+                  {i < steps.length - 1 && (
+                    <span
+                      className={`flex-1 h-0.5 mx-1 min-w-[8px] transition-colors ${
+                        isDone ? 'bg-[#226D68]' : 'bg-[#E5E7EB]'
+                      }`}
+                      aria-hidden
+                    />
+                  )}
+                </div>
+                <span className={`text-xs mt-1.5 truncate max-w-full ${labelColor}`}>{s.label}</span>
+              </div>
             </li>
           )
         })}
@@ -438,27 +446,28 @@ export default function CandidateOnboarding() {
     const ext = file?.name?.split('.').pop()?.toLowerCase()
     const isPdf = ext === 'pdf'
     return (
-      <div className="min-h-screen bg-gray-light flex flex-col items-center justify-center p-4 sm:p-5 safe-x safe-y">
-        <div className="w-full max-w-[480px]">
-          <div className="mb-4">
+      <div className="min-h-screen min-h-[100dvh] bg-[#F4F6F8] flex flex-col items-center pt-6 sm:pt-8 pb-8 px-4 safe-x safe-y">
+          <div className="w-full max-w-xl">
             <OnboardingStepper currentStep="upload" />
-          </div>
-          <Card className="border border-border shadow-sm rounded-lg overflow-hidden bg-card">
-            <div className="bg-gradient-to-r from-[#226D68] to-[#1a5a55] text-white px-4 py-3">
-              <h1 className="text-base font-bold">1. Déposez votre CV</h1>
-              <p className="text-white/90 text-[10px] mt-0.5">On l’analyse pour remplir votre profil automatiquement.</p>
-            </div>
-            <CardContent className="p-3 space-y-3">
-              <div
-                role="button"
+          <Card className="mt-6 sm:mt-8 border border-[#E5E7EB] shadow-sm rounded-xl bg-white overflow-hidden">
+              <CardContent className="p-6 sm:p-8 space-y-6">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] font-heading">
+                  Importez votre CV
+                </h1>
+                <div
+                  role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('cv-upload')?.click() } }}
                 onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files?.[0]) }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
                 onClick={() => !hasFile && document.getElementById('cv-upload')?.click()}
-                className={`min-h-[140px] rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68] focus-visible:ring-offset-2 ${
-                  hasFile ? 'border-[#226D68] bg-[#E8F4F3]/30' : dragOver ? 'border-[#226D68] bg-[#E8F4F3]/50 scale-[1.01]' : 'border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20 hover:border-[#226D68]/50'
+                className={`min-h-[160px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68] focus-visible:ring-offset-2 ${
+                  hasFile
+                    ? 'border-[#226D68] bg-[#E8F4F3]/40'
+                    : dragOver
+                    ? 'border-[#226D68] bg-[#E8F4F3]/60'
+                    : 'border-[#D1D5DB] bg-[#F9FAFB] hover:border-[#226D68]/50 hover:bg-[#E8F4F3]/20'
                 }`}
               >
                 <input type="file" id="cv-upload" accept={ACCEPT} onChange={(e) => handleFile(e.target.files?.[0])} className="hidden" />
@@ -479,29 +488,51 @@ export default function CandidateOnboarding() {
                   </>
                 ) : (
                   <>
-                    {dragOver ? <Cloud className="w-10 h-10 text-primary mb-2" /> : <Upload className="w-10 h-10 text-muted-foreground mb-2" />}
-                    <p className="font-medium text-sm text-gray-anthracite">Glissez votre CV ici</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">ou cliquez pour choisir · PDF ou DOCX</p>
+                    {dragOver ? <Cloud className="w-12 h-12 text-[#226D68] mb-3" /> : <Upload className="w-12 h-12 text-[#6b7280] mb-3" />}
+                    <p className="font-medium text-base text-[#2C2C2C]">Déposer mon CV</p>
+                    <p className="text-sm text-[#6b7280] mt-1">PDF ou DOCX · max {MAX_SIZE_MB} Mo</p>
                   </>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground text-center">Max {MAX_SIZE_MB} Mo</p>
-              {error && (
-                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive" role="alert">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs">{error}</p>
+                <a
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); document.getElementById('cv-upload')?.click() }}
+                  className="block text-center text-sm font-medium text-[#226D68] hover:text-[#1a5a55] underline"
+                >
+                  Pas de CV ? Complétez manuellement à l&apos;étape suivante.
+                </a>
+                <div className="space-y-3">
+                  <div className="flex gap-3 p-4 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB]">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center">
+                      <FileCheck className="w-5 h-5 text-[#226D68]" />
+                    </div>
+                    <p className="text-sm text-[#2C2C2C] leading-relaxed">
+                      Cette étape n&apos;est pas obligatoire à ce stade, mais fortement conseillée, car elle vous évitera de saisir manuellement vos expériences, formations et compétences.
+                    </p>
+                  </div>
+                  <div className="flex gap-3 p-4 rounded-lg border border-[#E5E7EB] bg-[#F9FAFB]">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center">
+                      <ShieldCheck className="w-5 h-5 text-[#226D68]" />
+                    </div>
+                    <p className="text-sm text-[#2C2C2C] leading-relaxed">
+                      Pas d&apos;inquiétude, votre CV n&apos;est jamais divulgué à un recruteur sans votre accord. Conformité RGPD garantie.
+                    </p>
+                  </div>
                 </div>
-              )}
+                {error && (
+                  <div className="flex items-start gap-2 p-4 rounded-lg bg-red-50 border border-red-200 text-red-600" role="alert">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm">{error}</p>
+                  </div>
+                )}
               <Button
                 type="button"
                 onClick={onParseCv}
                 disabled={!file || loading}
-                className="w-full h-10 text-sm bg-primary hover:bg-primary/90 text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 rounded-lg"
-                style={{ backgroundColor: '#226D68' }}
+                className="w-full h-12 text-base font-semibold bg-[#226D68] hover:bg-[#1a5a55] text-white focus-visible:ring-2 focus-visible:ring-[#226D68] focus-visible:ring-offset-2 disabled:opacity-50 rounded-lg transition-colors"
               >
-                {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden />Analyse en cours…</> : <><CheckCircle2 className="w-4 h-4 mr-2" aria-hidden />Analyser mon CV</>}
+                {loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" aria-hidden />Analyse en cours…</> : <>Continuer <ArrowRight className="w-5 h-5 ml-2 inline" /></>}
               </Button>
-              <p className="text-[11px] text-center text-muted-foreground leading-tight">Données analysées de façon sécurisée. Modifiable à l’étape suivante. Propulsé par Hrflow.ai</p>
             </CardContent>
           </Card>
         </div>
@@ -509,10 +540,10 @@ export default function CandidateOnboarding() {
     )
   }
 
-  // Étape 3 : Succès — Compact et professionnel
+  // Étape 3 : Succès — Charte Yemma
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-gray-light flex flex-col items-center justify-center p-4 safe-x safe-y">
+      <div className="min-h-screen min-h-[100dvh] bg-[#F4F6F8] flex flex-col items-center justify-center p-4 safe-x safe-y">
         <div className="w-full max-w-sm text-center">
           <OnboardingStepper currentStep="success" />
           <div className="mt-5 animate-in fade-in duration-300">
@@ -533,9 +564,9 @@ export default function CandidateOnboarding() {
     )
   }
 
-  // Étape 2 : Révision — Compact et professionnel
+  // Étape 2 : Révision — Charte Yemma
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-gray-light py-3 sm:py-4 px-4 sm:px-5 safe-x safe-y safe-bottom overflow-x-hidden">
+    <div className="min-h-screen min-h-[100dvh] bg-[#F4F6F8] flex flex-col py-3 sm:py-4 px-4 sm:px-5 safe-x safe-y safe-bottom overflow-x-hidden">
       <div className="max-w-3xl mx-auto space-y-2.5 min-w-0">
         <OnboardingStepper currentStep="review" />
           <div className="flex items-center justify-between gap-2 mb-2">

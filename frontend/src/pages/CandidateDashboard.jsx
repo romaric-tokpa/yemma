@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { 
   User, Edit, FileText, CheckCircle2, Clock, XCircle, 
   Briefcase, GraduationCap, Award, Code, MapPin, Star,
   Plus, Trash2, Eye, Mail, Phone, Calendar, LogOut,
   Home, Settings, Menu, X, TrendingUp, Users, FileCheck,
   Flag, Download, Image as ImageIcon, Loader2, Upload,
-  Wrench, Sparkles, BarChart3
+  Wrench, Sparkles, BarChart3, HelpCircle, Target, Search
 } from 'lucide-react'
 import { candidateApi, authApiService, documentApi } from '../services/api'
 import { Button } from '../components/ui/button'
@@ -32,15 +32,22 @@ import {
 } from '../utils/profilePayloads'
 import { formatDateTime } from '../utils/dateUtils'
 
-// Générer un avatar par défaut basé sur les initiales
-const generateAvatarUrl = (firstName, lastName) => {
-  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U'
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=200&background=random&color=fff&bold=true`
+// Charte graphique Yemma (landing)
+const CHARTE = {
+  vert: '#226D68',
+  vertClair: '#E8F4F3',
+  coral: '#e76f51',
+  texte: '#2C2C2C',
+  fond: '#F4F6F8',
 }
 
-// Générer un avatar par défaut pour les logos d'entreprises
+const generateAvatarUrl = (firstName, lastName) => {
+  const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U'
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&size=200&background=226D68&color=fff&bold=true`
+}
+
 const generateCompanyLogoUrl = (companyName) => {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(companyName || 'Company')}&size=100&background=random&color=fff&bold=true`
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(companyName || 'Company')}&size=100&background=e8f4f3&color=226D68&bold=true`
 }
 
 export default function CandidateDashboard() {
@@ -56,7 +63,7 @@ export default function CandidateDashboard() {
   const [skills, setSkills] = useState([])
   const [jobPreferences, setJobPreferences] = useState(null)
   const [documents, setDocuments] = useState([])
-  const [activeTab, setActiveTab] = useState('profile')
+  const [activeTab, setActiveTab] = useState('dashboard')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   
   // États pour les modales
@@ -117,10 +124,10 @@ export default function CandidateDashboard() {
     loadProfile()
     // Définir l'onglet actif selon l'URL ou le hash
     const hash = location.hash.replace('#', '')
-    if (hash && ['profile', 'experiences', 'educations', 'certifications', 'skills', 'preferences', 'documents'].includes(hash)) {
+    if (hash && ['dashboard', 'profile', 'experiences', 'educations', 'certifications', 'skills', 'preferences', 'documents'].includes(hash)) {
       setActiveTab(hash)
     } else {
-      setActiveTab('profile') // Par défaut, afficher le profil
+      setActiveTab('dashboard')
     }
   }, [location])
 
@@ -211,7 +218,9 @@ export default function CandidateDashboard() {
         setToast({ message: 'Impossible de joindre le serveur. Vérifiez votre connexion.', type: 'error' })
         return
       }
-      setToast({ message: 'Erreur lors du chargement du profil.', type: 'error' })
+      const detail = error.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : 'Erreur lors du chargement du profil.'
+      setToast({ message: msg, type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -431,149 +440,333 @@ export default function CandidateDashboard() {
     ? currentPhotoUrl 
     : defaultAvatar
 
-  // Navigation principale : 7 sections (sidebar = menu compte)
+  // Navigation principale (style Freelance Republik)
   const navItems = [
-    { id: 'profile', label: 'Identité', icon: User },
+    { id: 'dashboard', label: 'Mon dashboard', icon: Home },
+    { id: 'profile', label: 'Mon profil', icon: User },
+    { id: 'situation', label: 'Ma situation', icon: Search },
+    { id: 'preferences', label: 'Préférences emploi', icon: Target },
+    { id: 'documents', label: 'Mon CV', icon: FileText },
     { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
     { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
-    { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
     { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
-    { id: 'preferences', label: 'Recherche', icon: MapPin },
-    { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
+    { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
   ]
 
+  // Checklist complétion (alignée BRIEF)
+  const completionChecklist = [
+    { key: 'preferences', label: 'Préférences emploi', done: !!(jobPreferences?.desired_positions?.length && jobPreferences?.contract_types?.length && jobPreferences?.availability) },
+    { key: 'photo', label: 'Photo de profil', done: !!(currentPhotoUrl && !currentPhotoUrl.includes('ui-avatars.com')) },
+    { key: 'summary', label: 'Description', done: !!(profile?.professional_summary && profile.professional_summary.length >= 300) },
+    { key: 'skills', label: 'Compétences clés', done: skills.filter(s => s.skill_type === 'TECHNICAL').length > 0 },
+    { key: 'skills_any', label: 'Compétences', done: skills.length > 0 },
+    { key: 'experiences', label: 'Expériences', done: experiences.length > 0 },
+    { key: 'educations', label: 'Formations', done: educations.length > 0 },
+  ]
+
+  const cvDoc = documents?.find(d => d.document_type === 'CV')
+  const minCompletionForSubmit = 80
+
   return (
-    <div className="h-screen bg-gray-light flex overflow-hidden max-h-[100dvh] max-h-screen safe-top safe-bottom">
-      <a href="#dashboard-main" className="absolute left-[-9999px] top-2 z-[100] px-3 py-2 bg-primary text-white rounded-md font-medium text-sm focus:left-2 focus:inline-block focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+    <div className="min-h-screen flex flex-col bg-[#F4F6F8]">
+      <a href="#dashboard-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:px-3 focus:py-2 focus:bg-[#226D68] focus:text-white focus:rounded-md">
         Aller au contenu principal
       </a>
-      {/* Sidebar compacte et professionnelle */}
-      <aside className={`
-        fixed lg:static inset-y-0 left-0 z-50
-        bg-card border-r border-border shadow-xl lg:shadow-none
-        transition-[transform,width] duration-300 ease-out
-        flex flex-col safe-left
-        ${sidebarOpen
-          ? 'w-[min(240px,75vw)] sm:w-56 translate-x-0 lg:w-56'
-          : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16 lg:min-w-[4rem]'
-        }
-      `}
-        aria-label="Menu principal"
-        aria-hidden={!sidebarOpen}
-      >
-        {/* Header Sidebar compact */}
-        <div className="h-12 border-b border-border flex items-center justify-between px-3 shrink-0 safe-top bg-[#E8F4F3]/30">
-          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'justify-center w-full'}`}>
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#226D68] shrink-0">
-              <Users className="w-3.5 h-3.5 text-white" />
+
+      {/* Top bar - Logo, progression, user */}
+      <header className="sticky top-0 z-30 bg-white border-b border-neutral-200 shadow-sm safe-top">
+        <div className="flex items-center justify-between gap-4 px-4 py-3 max-w-7xl mx-auto">
+          <Link to="/" className="flex items-center gap-2 shrink-0">
+            <span className="font-bold text-[#226D68]">Yemma</span>
+            <span className="font-bold text-[#e76f51]">-Solutions</span>
+          </Link>
+
+          <div className="flex-1 max-w-md mx-4 hidden sm:block">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-xs font-medium text-[#2C2C2C]">Complétez votre profil</span>
+              <span className="text-xs font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
             </div>
-            {sidebarOpen && (
-              <span className="font-bold text-sm text-gray-900">Yemma</span>
-            )}
+            <Progress value={completionPercentage} className="h-2 bg-[#E8F4F3] [&>div]:bg-[#226D68]" />
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            className="h-7 w-7 shrink-0 hover:bg-muted"
-            title={sidebarOpen ? 'Réduire' : 'Agrandir'}
-          >
-            {sidebarOpen ? <X className="w-3.5 h-3.5" /> : <Menu className="w-3.5 h-3.5" />}
-          </Button>
-        </div>
 
-        {/* Espace flexible */}
-        <div className="flex-1" />
-
-        {/* Footer Sidebar compact */}
-        <div className="border-t border-border p-2 space-y-1.5 shrink-0 safe-bottom">
-          <div className={`flex items-center ${sidebarOpen ? 'gap-2' : 'justify-center'} p-1.5 rounded-lg hover:bg-muted/50 transition-colors`}>
-            <div className="relative shrink-0">
-              <img
-                src={displayPhoto}
-                alt={`Photo de profil de ${fullName}`}
-                className="w-8 h-8 rounded-lg object-cover border border-border"
-                onError={(e) => {
-                  if (!photoError && e.target.src !== defaultAvatar) {
-                    setPhotoError(true)
-                    e.target.src = defaultAvatar
-                  } else if (e.target.src !== defaultAvatar) {
-                    e.target.src = defaultAvatar
-                  }
-                }}
-                onLoad={() => {
-                  if (photoError && currentPhotoUrl) {
-                    setPhotoError(false)
-                  }
-                }}
-              />
-              {profile?.status && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card"
-                  style={{ 
-                    backgroundColor: profile.status === 'VALIDATED' ? '#22c55e' : 
-                                  profile.status === 'REJECTED' ? '#ef4444' : 
-                                  profile.status === 'IN_REVIEW' ? '#f59e0b' : '#94a3b8'
-                  }}
-                />
+          <div className="flex items-center gap-2 shrink-0">
+            <Link to="/contact" className="p-2 rounded-lg hover:bg-[#E8F4F3] text-[#2C2C2C]" title="Centre d'aide">
+              <HelpCircle className="h-5 w-5" />
+            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[#E8F4F3]"
+                aria-expanded={userMenuOpen}
+              >
+                <img src={displayPhoto} alt="" className="w-8 h-8 rounded-lg object-cover border border-neutral-200" onError={(e) => { e.target.src = defaultAvatar }} />
+              </button>
+              {userMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 py-2 w-48 bg-white rounded-lg shadow-lg border border-neutral-200 z-50">
+                    <div className="px-3 py-2 border-b border-neutral-100">
+                      <p className="font-medium text-sm text-[#2C2C2C] truncate">{fullName}</p>
+                      <p className="text-xs text-neutral-500 truncate">{profile?.email}</p>
+                    </div>
+                    <Button variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-50" onClick={handleLogout}>
+                      <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
-            {sidebarOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate text-gray-900">{fullName}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{profile.email}</p>
-              </div>
-            )}
           </div>
-          <Button
-            variant="ghost"
-            className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'} text-red-600 hover:text-red-700 hover:bg-red-50 h-8 text-xs px-2`}
-            onClick={handleLogout}
-            title={!sidebarOpen ? 'Déconnexion' : ''}
-          >
-            <LogOut className="w-3.5 h-3.5 shrink-0" />
-            {sidebarOpen && <span className="ml-1.5">Déconnexion</span>}
-          </Button>
         </div>
-      </aside>
+      </header>
 
-      {/* Overlay pour mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <div className="flex flex-1">
+        {/* Sidebar gauche - fond sombre (charte) */}
+        <aside className={`
+          fixed lg:static inset-y-0 left-0 z-40 w-64 flex flex-col
+          bg-[#2C2C2C] text-white
+          transition-transform duration-300 lg:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
+          <div className="p-4 border-b border-white/10">
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-white/10">
+              <X className="h-5 w-5" />
+            </button>
+            <nav className="mt-4 space-y-0.5">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const isActive = activeTab === item.id || (item.id === 'situation' && activeTab === 'preferences')
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id === 'situation' ? 'preferences' : item.id)
+                      window.innerWidth < 1024 && setSidebarOpen(false)
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-sm font-medium transition-colors ${
+                      isActive ? 'bg-[#226D68] text-white' : 'text-white/90 hover:bg-white/10'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                    {item.count != null && item.count > 0 && (
+                      <span className="ml-auto text-xs opacity-80">{item.count}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+          <div className="flex-1" />
+          <div className="p-4 border-t border-white/10">
+            <Link to="/contact" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-white/80">
+              <HelpCircle className="h-4 w-4" />
+              Besoin d'aide ?
+            </Link>
+          </div>
+        </aside>
 
-      {/* Bouton menu mobile flottant (visible quand sidebar fermée sur mobile) */}
-      {!sidebarOpen && (
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setSidebarOpen(true)}
-          className="fixed bottom-4 left-4 z-50 lg:hidden h-12 w-12 rounded-full shadow-lg bg-white border-[#226D68] hover:bg-[#E8F4F3]"
-          aria-label="Ouvrir le menu"
-        >
-          <Menu className="h-5 w-5 text-[#226D68]" />
-        </Button>
-      )}
+        {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+        {!sidebarOpen && (
+          <Button variant="outline" size="icon" onClick={() => setSidebarOpen(true)} className="fixed bottom-4 left-4 z-50 lg:hidden h-12 w-12 rounded-full shadow-lg bg-white border-[#226D68]">
+            <Menu className="h-5 w-5 text-[#226D68]" />
+          </Button>
+        )}
 
-      {/* Main Content */}
-      <main id="dashboard-main" className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-light min-w-0" aria-label="Contenu du profil">
-        <div className="container mx-auto px-4 py-3 sm:px-5 md:px-6 lg:px-8 max-w-7xl safe-x">
-          {/* Alerte statut IN_REVIEW compacte */}
-          {profile?.status === 'IN_REVIEW' && (
-            <div className="mb-3 rounded-lg border-l-3 border-l-amber-500 bg-amber-50/80 p-2.5 flex items-start gap-2" role="status">
-              <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-amber-900 text-xs mb-0.5">Profil en cours de validation</p>
-                <p className="text-[10px] text-amber-800">Notre équipe examine votre dossier. Vous serez contacté prochainement.</p>
+        {/* Main + Right sidebar */}
+        <div className="flex flex-1 min-w-0">
+          <main id="dashboard-main" className="flex-1 overflow-y-auto min-w-0 bg-[#F4F6F8]" aria-label="Contenu du profil">
+            <div className="max-w-4xl mx-auto px-4 py-6 lg:px-8 safe-x">
+          {/* Vue Dashboard (style capture) */}
+          {activeTab === 'dashboard' && (
+            <>
+              <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] mb-1 font-heading">Mon dashboard</h1>
+              <p className="text-[#6b7280] mb-6">
+                {fullName}, complétez votre profil pour rejoindre la CVthèque de candidats vérifiés et être visible auprès des recruteurs.
+              </p>
+
+              {profile?.status === 'IN_REVIEW' && (
+                <div className="mb-4 rounded-lg border-l-4 border-amber-500 bg-amber-50/80 p-3 flex items-start gap-2" role="status">
+                  <Clock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-900 text-sm">Profil en cours de validation</p>
+                    <p className="text-xs text-amber-800">Notre équipe examine votre dossier. Vous serez contacté prochainement.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Carte complétion profil */}
+              <Card className="mb-6 overflow-hidden border border-neutral-200 bg-white">
+                <CardContent className="p-5">
+                  <div className="flex flex-col sm:flex-row gap-6 items-start">
+                    <div className="flex flex-col items-center shrink-0">
+                      <div className="relative w-24 h-24">
+                        <svg className="w-24 h-24 -rotate-90" viewBox="0 0 36 36">
+                          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#E8F4F3" strokeWidth="3" />
+                          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#226D68" strokeWidth="3" strokeDasharray={`${completionPercentage}, 100`} strokeLinecap="round" />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
+                      </div>
+                      <span className="text-xs font-medium text-[#6b7280] mt-2">Complétion</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#2C2C2C] mb-4">
+                        Complétez votre profil à <strong>{minCompletionForSubmit}% minimum</strong> pour le soumettre à validation et entrer dans la CVthèque.
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {completionChecklist.map((item) => (
+                          <span key={item.key} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${item.done ? 'bg-[#E8F4F3] text-[#226D68]' : 'bg-neutral-100 text-neutral-500'}`}>
+                            {item.done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                            {item.label}
+                          </span>
+                        ))}
+                      </div>
+                      {profile?.status === 'DRAFT' && (
+                        <Button
+                          onClick={() => setShowSubmitConsentModal(true)}
+                          disabled={!canSubmit}
+                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                        >
+                          Soumettre mon profil
+                          <FileCheck className="ml-2 h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Grille de cartes d'actions */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                <Card className="border border-neutral-200 overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                        <Search className="h-5 w-5 text-[#226D68]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#2C2C2C] text-sm mb-1">Ma situation</p>
+                        <Badge className={`text-xs ${jobPreferences?.availability ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {jobPreferences?.availability || 'À compléter'}
+                        </Badge>
+                        <p className="text-xs text-[#6b7280] mt-2">Disponibilité et préférences de recherche d'emploi.</p>
+                        <Button variant="link" className="h-auto p-0 mt-2 text-[#226D68] text-xs font-medium" onClick={() => setShowPreferencesDialog(true)}>
+                          Mettre à jour →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-neutral-200 overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                        <FileText className="h-5 w-5 text-[#226D68]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#2C2C2C] text-sm mb-1">Mon CV</p>
+                        <Badge className={cvDoc ? 'bg-[#E8F4F3] text-[#226D68]' : 'bg-amber-100 text-amber-800'}>
+                          {cvDoc ? `Importé le ${new Date(cvDoc.created_at).toLocaleDateString('fr-FR')}` : 'À uploader'}
+                        </Badge>
+                        <p className="text-xs text-[#6b7280] mt-2">Un CV à jour augmente vos chances d'être contacté.</p>
+                        <Button variant="link" className="h-auto p-0 mt-2 text-[#226D68] text-xs font-medium" onClick={() => setShowDocumentDialog(true)}>
+                          Uploader →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-neutral-200 overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                        <Briefcase className="h-5 w-5 text-[#226D68]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#2C2C2C] text-sm mb-1">Expériences</p>
+                        <Badge className={experiences.length > 0 ? 'bg-[#E8F4F3] text-[#226D68]' : 'bg-amber-100 text-amber-800'}>
+                          {experiences.length}
+                        </Badge>
+                        <p className="text-xs text-[#6b7280] mt-2">Vos expériences professionnelles renforcent votre profil.</p>
+                        <Button variant="link" className="h-auto p-0 mt-2 text-[#226D68] text-xs font-medium" onClick={() => setActiveTab('experiences')}>
+                          {experiences.length > 0 ? 'Modifier' : 'Ajouter'} →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-neutral-200 overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                        <GraduationCap className="h-5 w-5 text-[#226D68]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#2C2C2C] text-sm mb-1">Formations</p>
+                        <Badge className={educations.length > 0 ? 'bg-[#E8F4F3] text-[#226D68]' : 'bg-amber-100 text-amber-800'}>
+                          {educations.length}
+                        </Badge>
+                        <p className="text-xs text-[#6b7280] mt-2">Diplômes et parcours académique.</p>
+                        <Button variant="link" className="h-auto p-0 mt-2 text-[#226D68] text-xs font-medium" onClick={() => setActiveTab('educations')}>
+                          {educations.length > 0 ? 'Modifier' : 'Ajouter'} →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-neutral-200 overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                        <Code className="h-5 w-5 text-[#226D68]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#2C2C2C] text-sm mb-1">Compétences</p>
+                        <Badge className={skills.length > 0 ? 'bg-[#E8F4F3] text-[#226D68]' : 'bg-amber-100 text-amber-800'}>
+                          {skills.length}
+                        </Badge>
+                        <p className="text-xs text-[#6b7280] mt-2">Compétences techniques et transversales.</p>
+                        <Button variant="link" className="h-auto p-0 mt-2 text-[#226D68] text-xs font-medium" onClick={() => setActiveTab('skills')}>
+                          {skills.length > 0 ? 'Modifier' : 'Ajouter'} →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-neutral-200 overflow-hidden hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                        <Award className="h-5 w-5 text-[#226D68]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#2C2C2C] text-sm mb-1">Certifications</p>
+                        <Badge className={certifications.length > 0 ? 'bg-[#E8F4F3] text-[#226D68]' : 'bg-amber-100 text-amber-800'}>
+                          {certifications.length}
+                        </Badge>
+                        <p className="text-xs text-[#6b7280] mt-2">Certifications et attestations.</p>
+                        <Button variant="link" className="h-auto p-0 mt-2 text-[#226D68] text-xs font-medium" onClick={() => setActiveTab('certifications')}>
+                          {certifications.length > 0 ? 'Modifier' : 'Ajouter'} →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
+            </>
           )}
 
-          {/* Header principal compact */}
-          <div className="mb-3">
-            <Card className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+          {/* Contenu des onglets (profile, experiences, etc.) - masqué en vue dashboard */}
+          {activeTab !== 'dashboard' && (
+          <>
+          {/* Header profil (visible hors dashboard) */}
+          <div className="mb-4">
+            <Card className="rounded-lg border border-neutral-200 bg-white shadow-sm overflow-hidden">
               {/* Bandeau de statut */}
               <div 
                 className="h-0.5"
@@ -753,38 +946,32 @@ export default function CandidateDashboard() {
             </Card>
           </div>
 
-          {/* Barre d'onglets compacte - responsive avec scroll horizontal sur mobile */}
-          <Tabs value={activeTab} onValueChange={(value) => { setActiveTab(value); navigate({ hash: `#${value}` }) }} className="w-full">
-            <div className="relative">
-              {/* Indicateur de scroll gauche */}
-              <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-gray-light to-transparent z-10 pointer-events-none sm:hidden" />
-              {/* Indicateur de scroll droite */}
-              <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-gray-light to-transparent z-10 pointer-events-none sm:hidden" />
-
-              <TabsList className="w-full justify-start h-auto p-0.5 bg-[#E8F4F3]/30 border border-border rounded-lg overflow-x-auto scrollbar-hide flex-nowrap touch-pan-x">
-                {navItems.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <TabsTrigger
-                      key={item.id}
-                      value={item.id}
-                      className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-2 sm:py-1.5 text-[11px] sm:text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all hover:bg-muted data-[state=active]:hover:bg-[#1a5a55] min-h-[40px] sm:min-h-0"
-                    >
-                      <Icon className="w-4 h-4 sm:w-3.5 sm:h-3.5 shrink-0" />
-                      <span className="whitespace-nowrap hidden xs:inline sm:inline">{item.label}</span>
-                      {item.count != null && item.count > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-0.5 sm:ml-1 h-4 px-1 text-[10px] font-medium data-[state=active]:bg-white/20 data-[state=active]:text-white"
-                        >
-                          {item.count}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  )
-                })}
-              </TabsList>
-            </div>
+          {/* Barre d'onglets - sections détaillées */}
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); navigate({ hash: `#${v}` }) }} className="w-full">
+            <TabsList className="w-full justify-start h-auto p-0.5 bg-[#E8F4F3]/30 border border-neutral-200 rounded-lg overflow-x-auto flex-wrap gap-1">
+              {[
+                { id: 'profile', label: 'Profil', icon: User },
+                { id: 'preferences', label: 'Préférences', icon: Target },
+                { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
+                { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
+                { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
+                { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
+                { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
+              ].map((item) => {
+                const Icon = item.icon
+                return (
+                  <TabsTrigger
+                    key={item.id}
+                    value={item.id}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white rounded-md"
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {item.label}
+                    {item.count != null && item.count > 0 && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{item.count}</Badge>}
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
 
               {/* Contenu des onglets */}
               <TabsContent value="profile" className="mt-3">
@@ -2257,6 +2444,8 @@ export default function CandidateDashboard() {
                 </Card>
               </TabsContent>
             </Tabs>
+          </>
+          )}
 
           {/* Footer avec dates du profil */}
           {(profile?.created_at || profile?.updated_at || profile?.submitted_at) && (
@@ -2276,6 +2465,30 @@ export default function CandidateDashboard() {
           )}
         </div>
       </main>
+
+      {/* Sidebar droite - Message Yemma (visible sur desktop) */}
+      <aside className="hidden xl:block w-80 shrink-0 border-l border-neutral-200 bg-white p-5 overflow-y-auto">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-[#E8F4F3] flex items-center justify-center">
+            <Users className="h-5 w-5 text-[#226D68]" />
+          </div>
+          <div>
+            <p className="font-semibold text-sm text-[#2C2C2C]">Yemma Solutions</p>
+            <p className="text-xs text-[#6b7280]">Votre parcours candidat</p>
+          </div>
+        </div>
+        <div className="space-y-3 text-sm text-[#2C2C2C] leading-relaxed">
+          <p>Bonjour {profile?.first_name || 'Candidat'}, bienvenue sur votre espace !</p>
+          <p>Pour rejoindre la <strong className="text-[#226D68]">CVthèque de candidats vérifiés</strong>, complétez votre profil puis soumettez-le. Notre équipe examinera votre dossier et vous contactera pour un entretien.</p>
+          <p className="text-xs text-[#6b7280]">Une fois validé, votre profil sera visible auprès des entreprises et recruteurs qui recherchent des talents comme vous.</p>
+          <Link to="/contact" className="inline-flex items-center gap-1.5 text-[#226D68] font-medium text-xs hover:underline mt-2">
+            <HelpCircle className="h-3.5 w-3.5" />
+            Une question ? Contactez-nous
+          </Link>
+        </div>
+      </aside>
+    </div>
+    </div>
 
       {/* Toast (succès / erreur) */}
       {toast && (
