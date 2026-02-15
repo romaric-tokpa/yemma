@@ -42,12 +42,11 @@ async def get_session() -> AsyncSession:
 
 
 async def init_db():
-    """Initialise la base de données (création des tables)
-    
-    Note: En production, utilisez Alembic pour gérer les migrations.
-    Cette fonction ne devrait être utilisée qu'en développement.
-    """
-    # Ne pas créer automatiquement les tables - utiliser Alembic à la place
-    # Les migrations Alembic sont gérées séparément
-    pass
+    """Initialise la base de données (création des tables)"""
+    async with engine.begin() as conn:
+        # Import des modèles pour que SQLModel les enregistre
+        from app.domain.models import Profile, Experience, Education, Certification, Skill, JobPreference
+
+        # Création des tables
+        await conn.run_sync(SQLModel.metadata.create_all)
 
