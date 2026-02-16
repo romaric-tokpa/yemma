@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom'
+import { Linkedin } from 'lucide-react'
 import { ROUTES } from '@/constants/routes'
+
+const LINKEDIN_URL = 'https://www.linkedin.com/company/yemma-solutions/'
 
 /**
  * Footer public uniforme pour toutes les pages landing (/, /candidat, /contact, /legal/*)
@@ -23,6 +26,17 @@ export default function PublicFooter() {
                 <Link to={ROUTES.CONTACT} className="hover:text-[#226D68] transition-colors">
                   Contact
                 </Link>
+              </li>
+              <li>
+                <a
+                  href={LINKEDIN_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 hover:text-[#226D68] transition-colors"
+                >
+                  <Linkedin className="w-4 h-4" />
+                  LinkedIn
+                </a>
               </li>
             </ul>
           </div>

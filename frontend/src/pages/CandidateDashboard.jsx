@@ -38,6 +38,7 @@ import {
 } from '../utils/profilePayloads'
 import { formatDateTime } from '../utils/dateUtils'
 import SupportWidget from '../components/candidate/SupportWidget'
+import { Toast } from '../components/common/Toast'
 
 // Charte graphique Yemma (landing)
 const CHARTE = {
@@ -2589,17 +2590,12 @@ export default function CandidateDashboard() {
     </div>
 
       {/* Toast (succès / erreur) */}
-      {toast && (
-        <div
-          role="alert"
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-[12px] shadow-lg border text-sm font-medium text-white max-w-[90vw] ${
-            toast.type === 'success' ? 'bg-primary border-primary/80' : 'bg-red-600 border-red-700'
-          }`}
-          style={toast.type === 'success' ? { backgroundColor: '#226D68' } : {}}
-        >
-          {toast.message}
-        </div>
-      )}
+      <Toast
+        message={toast?.message}
+        type={toast?.type || 'success'}
+        visible={!!toast}
+        onClose={() => setToast(null)}
+      />
 
       {/* Modale de confirmation (suppression, déconnexion) */}
       <Dialog open={!!confirmDialog} onOpenChange={(open) => !open && setConfirmDialog(null)}>

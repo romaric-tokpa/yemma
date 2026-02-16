@@ -76,6 +76,35 @@ curl -s http://localhost:8003/health
 # doit retourner du JSON (ex: {"status":"healthy","service":"document-service",...})
 ```
 
+### Diagnostic : erreur 500 sur archivage/validation admin (`POST /api/v1/admin/archive/...`)
+
+L’endpoint d’archivage appelle le **service candidat**. Si le service candidat n’est pas démarré, vous obtiendrez une erreur 500.
+
+**1. Démarrer le service candidat :**
+```bash
+docker-compose -f docker-compose.dev.yml up -d candidate
+```
+
+**2. Vérifier que le service candidat répond :**
+```bash
+curl -s http://localhost:8002/health
+# doit retourner : {"status":"healthy","service":"candidate-service",...}
+```
+
+**3. Services requis pour l’admin (validation, archivage, rejet) :**
+- `postgres`, `redis`, `auth` (prérequis)
+- `candidate` (obligatoire pour archivage/validation)
+- `admin` (le service admin lui-même)
+
+```bash
+docker-compose -f docker-compose.dev.yml up -d postgres redis auth candidate admin
+```
+
+**4. Consulter les logs admin en cas d’erreur :**
+```bash
+docker-compose -f docker-compose.dev.yml logs admin --tail=50
+```
+
 ### Diagnostic : erreurs 500 sur le service Document (photos, CV)
 
 Si vous obtenez des erreurs 500 sur `/api/v1/documents/candidate/...` ou `/api/v1/documents/upload/profile-photo` :

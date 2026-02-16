@@ -140,9 +140,7 @@ async def update_candidate_status(candidate_id: int, status: str, report_data: O
                 update_data["rejection_reason"] = report_data["rejection_reason"]
     
     try:
-        # Générer les headers avec le token de service
         headers = get_service_token_header("admin-service")
-        
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.put(
                 f"{settings.CANDIDATE_SERVICE_URL}/api/v1/profiles/{candidate_id}",
@@ -151,8 +149,58 @@ async def update_candidate_status(candidate_id: int, status: str, report_data: O
             )
             response.raise_for_status()
             return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise CandidateNotFoundError(str(candidate_id))
+        if e.response.status_code in (401, 403):
+            raise Exception(
+                f"Service candidat : erreur d'authentification ({e.response.status_code}). "
+                f"Vérifiez que INTERNAL_SERVICE_TOKEN_SECRET est identique dans tous les services."
+            )
+        detail = ""
+        try:
+            body = e.response.json()
+            detail = body.get("detail", str(body))
+        except Exception:
+            detail = e.response.text or str(e)
+        raise Exception(f"Service candidat ({e.response.status_code}): {detail}")
+    except httpx.ConnectError as e:
+        raise Exception(
+            f"Impossible de joindre le service candidat ({settings.CANDIDATE_SERVICE_URL}). "
+            f"Vérifiez qu'il est démarré et que CANDIDATE_SERVICE_URL est correct (ex. http://localhost:8002 en dev local)."
+        )
     except httpx.HTTPError as e:
-        raise Exception(f"Failed to update candidate status: {str(e)}")
+        raise Exception(f"Erreur lors de la mise à jour du statut: {str(e)}")
+
+
+async def delete_candidate_profile(candidate_id: int) -> Dict[str, Any]:
+    """
+    Supprime un profil candidat (soft delete).
+
+    Args:
+        candidate_id: ID du profil candidat
+
+    Returns:
+        Dict avec message de confirmation
+
+    Raises:
+        CandidateNotFoundError: Si le candidat n'existe pas
+    """
+    try:
+        headers = get_service_token_header("admin-service")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.delete(
+                f"{settings.CANDIDATE_SERVICE_URL}/api/v1/profiles/{candidate_id}",
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise CandidateNotFoundError(str(candidate_id))
+        raise
+    except httpx.HTTPError as e:
+        raise Exception(f"Failed to delete candidate profile: {str(e)}")
 
 
 async def update_candidate_hrflow_key(candidate_id: int, hrflow_profile_key: str) -> Dict[str, Any]:

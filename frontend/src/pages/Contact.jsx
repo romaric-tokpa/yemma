@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Shield, UserCheck, Euro, ArrowRight, MessageCircle, CheckCircle2, AlertCircle } from 'lucide-react'
+import { motion } from 'framer-motion'
+import {
+  Shield, UserCheck, Euro, ArrowRight, MessageCircle, CheckCircle2, AlertCircle,
+  Mail, MapPin, Linkedin
+} from 'lucide-react'
 import { ROUTES } from '@/constants/routes'
 import { SEO } from '@/components/seo/SEO'
 import { Button } from '@/components/ui/button'
@@ -8,6 +12,24 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import PublicPageLayout from '@/components/layout/PublicPageLayout'
+
+const contactEmail = 'contact@yemma-solutions.com'
+const whatsappLink = 'https://wa.me/2250798872672'
+const linkedinUrl = 'https://www.linkedin.com/company/yemma-solutions/'
+
+const strengths = [
+  { icon: Shield, text: 'Profils validés à 100 % par des experts RH' },
+  { icon: UserCheck, text: 'Matching et scoring pour des recrutements ciblés' },
+  { icon: UserCheck, text: 'Accompagnement personnalisé candidats et entreprises' },
+  { icon: Euro, text: 'Économies jusqu\'à 60 % sur les coûts de recrutement' },
+]
+
+const contactChannels = [
+  { icon: Mail, label: 'Email', href: `mailto:${contactEmail}`, accent: false },
+  { icon: MessageCircle, label: 'WhatsApp', href: whatsappLink, accent: true },
+  { icon: Linkedin, label: 'LinkedIn', href: linkedinUrl, accent: false },
+  { icon: MapPin, label: 'Siège', href: 'https://maps.google.com/?q=Abidjan,Cote+Ivoire', accent: false },
+]
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -20,9 +42,6 @@ export default function Contact() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState(null)
-
-  const contactEmail = 'contact@yemma-solutions.com'
-  const whatsappLink = 'https://wa.me/2250798872672'
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -59,13 +78,82 @@ export default function Contact() {
         canonical="/contact"
       />
       <PublicPageLayout title="" subtitle="" badge={null}>
-        <section className="pt-20 md:pt-24 pb-10 md:pb-14 overflow-x-hidden" style={{ backgroundColor: '#F0F7F6' }}>
-          <div className="max-w-6xl mx-auto px-4 xs:px-5 sm:px-6 lg:px-8 w-full max-w-[100vw]">
+        {/* Hero */}
+        <section className="pt-16 md:pt-20 pb-10 md:pb-14 bg-[#F4F6F8] overflow-hidden">
+          <div className="max-w-6xl mx-auto px-4 xs:px-5 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="text-center max-w-2xl mx-auto"
+            >
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E8F4F3] text-[#226D68] text-xs font-semibold mb-4">
+                Nous sommes à votre écoute
+              </span>
+              <h1 className="text-2xl xs:text-3xl sm:text-4xl font-bold text-[#2C2C2C] mb-3 font-heading leading-tight">
+                Contactez-nous
+              </h1>
+              <p className="text-base sm:text-lg text-[#6b7280] leading-relaxed">
+                Une question, un projet recrutement ? Notre équipe vous répond sous 48h.
+              </p>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Canaux de contact — cartes cliquables */}
+        <section className="py-8 md:py-12 bg-white overflow-hidden">
+          <div className="max-w-6xl mx-auto px-4 xs:px-5 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-wrap justify-center gap-3 sm:gap-4"
+            >
+              {contactChannels.map((channel, i) => {
+                const Icon = channel.icon
+                return (
+                  <motion.a
+                    key={channel.label}
+                    href={channel.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={channel.label}
+                    aria-label={channel.label}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.3, delay: i * 0.06 }}
+                    whileHover={{ scale: 1.08 }}
+                    className={`flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl transition-all ${
+                      channel.accent
+                        ? 'bg-[#25D366]/15 text-[#25D366] hover:bg-[#25D366]/25'
+                        : 'bg-[#E8F4F3] text-[#226D68] hover:bg-[#226D68]/20'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.5} />
+                  </motion.a>
+                )
+              })}
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Contenu principal : présentation + formulaire */}
+        <section className="py-10 md:py-14 bg-[#F4F6F8] overflow-hidden">
+          <div className="max-w-6xl mx-auto px-4 xs:px-5 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-start">
-              {/* Colonne gauche - Qui sommes-nous */}
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-[#2C2C2C] mb-2">Contactez-nous dès maintenant !</h1>
-                <h2 className="text-lg font-bold text-[#2C2C2C] mb-4">Qui sommes-nous ?</h2>
+              {/* Colonne gauche — Qui sommes-nous */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="space-y-6"
+              >
+                <h2 className="text-xl md:text-2xl font-bold text-[#2C2C2C] font-heading">
+                  Qui sommes-nous ?
+                </h2>
                 <div className="space-y-4 text-sm text-[#374151] leading-relaxed">
                   <p>
                     Yemma Solutions est la plateforme sélective des profils préqualifiés pour le recrutement.
@@ -77,58 +165,64 @@ export default function Contact() {
                     Constituée de passionnés, adossée à une technologie forte, notre équipe a fait siennes les valeurs de Qualité, de Transparence et d&apos;Engagement.
                   </p>
                 </div>
-                <h3 className="text-base font-bold text-[#2C2C2C] mt-8 mb-4">Nos points forts :</h3>
+
+                <h3 className="text-base font-bold text-[#2C2C2C] pt-2">Nos points forts</h3>
                 <ul className="space-y-3">
-                  {[
-                    { icon: Shield, text: 'Profils validés à 100 % par des experts RH' },
-                    { icon: UserCheck, text: 'Matching et scoring pour des recrutements ciblés' },
-                    { icon: UserCheck, text: 'Accompagnement personnalisé candidats et entreprises' },
-                    { icon: Euro, text: 'Économies jusqu\'à 60 % sur les coûts de recrutement' },
-                  ].map((item, i) => {
+                  {strengths.map((item, i) => {
                     const Icon = item.icon
                     return (
-                      <li key={i} className="flex items-center gap-3 text-sm text-[#374151]">
-                        <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                      <motion.li
+                        key={i}
+                        initial={{ opacity: 0, x: -10 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: i * 0.05 }}
+                        className="flex items-center gap-3 text-sm text-[#374151]"
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center shrink-0 shadow-sm">
                           <Icon className="h-4 w-4 text-[#226D68]" strokeWidth={1.5} />
                         </div>
                         {item.text}
-                      </li>
+                      </motion.li>
                     )
                   })}
                 </ul>
 
-                {/* Contact WhatsApp */}
-                <div className="mt-8">
-                  <a
-                    href={whatsappLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium bg-[#25D366] text-white hover:bg-[#20BA5A] transition-colors"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                    Nous contacter par WhatsApp
-                  </a>
-                </div>
-              </div>
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium bg-[#25D366] text-white hover:bg-[#20BA5A] transition-colors shadow-sm"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Nous contacter par WhatsApp
+                </a>
+              </motion.div>
 
-              {/* Colonne droite - Formulaire */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8">
-                <h2 className="text-base font-bold text-[#2C2C2C] mb-6">Envoyez-nous un message</h2>
+              {/* Colonne droite — Formulaire */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8"
+              >
+                <h2 className="text-lg font-bold text-[#2C2C2C] mb-6">Envoyez-nous un message</h2>
                 {submitStatus === 'success' && (
-                  <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-xs bg-[#E8F4F3] border border-[#226D68]/30 text-[#226D68]">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <div className="mb-4 p-4 rounded-xl flex items-center gap-3 text-sm bg-[#E8F4F3] border border-[#226D68]/30 text-[#226D68]">
+                    <CheckCircle2 className="h-5 w-5 shrink-0" />
                     Message envoyé avec succès ! Nous vous répondrons rapidement.
                   </div>
                 )}
                 {submitStatus === 'error' && (
-                  <div className="mb-4 p-3 rounded-lg flex items-center gap-2 text-xs bg-red-50 border border-red-200 text-red-600">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
+                  <div className="mb-4 p-4 rounded-xl flex items-center gap-3 text-sm bg-red-50 border border-red-200 text-red-600">
+                    <AlertCircle className="h-5 w-5 shrink-0" />
                     Erreur lors de l&apos;envoi. Contactez-nous directement.
                   </div>
                 )}
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="firstName" className="text-sm font-medium text-[#374151]">
                         Prénom *
                       </Label>
@@ -138,11 +232,11 @@ export default function Contact() {
                         required
                         value={formData.firstName}
                         onChange={handleInputChange}
-                        className="h-10 mt-1.5 border-gray-200 w-full min-w-0"
+                        className="h-11 mt-0 border-gray-200 focus:border-[#226D68] focus:ring-[#226D68]/20 rounded-lg"
                         placeholder="Votre prénom"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="lastName" className="text-sm font-medium text-[#374151]">
                         Nom *
                       </Label>
@@ -152,12 +246,12 @@ export default function Contact() {
                         required
                         value={formData.lastName}
                         onChange={handleInputChange}
-                        className="h-10 mt-1.5 border-gray-200 w-full min-w-0"
+                        className="h-11 mt-0 border-gray-200 focus:border-[#226D68] focus:ring-[#226D68]/20 rounded-lg"
                         placeholder="Votre nom"
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium text-[#374151]">
                       Email professionnel *
                     </Label>
@@ -168,11 +262,11 @@ export default function Contact() {
                       required
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="h-10 mt-1.5 border-gray-200 w-full min-w-0"
+                      className="h-11 border-gray-200 focus:border-[#226D68] focus:ring-[#226D68]/20 rounded-lg"
                       placeholder="votre@email.com"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="phone" className="text-sm font-medium text-[#374151]">
                       Téléphone
                     </Label>
@@ -182,11 +276,11 @@ export default function Contact() {
                       type="tel"
                       value={formData.phone}
                       onChange={handleInputChange}
-                      className="h-10 mt-1.5 border-gray-200 w-full min-w-0"
+                      className="h-11 border-gray-200 focus:border-[#226D68] focus:ring-[#226D68]/20 rounded-lg"
                       placeholder="+225 XX XX XX XX XX"
                     />
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="contactType" className="text-sm font-medium text-[#374151]">
                       Type de contact *
                     </Label>
@@ -196,7 +290,7 @@ export default function Contact() {
                       required
                       value={formData.contactType}
                       onChange={handleInputChange}
-                      className="mt-1.5 flex h-10 w-full min-w-0 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68] focus-visible:ring-offset-2"
+                      className="flex h-11 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#226D68]/20 focus:border-[#226D68]"
                     >
                       <option value="">Veuillez sélectionner</option>
                       <option value="Candidat">Candidat</option>
@@ -205,7 +299,7 @@ export default function Contact() {
                       <option value="Autre">Autre</option>
                     </select>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="message" className="text-sm font-medium text-[#374151]">
                       Votre message
                     </Label>
@@ -214,13 +308,13 @@ export default function Contact() {
                       name="message"
                       value={formData.message}
                       onChange={handleInputChange}
-                      className="min-h-[120px] mt-1.5 border-gray-200 text-sm resize-y w-full min-w-0"
+                      className="min-h-[120px] border-gray-200 focus:border-[#226D68] focus:ring-[#226D68]/20 text-sm resize-y rounded-lg"
                       placeholder="Décrivez votre demande..."
                     />
                   </div>
                   <p className="text-xs text-[#6b7280] leading-relaxed">
                     En cliquant ci-dessous, vous autorisez Yemma Solutions à stocker et traiter les données personnelles soumises afin de traiter votre demande. Consultez notre{' '}
-                    <Link to={ROUTES.LEGAL_PRIVACY} className="text-[#226D68] hover:underline">
+                    <Link to={ROUTES.LEGAL_PRIVACY} className="text-[#226D68] hover:underline font-medium">
                       Politique de confidentialité
                     </Link>{' '}
                     pour en savoir plus.
@@ -228,17 +322,17 @@ export default function Contact() {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-12 bg-[#226D68] hover:bg-[#1a5a55] text-white font-medium rounded-lg"
+                    className="w-full h-12 bg-[#226D68] hover:bg-[#1a5a55] text-white font-medium rounded-xl"
                   >
                     {isSubmitting ? 'Envoi...' : (
                       <>
-                        Contactez-nous
+                        Envoyer le message
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
                   </Button>
                 </form>
-              </div>
+              </motion.div>
             </div>
           </div>
         </section>

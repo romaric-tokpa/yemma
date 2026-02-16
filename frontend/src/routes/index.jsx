@@ -35,7 +35,9 @@ const CandidateDetailPage = lazy(() => import('@/pages/CandidateDetailPage'))
 
 // Routes Admin
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'))
+const AdminValidationPage = lazy(() => import('@/pages/AdminValidationPage'))
 const AdminCvtheque = lazy(() => import('@/pages/AdminCvtheque'))
+const AdminStatisticsPage = lazy(() => import('@/pages/AdminStatisticsPage'))
 const AdminReview = lazy(() => import('@/pages/AdminReview'))
 const AdminInvitationsPage = lazy(() => import('@/pages/AdminInvitationsPage'))
 const CreateAdminAccount = lazy(() => import('@/pages/CreateAdminAccount'))
@@ -255,6 +257,34 @@ export default function AppRoutes() {
             <AdminDashboard />
           </AuthGuard>
         } 
+      />
+      <Route 
+        path="/admin/companies" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/validation" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminValidationPage />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/statistics" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminStatisticsPage />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/raccourcis" 
+        element={<Navigate to="/admin/dashboard" replace />}
       />
       <Route 
         path="/admin/review/:candidateId" 

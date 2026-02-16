@@ -128,21 +128,23 @@ async def get_profiles_stats_by_sector(
     result = await session.execute(statement)
     rows = result.all()
 
-    # Agrégation par secteur: { sector: { total, validated } }
+    # Agrégation par secteur: { sector: { total, validated, archived } }
     by_sector: Dict[str, Dict[str, int]] = {}
     for row in rows:
         sector = row.sector or "Non renseigné"
         status_value = row.status.value if isinstance(row.status, ProfileStatus) else str(row.status)
         count = row.count or 0
         if sector not in by_sector:
-            by_sector[sector] = {"total": 0, "validated": 0}
+            by_sector[sector] = {"total": 0, "validated": 0, "archived": 0}
         by_sector[sector]["total"] += count
         if status_value == "VALIDATED":
             by_sector[sector]["validated"] += count
+        if status_value == "ARCHIVED":
+            by_sector[sector]["archived"] += count
 
     # Liste triée par total décroissant
     out = [
-        {"sector": sector, "total": data["total"], "validated": data["validated"]}
+        {"sector": sector, "total": data["total"], "validated": data["validated"], "archived": data.get("archived", 0)}
         for sector, data in by_sector.items()
     ]
     out.sort(key=lambda x: (-x["total"], x["sector"]))

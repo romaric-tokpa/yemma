@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 from app.infrastructure.auth import require_admin_role
-from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status, update_candidate_hrflow_key
+from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status, update_candidate_hrflow_key, delete_candidate_profile
 from app.infrastructure.hrflow_parse_client import parse_cv_and_get_key
 from app.infrastructure.hrflow_asking_client import ask_profile, HrFlowAskingError
 from app.infrastructure.search_client import index_candidate_in_search, remove_candidate_from_search
@@ -322,11 +322,123 @@ async def archive_candidate(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Candidate with id {candidate_id} not found"
         )
+    except HTTPException:
+        raise
+    except Exception as e:
+        err_msg = str(e)
+        # 502 si le service candidat est inaccessible
+        status_code = status.HTTP_502_BAD_GATEWAY if "Impossible de joindre" in err_msg else status.HTTP_500_INTERNAL_SERVER_ERROR
+        raise HTTPException(
+            status_code=status_code,
+            detail=err_msg
+        )
+
+
+@router.post("/unarchive/{candidate_id}", status_code=status.HTTP_200_OK)
+async def unarchive_candidate(
+    candidate_id: int,
+    background_tasks: BackgroundTasks,
+    admin_user=Depends(require_admin_role),
+):
+    """
+    Déarchive un profil candidat.
+
+    - Met à jour le statut à 'VALIDATED' dans le service candidat
+    - Réindexe le candidat dans l'index de recherche (CVthèque)
+    - Restaure le profil dans la liste de validation (visible sous le filtre VALIDATED)
+    """
+    try:
+        # Récupérer le profil complet pour l'indexation
+        profile_data = await get_candidate_profile(candidate_id)
+        if profile_data.get("status") != "ARCHIVED":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Seuls les profils archivés peuvent être déarchivés",
+            )
+
+        # Mettre à jour le statut dans le service candidat
+        await update_candidate_status(
+            candidate_id=candidate_id,
+            status="VALIDATED",
+        )
+
+        # Réindexer dans l'index de recherche (synchrone pour cohérence)
+        try:
+            await index_candidate_in_search(candidate_id, profile_data)
+            indexation_status = "completed"
+        except Exception as index_err:
+            logger.warning("Indexation synchrone échouée pour déarchivage %s: %s", candidate_id, index_err)
+            background_tasks.add_task(index_candidate_task, candidate_id, profile_data)
+            indexation_status = "pending"
+
+        return {
+            "message": "Candidate profile unarchived successfully",
+            "candidate_id": candidate_id,
+            "status": "VALIDATED",
+            "indexed_in_search": indexation_status,
+        }
+
+    except CandidateNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate with id {candidate_id} not found",
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to archive candidate: {str(e)}"
+            detail=f"Failed to unarchive candidate: {str(e)}",
         )
+
+
+@router.post("/delete/{candidate_id}", status_code=status.HTTP_200_OK)
+async def delete_candidate(
+    candidate_id: int,
+    background_tasks: BackgroundTasks,
+    admin_user=Depends(require_admin_role),
+):
+    """
+    Supprime un profil candidat (soft delete).
+
+    - Marque le profil comme supprimé (deleted_at) dans le service candidat
+    - Déclenche un appel asynchrone pour retirer le candidat de l'index de recherche
+    """
+    try:
+        await delete_candidate_profile(candidate_id=candidate_id)
+        background_tasks.add_task(remove_candidate_task, candidate_id)
+        return {
+            "message": "Candidate profile deleted successfully",
+            "candidate_id": candidate_id,
+        }
+    except CandidateNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate with id {candidate_id} not found",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete candidate: {str(e)}",
+        )
+
+
+def _empty_evaluation_response(candidate_id: int) -> dict:
+    """Réponse vide pour le formulaire d'évaluation (fallback en cas d'erreur)."""
+    return {
+        "candidate_id": candidate_id,
+        "candidate_name": "",
+        "overall_score": None,
+        "technical_skills_rating": None,
+        "soft_skills_rating": None,
+        "communication_rating": None,
+        "motivation_rating": None,
+        "soft_skills_tags": [],
+        "interview_notes": None,
+        "recommendations": None,
+        "summary": None,
+        "validated_at": None,
+    }
 
 
 @router.get("/evaluation/{candidate_id}", status_code=status.HTTP_200_OK)
@@ -340,17 +452,14 @@ async def get_candidate_evaluation(
     Retourne le compte-rendu rédigé par l'Admin lors de la validation.
     Si le candidat n'a pas encore été évalué, retourne 200 avec des valeurs vides
     (pour permettre au formulaire d'évaluation de s'afficher sans erreur 404).
+    En cas d'erreur de communication avec le service candidat, retourne aussi
+    des valeurs vides pour permettre à l'admin de continuer (validation/rejet).
     
     **Usage** : Appelé par le frontend pour charger le formulaire d'évaluation.
     """
     try:
-        # Récupérer le profil complet depuis le Candidate Service
         profile_data = await get_candidate_profile(candidate_id)
-        
-        # Extraire le rapport d'évaluation (peut être absent si pas encore validé)
         admin_report = profile_data.get("admin_report") or {}
-        
-        # Retourner le rapport formaté (valeurs vides si pas encore évalué)
         return {
             "candidate_id": candidate_id,
             "candidate_name": f"{profile_data.get('first_name', '')} {profile_data.get('last_name', '')}".strip(),
@@ -365,20 +474,19 @@ async def get_candidate_evaluation(
             "summary": admin_report.get("summary"),
             "validated_at": profile_data.get("validated_at"),
         }
-        
     except CandidateNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Candidate with id {candidate_id} not found"
         )
     except HTTPException:
-        # Re-raise les HTTPException
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve candidate evaluation: {str(e)}"
+        logger.warning(
+            "Failed to fetch candidate profile for evaluation (candidate_id=%s): %s. Returning empty form.",
+            candidate_id, str(e)
         )
+        return _empty_evaluation_response(candidate_id)
 
 
 @router.post("/index-cv/{candidate_id}", status_code=status.HTTP_200_OK)

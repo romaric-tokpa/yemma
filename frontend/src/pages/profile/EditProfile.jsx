@@ -29,6 +29,7 @@ import {
   PreferencesForm,
 } from '@/pages/CandidateDashboard'
 import SupportWidget from '@/components/candidate/SupportWidget'
+import { Toast } from '@/components/common/Toast'
 
 const profileSchema = z.object({
   firstName: z.string().min(2, 'Le prénom doit contenir au moins 2 caractères'),
@@ -1149,17 +1150,12 @@ export default function EditProfile() {
       </Dialog>
 
       {/* Toast */}
-      {toast && (
-        <div
-          role="alert"
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2.5 rounded-[12px] shadow-lg border text-sm font-medium text-white ${
-            toast.type === 'success' ? 'bg-primary border-primary/80' : 'bg-red-600 border-red-700'
-          }`}
-          style={toast.type === 'success' ? { backgroundColor: '#226D68' } : {}}
-        >
-          {typeof toast.message === 'string' ? toast.message : getApiErrorDetail({ response: { data: { detail: toast.message } } }, 'Erreur')}
-        </div>
-      )}
+      <Toast
+        message={toast ? (typeof toast.message === 'string' ? toast.message : getApiErrorDetail({ response: { data: { detail: toast.message } } }, 'Erreur')) : null}
+        type={toast?.type || 'success'}
+        visible={!!toast}
+        onClose={() => setToast(null)}
+      />
     </div>
   )
 }

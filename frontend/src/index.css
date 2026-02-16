@@ -77,6 +77,21 @@
   }
 }
 
+/* Toast notification - entrée fluide */
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-toast-in {
+  animation: toast-in 0.35s cubic-bezier(0.21, 0.47, 0.32, 1) forwards;
+}
+
 /* Section postes - défilement cartes */
 @keyframes scroll-jobs {
   0% {

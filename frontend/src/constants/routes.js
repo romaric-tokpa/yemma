@@ -44,6 +44,8 @@ export const ROUTES = {
   
   // Routes admin
   ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_COMPANIES: '/admin/companies',
+  ADMIN_STATISTICS: '/admin/statistics',
   ADMIN_REVIEW: (candidateId) => `/admin/review/${candidateId}`,
   
   // Routes par défaut selon le rôle

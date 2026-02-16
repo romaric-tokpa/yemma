@@ -407,6 +407,7 @@ async def list_profiles(
     status: Optional[str] = None,
     page: int = 1,
     size: int = 20,
+    q: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
     current_user: TokenData = Depends(get_current_user)
 ):
@@ -433,10 +434,19 @@ async def list_profiles(
             detail="Réservé aux administrateurs"
         )
     
-    from sqlalchemy import select, func
+    from sqlalchemy import select, func, or_
     from app.domain.models import Profile
     
     base_filter = Profile.deleted_at.is_(None)
+    if q and q.strip():
+        search_term = f"%{q.strip()}%"
+        search_filter = or_(
+            Profile.first_name.ilike(search_term),
+            Profile.last_name.ilike(search_term),
+            Profile.email.ilike(search_term),
+            Profile.profile_title.ilike(search_term),
+        )
+        base_filter = base_filter & search_filter
     if status:
         try:
             status_enum = ProfileStatus(status.upper())
@@ -893,6 +903,30 @@ async def update_profile(
         raise ProfileNotFoundError(str(profile_id))
     
     return ProfileResponse.model_validate(updated_profile)
+
+
+@router.delete("/{profile_id}", status_code=http_status.HTTP_200_OK)
+async def delete_profile(
+    profile_id: int,
+    session: AsyncSession = Depends(get_session),
+    service_info: Optional[dict] = Depends(verify_internal_token),
+):
+    """
+    Supprime un profil (soft delete).
+    Réservé aux appels inter-services (X-Service-Token requis).
+    """
+    if not service_info:
+        raise HTTPException(
+            status_code=http_status.HTTP_401_UNAUTHORIZED,
+            detail="Service token required for profile deletion",
+        )
+    profile = await ProfileRepository.get_by_id(session, profile_id)
+    if not profile:
+        raise ProfileNotFoundError(str(profile_id))
+    success = await ProfileRepository.delete(session, profile_id)
+    if not success:
+        raise ProfileNotFoundError(str(profile_id))
+    return {"message": "Profile deleted successfully", "profile_id": profile_id}
 
 
 @router.post("/{profile_id}/submit", response_model=ProfileResponse)
