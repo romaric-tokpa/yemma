@@ -559,6 +559,10 @@ services:
       # Authentification inter-services (requis pour appeler le service candidat)
       INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
       
+      # JWT (validation des tokens utilisateur - même secret que Auth Service)
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      
       # HrFlow.ai - Profile Asking (CvGPT) pour Analyse par IA
       HRFLOW_API_KEY: ${HRFLOW_API_KEY:-}
       HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-ae16505f6f0eebe3abb79ad1bf83ec53b4886432}

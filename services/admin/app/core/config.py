@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     HRFLOW_API_URL: str = Field(default="https://api.hrflow.ai/v1", description="HrFlow API base URL")
     HRFLOW_USER_EMAIL: str = Field(default="", description="HrFlow account email (required for Asking API)")
 
+    # JWT (validation des tokens utilisateur - même secret que Auth Service)
+    JWT_SECRET_KEY: str = Field(default="", description="Secret key for JWT validation (must match Auth Service)")
+    JWT_ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
+
     # CORS (défini comme string pour éviter les problèmes de parsing)
     CORS_ORIGINS: str = Field(
         default="http://localhost:3000,http://localhost:8000",

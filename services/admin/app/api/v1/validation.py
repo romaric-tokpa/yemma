@@ -3,10 +3,11 @@ Endpoints de validation des profils candidats
 """
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, File, UploadFile
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
+from app.infrastructure.auth import require_admin_role
 from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status, update_candidate_hrflow_key
 from app.infrastructure.hrflow_parse_client import parse_cv_and_get_key
 from app.infrastructure.hrflow_asking_client import ask_profile, HrFlowAskingError
@@ -123,7 +124,8 @@ async def remove_candidate_task(candidate_id: int):
 async def validate_candidate(
     candidate_id: int,
     report: ValidationReport,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    admin_user=Depends(require_admin_role),
 ):
     """
     Valide un profil candidat avec actions asynchrones via BackgroundTasks
@@ -240,7 +242,8 @@ async def validate_candidate(
 async def reject_candidate(
     candidate_id: int,
     report: RejectionReport,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    admin_user=Depends(require_admin_role),
 ):
     """
     Rejette un profil candidat
@@ -288,7 +291,8 @@ async def reject_candidate(
 @router.post("/archive/{candidate_id}", status_code=status.HTTP_200_OK)
 async def archive_candidate(
     candidate_id: int,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    admin_user=Depends(require_admin_role),
 ):
     """
     Archive un profil candidat
@@ -326,7 +330,10 @@ async def archive_candidate(
 
 
 @router.get("/evaluation/{candidate_id}", status_code=status.HTTP_200_OK)
-async def get_candidate_evaluation(candidate_id: int):
+async def get_candidate_evaluation(
+    candidate_id: int,
+    admin_user=Depends(require_admin_role),
+):
     """
     Récupère le rapport d'évaluation d'un candidat.
     
@@ -375,7 +382,11 @@ async def get_candidate_evaluation(candidate_id: int):
 
 
 @router.post("/index-cv/{candidate_id}", status_code=status.HTTP_200_OK)
-async def index_cv_for_candidate(candidate_id: int, file: UploadFile = File(..., description="Fichier CV (PDF ou DOCX)")):
+async def index_cv_for_candidate(
+    candidate_id: int,
+    file: UploadFile = File(..., description="Fichier CV (PDF ou DOCX)"),
+    admin_user=Depends(require_admin_role),
+):
     """
     Indexe un CV pour un profil existant afin d'activer l'analyse IA (CvGPT).
 
@@ -408,7 +419,11 @@ async def index_cv_for_candidate(candidate_id: int, file: UploadFile = File(...,
 
 
 @router.post("/profile-ask/{candidate_id}", status_code=status.HTTP_200_OK)
-async def profile_ask(candidate_id: int, body: ProfileAskRequest):
+async def profile_ask(
+    candidate_id: int,
+    body: ProfileAskRequest,
+    admin_user=Depends(require_admin_role),
+):
     """
     Pose une question en langage naturel sur le profil candidat (API HrFlow Profile Asking / CvGPT).
 

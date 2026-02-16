@@ -527,6 +527,9 @@ services:
       SEARCH_SERVICE_URL: http://search:8000
       NOTIFICATION_SERVICE_URL: http://notification:8000
       CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000,http://localhost:8000}
+      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
     networks:
       - yemma-network
     depends_on:
