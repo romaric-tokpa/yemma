@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "candidate-service"
     APP_ENV: str = "development"
     DEBUG: bool = True
+    # Offres d'emploi : exiger profil complet pour postuler (effet Leurre). Seuil en % (ex: 80).
+    REQUIRE_FULL_PROFILE_FOR_APPLY: bool = True
+    PROFILE_COMPLETION_THRESHOLD: int = 80
 
     # Database
     DB_HOST: str = "localhost"

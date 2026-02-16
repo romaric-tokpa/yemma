@@ -569,7 +569,7 @@ export default function CandidateOnboarding() {
 
   if (checkingProfile) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#226D68] mx-auto mb-3" />
           <p className="text-sm text-[#6b7280]">Chargement...</p>
@@ -581,7 +581,7 @@ export default function CandidateOnboarding() {
   // Étape 0 : Modale de consentement (bloquante)
   if (showConsentModal) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
         <ConsentModal
           open={showConsentModal}
           onAccept={handleConsentAccept}
@@ -598,7 +598,7 @@ export default function CandidateOnboarding() {
     const ext = file?.name?.split('.').pop()?.toLowerCase()
     const isPdf = ext === 'pdf'
     return (
-      <div className="min-h-screen min-h-[100dvh] flex flex-col bg-[#F4F6F8]">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col">
         <OnboardingHeader step="upload" />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-4 py-6 lg:px-8 safe-x">
@@ -708,7 +708,7 @@ export default function CandidateOnboarding() {
   // Étape 3 : Succès — aligné dashboard
   if (step === 'success') {
     return (
-      <div className="min-h-screen min-h-[100dvh] flex flex-col bg-[#F4F6F8]">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col">
         <OnboardingHeader step="success" />
         <main className="flex-1 flex items-center justify-center p-4 overflow-x-hidden">
           <div className="w-full max-w-md text-center">
@@ -734,7 +734,7 @@ export default function CandidateOnboarding() {
 
   // Étape 2 : Révision — aligné dashboard
   return (
-    <div className="min-h-screen min-h-[100dvh] flex flex-col bg-[#F4F6F8]">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col">
       <OnboardingHeader step="review" onBack={() => setStep('upload')} />
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 py-6 lg:px-8 safe-x space-y-4">

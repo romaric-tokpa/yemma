@@ -262,3 +262,68 @@ class ProfileSubmitRequest(BaseModel):
     """Schéma pour la soumission d'un profil"""
     pass  # Pas de données supplémentaires nécessaires
 
+
+# ============================================
+# Job Offer Schemas (effet Leurre)
+# ============================================
+
+class JobOfferCreate(BaseModel):
+    """Schéma pour la création d'une offre"""
+    title: str = Field(..., max_length=255)
+    description: str = Field(...)
+    location: str = Field(..., max_length=255)
+    contract_type: str = Field(..., max_length=50)
+    salary_range: Optional[str] = Field(default=None, max_length=100)
+    requirements: Optional[str] = Field(default=None)
+    expires_at: Optional[datetime] = Field(default=None)
+    sector: Optional[str] = Field(default=None, max_length=255, description="Secteur d'activité")
+    # Entreprise partenaire (offres externes)
+    company_name: Optional[str] = Field(default=None, max_length=255)
+    company_logo_url: Optional[str] = Field(default=None, max_length=500)
+    external_application_url: Optional[str] = Field(default=None, max_length=500)
+    application_email: Optional[str] = Field(default=None, max_length=255)
+
+
+class JobOfferUpdate(BaseModel):
+    """Schéma pour la mise à jour d'une offre"""
+    title: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+    location: Optional[str] = Field(default=None, max_length=255)
+    contract_type: Optional[str] = Field(default=None, max_length=50)
+    salary_range: Optional[str] = Field(default=None, max_length=100)
+    requirements: Optional[str] = None
+    status: Optional[str] = Field(default=None, max_length=50)
+    expires_at: Optional[datetime] = None
+    sector: Optional[str] = Field(default=None, max_length=255)
+    company_name: Optional[str] = Field(default=None, max_length=255)
+    company_logo_url: Optional[str] = Field(default=None, max_length=500)
+    external_application_url: Optional[str] = Field(default=None, max_length=500)
+    application_email: Optional[str] = Field(default=None, max_length=255)
+
+
+class JobOfferResponse(BaseModel):
+    """Schéma de réponse pour une offre"""
+    id: int
+    title: str
+    description: str
+    location: str
+    contract_type: str
+    salary_range: Optional[str] = None
+    requirements: Optional[str] = None
+    status: str
+    created_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    sector: Optional[str] = None
+    company_name: Optional[str] = None
+    company_logo_url: Optional[str] = None
+    external_application_url: Optional[str] = None
+    application_email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ApplicationCreate(BaseModel):
+    """Schéma pour une candidature (optionnel : lettre de motivation)"""
+    cover_letter: Optional[str] = Field(default=None)
+

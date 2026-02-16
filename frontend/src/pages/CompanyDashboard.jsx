@@ -106,7 +106,7 @@ export default function CompanyDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[#226D68]" />
           <p className="text-sm text-[#2C2C2C]/70">Chargement...</p>
@@ -117,7 +117,7 @@ export default function CompanyDashboard() {
 
   if (!company) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-sm border-0 shadow-sm">
           <CardHeader className="pb-2 pt-5 px-5">
             <CardTitle className="text-base font-semibold text-[#2C2C2C]">Aucune entreprise</CardTitle>

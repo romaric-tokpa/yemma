@@ -8,7 +8,7 @@ import PublicFooter from '@/components/layout/PublicFooter'
  */
 export default function PublicPageLayout({ children, title, subtitle, badge, heroImage }) {
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-white flex flex-col overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col overflow-x-hidden w-full max-w-[100vw]">
       <PublicNavbar variant="light" />
 
       {/* Hero compact avec animations */}

@@ -145,7 +145,7 @@ export default function RegisterCandidat() {
   if (success) {
     return (
       <div
-        className="min-h-screen min-h-[100dvh] bg-white flex items-center justify-center p-4 sm:p-6"
+        className="min-h-screen min-h-[100dvh] flex items-center justify-center p-4 sm:p-6"
         style={{
           paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))',
           paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))',

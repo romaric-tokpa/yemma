@@ -57,7 +57,7 @@ export default function CompanyManagement({ embedded }) {
   }
 
   return (
-    <div className={embedded ? '' : 'min-h-screen bg-[#F4F6F8] p-4'}>
+    <div className={embedded ? '' : 'min-h-screen p-4'}>
       <div className={embedded ? '' : 'max-w-4xl mx-auto'}>
         {!embedded && (
           <div className="mb-4">

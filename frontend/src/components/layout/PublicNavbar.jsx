@@ -161,6 +161,9 @@ export default function PublicNavbar({ variant = 'light' }) {
             <Link to={ROUTES.CANDIDAT} className={`text-sm font-medium transition-colors ${linkActive}`}>
               Candidat
             </Link>
+            <Link to="/offres" className={`text-sm font-medium transition-colors ${linkBase}`}>
+              Offres
+            </Link>
             <Link to={ROUTES.CONTACT} className={`text-sm font-medium transition-colors ${linkBase}`}>
               Contactez-nous !
             </Link>
@@ -234,6 +237,9 @@ export default function PublicNavbar({ variant = 'light' }) {
           </Link>
           <Link to={ROUTES.CANDIDAT} className={`block text-sm py-2 ${mobileLinkActive}`} onClick={() => setMobileMenuOpen(false)}>
             Candidat
+          </Link>
+          <Link to="/offres" className={`block text-sm py-2 ${mobileLink}`} onClick={() => setMobileMenuOpen(false)}>
+            Offres
           </Link>
           <Link to={ROUTES.CONTACT} className={`block text-sm py-2 ${mobileLink}`} onClick={() => setMobileMenuOpen(false)}>
             Contactez-nous !

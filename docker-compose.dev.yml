@@ -273,6 +273,8 @@ services:
       APP_NAME: candidate-service
       APP_ENV: ${APP_ENV:-development}
       DEBUG: ${DEBUG:-true}
+      REQUIRE_FULL_PROFILE_FOR_APPLY: ${REQUIRE_FULL_PROFILE_FOR_APPLY:-true}
+      PROFILE_COMPLETION_THRESHOLD: ${PROFILE_COMPLETION_THRESHOLD:-80}
       
       # Database
       DB_HOST: postgres

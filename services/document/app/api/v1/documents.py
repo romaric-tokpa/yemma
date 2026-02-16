@@ -204,6 +204,82 @@ async def upload_company_logo(
         )
 
 
+@router.options("/upload/job-offer-logo")
+async def options_upload_job_offer_logo():
+    """Gérer les requêtes OPTIONS pour /upload/job-offer-logo"""
+    from fastapi.responses import Response
+
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
+
+@router.post("/upload/job-offer-logo")
+async def upload_job_offer_logo(
+    file: UploadFile = File(..., description="Logo de l'entreprise (JPG, PNG, max 2MB)"),
+):
+    """
+    Upload un logo d'entreprise pour une offre d'emploi (admin).
+
+    - **file**: Logo à uploader (JPG, PNG, max 2MB)
+    """
+    try:
+        logger.info(f"Upload job offer logo: filename={file.filename}")
+
+        mime_type, file_content = await FileValidator.validate_file_content(file)
+
+        if len(file_content) > 2 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le logo ne doit pas dépasser 2 Mo"
+            )
+
+        if mime_type not in ['image/jpeg', 'image/png', 'image/webp']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le fichier doit être une image (JPG, PNG, WebP)"
+            )
+
+        file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'png'
+        stored_filename = f"{uuid.uuid4()}.{file_extension}"
+        s3_key = f"job-offers/logos/{stored_filename}"
+
+        await s3_storage.upload_file(
+            file_content=file_content,
+            s3_key=s3_key,
+            content_type=mime_type
+        )
+        logger.info(f"Successfully uploaded job offer logo to S3: {s3_key}")
+
+        if settings.S3_PUBLIC_ENDPOINT and settings.S3_FORCE_PATH_STYLE:
+            public_url = f"{settings.S3_PUBLIC_ENDPOINT}/{settings.S3_BUCKET_NAME}/{s3_key}"
+        else:
+            public_url = await s3_storage.generate_presigned_url(s3_key, expiration=31536000)  # 1 an
+
+        return {
+            "url": public_url,
+            "s3_key": s3_key,
+            "filename": stored_filename,
+            "size": len(file_content),
+            "mime_type": mime_type
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading job offer logo: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors du téléchargement du logo: {str(e)}"
+        )
+
+
 @router.options("/upload/profile-photo")
 async def options_upload_profile_photo():
     """Gérer les requêtes OPTIONS pour /upload/profile-photo"""

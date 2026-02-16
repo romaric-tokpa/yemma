@@ -302,7 +302,7 @@ export default function CompanyOnboarding() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[#226D68]" />
           <p className="text-sm text-[#2C2C2C]/70">Chargement...</p>
@@ -312,7 +312,7 @@ export default function CompanyOnboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen overflow-x-hidden w-full max-w-[100vw]">
       {/* Header compact */}
       <header className="bg-white border-b border-[#e5e7eb] sticky top-0 z-40">
         <div className="max-w-2xl mx-auto px-4 xs:px-5 py-3 min-w-0">

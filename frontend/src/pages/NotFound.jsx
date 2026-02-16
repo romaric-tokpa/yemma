@@ -20,7 +20,7 @@ export default function NotFound() {
   const secondaryColor = '#e76f51'
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: `linear-gradient(135deg, #E8F4F3 0%, #ffffff 50%, #FDF2F0 100%)` }}>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-dots">
       <div className="max-w-2xl w-full text-center">
         {/* Illustration 404 */}
         <div className="mb-8">

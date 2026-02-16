@@ -19,6 +19,8 @@ const CGU = lazy(() => import('@/pages/legal/CGU'))
 
 // Page Candidat
 const CandidatLanding = lazy(() => import('@/pages/CandidatLanding'))
+const CandidateJobsPage = lazy(() => import('@/pages/CandidateJobsPage'))
+const JobOfferDetailPage = lazy(() => import('@/pages/JobOfferDetailPage'))
 
 // Routes Candidat
 const CandidateOnboarding = lazy(() => import('@/pages/CandidateOnboarding'))
@@ -40,6 +42,8 @@ const AdminCvtheque = lazy(() => import('@/pages/AdminCvtheque'))
 const AdminStatisticsPage = lazy(() => import('@/pages/AdminStatisticsPage'))
 const AdminReview = lazy(() => import('@/pages/AdminReview'))
 const AdminInvitationsPage = lazy(() => import('@/pages/AdminInvitationsPage'))
+const AdminJobManager = lazy(() => import('@/pages/AdminJobManager'))
+const AdminJobFormPage = lazy(() => import('@/pages/AdminJobFormPage'))
 const CreateAdminAccount = lazy(() => import('@/pages/CreateAdminAccount'))
 
 // Page 404
@@ -71,6 +75,8 @@ export default function AppRoutes() {
       <Route path="/legal/privacy" element={<PrivacyPolicy />} />
       <Route path="/legal/terms" element={<CGU />} />
       <Route path="/candidat" element={<CandidatLanding />} />
+      <Route path="/offres/:id" element={<JobOfferDetailPage />} />
+      <Route path="/offres" element={<CandidateJobsPage />} />
 
       {/* Routes Démo (accessibles sans authentification) */}
       <Route path="/demo/cvtheque" element={<DemoCvtheque />} />
@@ -300,7 +306,31 @@ export default function AppRoutes() {
           <AuthGuard allowedRoles={['ROLE_SUPER_ADMIN']}>
             <AdminInvitationsPage />
           </AuthGuard>
-        } 
+        }
+      />
+      <Route 
+        path="/admin/jobs/new" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminJobFormPage />
+          </AuthGuard>
+        }
+      />
+      <Route 
+        path="/admin/jobs/:id/edit" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminJobFormPage />
+          </AuthGuard>
+        }
+      />
+      <Route 
+        path="/admin/jobs" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminJobManager />
+          </AuthGuard>
+        }
       />
       
       {/* Route 404 - Doit être en dernier */}

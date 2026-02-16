@@ -26,7 +26,7 @@ const confirmResetSchema = z.object({
 
 function ResetPasswordLayout({ children }) {
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-white flex flex-col lg:flex-row overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col lg:flex-row overflow-x-hidden w-full max-w-[100vw]">
       {/* Bande décorative gauche - style Login */}
       <div
         className="hidden lg:block w-16 lg:w-20 shrink-0"

@@ -94,11 +94,22 @@ export default function CandidatLanding() {
       </section>
 
       {/* Bloc postes recherchés - compact, juste sous le hero */}
-      <section className="py-5 md:py-6 bg-white border-b border-gray-100 overflow-hidden">
+      <section className="py-5 md:py-6 border-b border-gray-100 overflow-hidden bg-dots">
         <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6">
-          <p className="text-center text-sm text-[#6b7280] mb-4">
-            Des postes recherchés dans tous les secteurs
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <p className="text-center sm:text-left text-sm text-[#6b7280]">
+              Des postes recherchés dans tous les secteurs
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] shrink-0 mx-auto sm:mx-0"
+              onClick={() => navigate('/offres')}
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              Voir les offres
+            </Button>
+          </div>
           <div className="relative overflow-hidden">
             <div className="absolute left-0 top-0 w-8 md:w-16 h-full z-10 pointer-events-none bg-gradient-to-r from-white to-transparent" />
             <div className="absolute right-0 top-0 w-8 md:w-16 h-full z-10 pointer-events-none bg-gradient-to-l from-white to-transparent" />
@@ -393,7 +404,7 @@ export default function CandidatLanding() {
       </section>
 
       {/* Section Comment marche la plateforme ? - 3 colonnes */}
-      <section className="py-16 md:py-20 bg-white">
+      <section className="py-16 md:py-20 bg-dots">
         <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -475,7 +486,7 @@ export default function CandidatLanding() {
       </section>
 
       {/* CTA finale - style capture (2 colonnes, fond pêche) - orienté candidat */}
-      <section className="py-10 md:py-14 px-3 xs:px-4 sm:px-6 bg-white">
+      <section className="py-10 md:py-14 px-3 xs:px-4 sm:px-6 bg-dots">
         <div className="max-w-6xl mx-auto">
           <div
             className="rounded-2xl sm:rounded-[32px] p-5 xs:p-6 sm:p-8 md:p-10 lg:p-12 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 sm:gap-8 lg:gap-12"

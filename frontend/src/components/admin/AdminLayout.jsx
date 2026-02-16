@@ -7,7 +7,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
   User, Clock, CheckCircle, XCircle, BarChart3, Search, Shield, Building,
-  LogOut, Menu, X, HelpCircle, LayoutDashboard, FileCheck
+  LogOut, Menu, X, HelpCircle, LayoutDashboard, FileCheck, Briefcase
 } from 'lucide-react'
 import { LogoutConfirmDialog } from '@/components/common/LogoutConfirmDialog'
 import { authApiService } from '@/services/api'
@@ -50,9 +50,10 @@ export default function AdminLayout({ children }) {
   }
 
   const isCvtheque = location.pathname === '/admin/cvtheque'
+  const isJobs = location.pathname.startsWith('/admin/jobs')
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F6F8]">
+    <div className="min-h-screen flex flex-col">
       <a href="#admin-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:px-3 focus:py-2 focus:bg-[#226D68] focus:text-white focus:rounded-md">
         Aller au contenu principal
       </a>
@@ -159,6 +160,15 @@ export default function AdminLayout({ children }) {
                 <Building className="h-4 w-4 shrink-0" />
                 Entreprises
               </Link>
+              <Link
+                to="/admin/jobs"
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-colors ${
+                  location.pathname.startsWith('/admin/jobs') ? 'bg-[#E8F4F3] text-[#226D68]' : 'text-[#2C2C2C] hover:bg-gray-50'
+                }`}
+              >
+                <Briefcase className="h-4 w-4 shrink-0" />
+                Offres d'emploi
+              </Link>
               {isSuperAdmin && (
                 <Link
                   to="/admin/invitations"
@@ -196,9 +206,13 @@ export default function AdminLayout({ children }) {
           </Button>
         )}
 
-        <main id="admin-main" className={`flex-1 min-w-0 bg-[#F4F6F8] flex flex-col ${isCvtheque ? 'overflow-hidden' : 'overflow-y-auto'}`} aria-label="Contenu administration">
+        <main id="admin-main" className={`flex-1 min-w-0 flex flex-col ${isCvtheque ? 'overflow-hidden' : 'overflow-y-auto'}`} aria-label="Contenu administration">
           {isCvtheque ? (
             <div className="flex-1 flex flex-col min-h-0 w-full max-w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-5">
+              {children}
+            </div>
+          ) : isJobs ? (
+            <div className="flex-1 w-full max-w-full px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
               {children}
             </div>
           ) : (

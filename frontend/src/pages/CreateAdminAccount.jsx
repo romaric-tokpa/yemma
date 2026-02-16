@@ -146,7 +146,7 @@ export default function CreateAdminAccount() {
 
   if (isValidatingToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md border border-border shadow-sm rounded-lg">
           <CardContent className="pt-5 pb-5 px-4">
             <div className="flex flex-col items-center justify-center space-y-2">
@@ -163,7 +163,7 @@ export default function CreateAdminAccount() {
 
   if (error && !tokenInfo) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md border border-red-200 shadow-sm rounded-lg bg-red-50/50">
           <CardHeader className="text-center pb-3">
             <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-red-100">
@@ -189,7 +189,7 @@ export default function CreateAdminAccount() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md border border-green-200 shadow-sm rounded-lg bg-green-50/50">
           <CardContent className="pt-5 pb-5 px-4">
             <div className="flex flex-col items-center justify-center space-y-2">
@@ -208,7 +208,7 @@ export default function CreateAdminAccount() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-light p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 safe-y overflow-x-hidden w-full max-w-[100vw]">
       <Card className="w-full max-w-md min-w-0 overflow-hidden border border-border shadow-sm rounded-lg bg-card">
         <CardHeader className="text-center pb-2.5 px-4 pt-4">
           <div className="mx-auto mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-[#226D68]/10">

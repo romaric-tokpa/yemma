@@ -15,7 +15,7 @@ export default function PaymentSuccess() {
   }, [navigate])
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <div className="text-center max-w-sm">
         <div className="w-16 h-16 rounded-full bg-[#E8F4F3] flex items-center justify-center mx-auto mb-4">
           <CheckCircle className="w-10 h-10 text-[#226D68]" />

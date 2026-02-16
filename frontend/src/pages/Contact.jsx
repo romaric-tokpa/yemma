@@ -79,7 +79,7 @@ export default function Contact() {
       />
       <PublicPageLayout title="" subtitle="" badge={null}>
         {/* Hero */}
-        <section className="pt-16 md:pt-20 pb-10 md:pb-14 bg-[#F4F6F8] overflow-hidden">
+        <section className="pt-16 md:pt-20 pb-10 md:pb-14 overflow-hidden">
           <div className="max-w-6xl mx-auto px-4 xs:px-5 sm:px-6 lg:px-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -101,7 +101,7 @@ export default function Contact() {
         </section>
 
         {/* Canaux de contact — cartes cliquables */}
-        <section className="py-8 md:py-12 bg-white overflow-hidden">
+        <section className="py-8 md:py-12 overflow-hidden">
           <div className="max-w-6xl mx-auto px-4 xs:px-5 sm:px-6 lg:px-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -140,7 +140,7 @@ export default function Contact() {
         </section>
 
         {/* Contenu principal : présentation + formulaire */}
-        <section className="py-10 md:py-14 bg-[#F4F6F8] overflow-hidden">
+        <section className="py-10 md:py-14 overflow-hidden">
           <div className="max-w-6xl mx-auto px-4 xs:px-5 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-start">
               {/* Colonne gauche — Qui sommes-nous */}

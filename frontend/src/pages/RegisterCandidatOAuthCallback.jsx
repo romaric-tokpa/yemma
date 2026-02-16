@@ -94,7 +94,7 @@ export default function RegisterCandidatOAuthCallback() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-[380px] rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <CardContent className="p-4">
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-700">
@@ -115,7 +115,7 @@ export default function RegisterCandidatOAuthCallback() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-[380px] rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <CardContent className="p-8 flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-[#226D68] animate-spin" />

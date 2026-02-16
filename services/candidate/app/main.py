@@ -10,7 +10,7 @@ import logging
 
 from app.core.config import settings
 from app.core.exceptions import CandidateError
-from app.api.v1 import profiles, stats
+from app.api.v1 import profiles, stats, jobs
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +37,7 @@ app.add_middleware(
 # Routes : stats AVANT profiles pour que /api/v1/profiles/stats matche avant /profiles/{profile_id}
 app.include_router(stats.router, prefix="/api/v1", tags=["Stats"])
 app.include_router(profiles.router, prefix="/api/v1")
+app.include_router(jobs.router, prefix="/api/v1")
 
 
 def _debug_log(loc: str, msg: str, data: dict, hid: str):

@@ -316,7 +316,7 @@ export default function EditProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-[#226D68]" aria-hidden />
           <p className="text-sm text-[#6b7280]">Chargement de votre profil...</p>
@@ -338,7 +338,7 @@ export default function EditProfile() {
   ]
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-white flex overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen min-h-[100dvh] flex overflow-x-hidden w-full max-w-[100vw]">
       {/* Sidebar - style capture */}
       <aside className="w-56 lg:w-64 hidden md:flex flex-col shrink-0 bg-white border-r border-[#e5e7eb]">
         <div className="p-4 border-b border-[#e5e7eb]">

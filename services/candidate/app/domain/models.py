@@ -226,3 +226,68 @@ class JobPreference(SQLModel, table=True):
     # Relations
     profile: Profile = Relationship(back_populates="job_preferences")
 
+
+# ============================================
+# Job Offers & Applications (effet Leurre)
+# ============================================
+
+class JobStatus(str, Enum):
+    """Statut d'une offre d'emploi"""
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
+    CLOSED = "CLOSED"
+
+
+class ApplicationStatus(str, Enum):
+    """Statut d'une candidature"""
+    PENDING = "PENDING"
+    REVIEWED = "REVIEWED"
+    ACCEPTED = "ACCEPTED"
+
+
+class JobOffer(SQLModel, table=True):
+    """Offre d'emploi - appât pour l'acquisition de profils complets (internes + partenaires)"""
+    __tablename__ = "job_offers"
+    __table_args__ = {'extend_existing': True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = Field(max_length=255, description="Titre du poste")
+    description: str = Field(description="Contenu HTML (TinyMCE/Quill)")
+    location: str = Field(max_length=255, description="Localisation")
+    contract_type: str = Field(max_length=50, description="CDI, CDD, Freelance, etc.")
+    salary_range: Optional[str] = Field(default=None, max_length=100)
+    requirements: Optional[str] = Field(default=None, description="Prérequis")
+
+    # Secteur d'activité
+    sector: Optional[str] = Field(default=None, max_length=255, description="Secteur d'activité")
+
+    # Entreprise partenaire (offres externes)
+    company_name: Optional[str] = Field(default=None, max_length=255, description="Nom de l'entreprise")
+    company_logo_url: Optional[str] = Field(default=None, max_length=500, description="URL du logo")
+    # Mode de candidature externe
+    external_application_url: Optional[str] = Field(default=None, max_length=500, description="Redirection vers site externe")
+    application_email: Optional[str] = Field(default=None, max_length=255, description="Email de candidature")
+
+    status: JobStatus = Field(default=JobStatus.DRAFT, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = Field(default=None)
+
+    # Relations
+    applications: List["Application"] = Relationship(back_populates="job_offer")
+
+
+class Application(SQLModel, table=True):
+    """Table de liaison entre Candidat et Offre"""
+    __tablename__ = "applications"
+    __table_args__ = {'extend_existing': True}
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    candidate_id: int = Field(foreign_key="profiles.id", index=True)
+    job_offer_id: int = Field(foreign_key="job_offers.id", index=True)
+    status: str = Field(default="PENDING", max_length=50)  # PENDING, REVIEWED, ACCEPTED
+    applied_at: datetime = Field(default_factory=datetime.utcnow)
+    cover_letter: Optional[str] = Field(default=None)
+
+    # Relations
+    job_offer: JobOffer = Relationship(back_populates="applications")
+

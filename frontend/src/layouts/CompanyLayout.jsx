@@ -8,7 +8,7 @@ import Footer from '@/components/layout/Footer'
  */
 export default function CompanyLayout() {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen flex flex-col overflow-x-hidden w-full max-w-[100vw]">
       <Navbar />
       <main className="flex-1 w-full min-w-0">
         <Outlet />

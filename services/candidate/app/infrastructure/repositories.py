@@ -9,7 +9,8 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import SQLModel
 
 from app.domain.models import (
-    Profile, Experience, Education, Certification, Skill, JobPreference, ProfileStatus
+    Profile, Experience, Education, Certification, Skill, JobPreference, ProfileStatus,
+    JobOffer, Application, JobStatus,
 )
 from app.core.exceptions import ProfileNotFoundError, ProfileAlreadyExistsError
 from app.core.completion import calculate_completion_percentage
@@ -447,4 +448,98 @@ class JobPreferenceRepository:
         await session.commit()
         await session.refresh(preference)
         return preference
+
+
+class JobOfferRepository:
+    """Repository pour les offres d'emploi"""
+
+    @staticmethod
+    async def create(session: AsyncSession, data: dict) -> JobOffer:
+        """Crée une offre d'emploi"""
+        job = JobOffer(**data)
+        session.add(job)
+        await session.commit()
+        await session.refresh(job)
+        return job
+
+    @staticmethod
+    async def get_by_id(session: AsyncSession, job_id: int) -> Optional[JobOffer]:
+        """Récupère une offre par ID"""
+        result = await session.execute(select(JobOffer).where(JobOffer.id == job_id))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_published(
+        session: AsyncSession,
+        title: Optional[str] = None,
+        location: Optional[str] = None,
+        contract_type: Optional[str] = None,
+        company: Optional[str] = None,
+    ) -> List[JobOffer]:
+        """Liste les offres publiées, avec filtres optionnels"""
+        stmt = select(JobOffer).where(JobOffer.status == JobStatus.PUBLISHED)
+        if title:
+            stmt = stmt.where(JobOffer.title.ilike(f"%{title}%"))
+        if location:
+            stmt = stmt.where(JobOffer.location.ilike(f"%{location}%"))
+        if contract_type:
+            stmt = stmt.where(JobOffer.contract_type == contract_type)
+        if company:
+            stmt = stmt.where(JobOffer.company_name.ilike(f"%{company}%"))
+        stmt = stmt.order_by(JobOffer.created_at.desc())
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list_all(session: AsyncSession) -> List[JobOffer]:
+        """Liste toutes les offres (admin)"""
+        result = await session.execute(
+            select(JobOffer).order_by(JobOffer.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def update(session: AsyncSession, job_id: int, data: dict) -> Optional[JobOffer]:
+        """Met à jour une offre"""
+        job = await JobOfferRepository.get_by_id(session, job_id)
+        if not job:
+            return None
+        for key, value in data.items():
+            if hasattr(job, key):
+                setattr(job, key, value)
+        await session.commit()
+        await session.refresh(job)
+        return job
+
+
+class ApplicationRepository:
+    """Repository pour les candidatures"""
+
+    @staticmethod
+    async def create(
+        session: AsyncSession,
+        candidate_id: int,
+        job_offer_id: int,
+        cover_letter: Optional[str] = None,
+        status: str = "PENDING",
+    ) -> Application:
+        """Crée une candidature (status: PENDING, EXTERNAL_REDIRECT, etc.)"""
+        app = Application(candidate_id=candidate_id, job_offer_id=job_offer_id, cover_letter=cover_letter, status=status)
+        session.add(app)
+        await session.commit()
+        await session.refresh(app)
+        return app
+
+    @staticmethod
+    async def exists(session: AsyncSession, candidate_id: int, job_offer_id: int) -> bool:
+        """Vérifie si le candidat a déjà postulé à cette offre"""
+        result = await session.execute(
+            select(Application).where(
+                and_(
+                    Application.candidate_id == candidate_id,
+                    Application.job_offer_id == job_offer_id,
+                )
+            )
+        )
+        return result.scalar_one_or_none() is not None
 

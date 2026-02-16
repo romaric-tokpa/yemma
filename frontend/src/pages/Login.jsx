@@ -91,7 +91,7 @@ export default function Login() {
         canonical="/login"
       />
       <PublicNavbar variant="light" />
-      <div className="min-h-screen min-h-[100dvh] bg-white flex flex-col lg:flex-row overflow-x-hidden w-full max-w-[100vw] pt-14 md:pt-16">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col lg:flex-row overflow-x-hidden w-full max-w-[100vw] pt-14 md:pt-16">
         {/* Bande décorative gauche - style capture */}
         <div
           className="hidden lg:block w-16 lg:w-20 shrink-0"

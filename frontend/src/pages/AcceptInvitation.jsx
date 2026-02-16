@@ -203,7 +203,7 @@ export default function AcceptInvitation() {
   if (!token) {
     console.log('🔵 No token, showing error message')
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">Lien invalide</CardTitle>
@@ -223,7 +223,7 @@ export default function AcceptInvitation() {
   
   if (loadingInvitation) {
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
@@ -238,7 +238,7 @@ export default function AcceptInvitation() {
   
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
+      <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
@@ -258,7 +258,7 @@ export default function AcceptInvitation() {
   console.log('Rendering AcceptInvitation form, invitationInfo:', invitationInfo, 'error:', error)
   
   return (
-    <div className="min-h-screen bg-gray-light flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen flex items-center justify-center p-4 px-4 xs:px-5 relative overflow-x-hidden w-full max-w-[100vw]">
       <Card className="w-full max-w-md min-w-0 overflow-hidden">
         <CardHeader className="text-center">
           <div className="w-16 h-16 bg-[#226D68]/10 rounded-full flex items-center justify-center mx-auto mb-4">

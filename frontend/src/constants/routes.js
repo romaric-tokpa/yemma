@@ -37,6 +37,15 @@ export const ROUTES = {
   COMPANY_MANAGEMENT: '/company/management',
   COMPANY_SEARCH: '/company/search',
   
+  // Offres d'emploi (publiques)
+  JOB_OFFERS: '/offres',
+  JOB_OFFER_DETAIL: (id) => `/offres/${id}`,
+
+  // Admin - Offres
+  ADMIN_JOBS: '/admin/jobs',
+  ADMIN_JOB_NEW: '/admin/jobs/new',
+  ADMIN_JOB_EDIT: (id) => `/admin/jobs/${id}/edit`,
+
   // Routes recherche
   SEARCH: '/search',
   SEARCH_PRO: '/search/pro',

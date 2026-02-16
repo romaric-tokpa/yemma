@@ -136,7 +136,7 @@ export default function CandidateDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#226D68] border-t-transparent mx-auto mb-3" />
           <p className="text-sm text-[#2C2C2C]/70">Chargement du profil...</p>
@@ -147,7 +147,7 @@ export default function CandidateDetailPage() {
 
   if (!candidate) {
     return (
-      <div className="min-h-screen bg-[#F4F6F8] flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="max-w-md w-full p-6 text-center">
           <FileText className="h-12 w-12 mx-auto mb-3 text-[#9ca3af]" />
           <h2 className="text-lg font-semibold text-[#2C2C2C] mb-2">Candidat non trouvé</h2>
@@ -178,7 +178,7 @@ export default function CandidateDetailPage() {
   ].filter(i => report[i.key] !== undefined)
 
   return (
-    <div className="min-h-screen bg-[#F4F6F8]">
+    <div className="min-h-screen">
       {/* Barre top compacte */}
       <div className="sticky top-0 z-20 bg-white border-b border-[#e5e7eb] px-4 py-2.5 flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={() => navigate(searchBackUrl)} className="text-[#2C2C2C] hover:bg-[#F4F6F8] -ml-1">

@@ -77,7 +77,7 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-white relative overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen min-h-[100dvh] relative overflow-x-hidden w-full max-w-[100vw]">
       <SEO
         title="Plateforme de Recrutement | CVthèque de candidats vérifiés"
         description="Yemma Solutions - CVthèque de candidats 100% validés par des experts RH. Réduisez vos coûts de recrutement (~60%), accélérez vos embauches (objectif 48h). Recherche avancée, matching et évaluations expertes. Essai gratuit 14 jours."
@@ -87,7 +87,7 @@ export default function LandingPage() {
       <PublicNavbar variant="light" />
 
       {/* Hero */}
-      <section className="relative pt-16 xs:pt-20 md:pt-24 pb-12 xs:pb-16 md:pb-24 overflow-hidden bg-white">
+      <section className="relative pt-16 xs:pt-20 md:pt-24 pb-12 xs:pb-16 md:pb-24 overflow-hidden">
         <div className="max-w-7xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 sm:gap-12 lg:gap-16">
             {/* Contenu gauche */}
@@ -156,7 +156,7 @@ export default function LandingPage() {
       </section>
 
       {/* Bloc partenaires - compact avec défilement */}
-      <section className="py-5 xs:py-6 md:py-8 bg-white border-b border-gray-100 overflow-hidden">
+      <section className="py-5 xs:py-6 md:py-8 border-b border-gray-100 overflow-hidden">
         <div className="max-w-5xl mx-auto px-3 xs:px-4 sm:px-6 mb-6">
           <p className="text-center text-sm md:text-base text-[#2C2C2C]">
             <span className="font-semibold underline decoration-[#226D68] decoration-2 underline-offset-2">+ 500 entreprises</span>
@@ -292,7 +292,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pourquoi 500+ entreprises nous font confiance - style capture */}
-      <section id="benefits" className="py-10 xs:py-12 md:py-16 bg-white overflow-hidden">
+      <section id="benefits" className="py-10 xs:py-12 md:py-16 overflow-hidden">
         <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6">
           <motion.h2
             initial={{ opacity: 0, y: 20 }}

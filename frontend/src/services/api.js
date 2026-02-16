@@ -92,7 +92,8 @@ const createApiClient = (baseURL) => {
       '/api/v1/auth/password-reset',
       '/api/v1/auth/password-reset/confirm',
       '/api/v1/admin-invitations/validate',
-      '/api/v1/admin-invitations/register'
+      '/api/v1/admin-invitations/register',
+      '/api/v1/jobs'  // Liste et détail des offres (publics)
     ]
     const isPublicRoute = publicRoutes.some(route => config.url?.includes(route))
     
@@ -520,6 +521,54 @@ export const candidateApi = {
     return response.data
   },
 
+  // ===== OFFRES D'EMPLOI (effet Leurre) =====
+  listJobs: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.title) params.append('title', filters.title)
+    if (filters.location) params.append('location', filters.location)
+    if (filters.contract_type) params.append('contract_type', filters.contract_type)
+    if (filters.company) params.append('company', filters.company)
+    const response = await api.get(`/api/v1/jobs?${params.toString()}`, { timeout: 30000 })
+    return response.data
+  },
+
+  getJob: async (jobId) => {
+    const response = await api.get(`/api/v1/jobs/${jobId}`, { timeout: 30000 })
+    return response.data
+  },
+
+  applyToJob: async (jobId, coverLetter = null) => {
+    const response = await api.post(`/api/v1/jobs/${jobId}/apply`, { cover_letter: coverLetter })
+    return response.data
+  },
+
+  // ===== ADMIN - OFFRES D'EMPLOI =====
+  // Timeout 60s pour les offres (proxy/nginx peuvent être lents en dev)
+  adminListJobs: async () => {
+    const response = await api.get('/api/v1/admin/jobs', { timeout: 60000 })
+    return response.data
+  },
+
+  adminCreateJob: async (data) => {
+    const response = await api.post('/api/v1/admin/jobs', data, { timeout: 60000 })
+    return response.data
+  },
+
+  adminGetJob: async (jobId) => {
+    const response = await api.get(`/api/v1/admin/jobs/${jobId}`, { timeout: 60000 })
+    return response.data
+  },
+
+  adminUpdateJob: async (jobId, data) => {
+    const response = await api.patch(`/api/v1/admin/jobs/${jobId}`, data, { timeout: 60000 })
+    return response.data
+  },
+
+  adminUpdateJobStatus: async (jobId, status) => {
+    const response = await api.patch(`/api/v1/admin/jobs/${jobId}/status?status_value=${encodeURIComponent(status)}`, null, { timeout: 60000 })
+    return response.data
+  },
+
   // Méthode de compatibilité (ancienne API)
   saveProfile: async (data) => {
     // Pour compatibilité avec l'ancien code
@@ -788,6 +837,19 @@ export const documentApi = {
     formData.append('candidate_id', candidateId)
 
     const response = await documentApiClient.post('/api/v1/documents/upload/profile-photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
+
+  // Upload logo d'entreprise pour une offre d'emploi (admin)
+  uploadJobOfferLogo: async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await documentApiClient.post('/api/v1/documents/upload/job-offer-logo', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

@@ -9,7 +9,7 @@ import {
   Plus, Trash2, Eye, EyeOff, Mail, Phone, Calendar, LogOut,
   Home, Settings, Menu, X, TrendingUp, FileCheck,
   Flag, Download, Image as ImageIcon, Loader2, Upload,
-  Wrench, Sparkles, BarChart3, HelpCircle, Target, Search,
+  Wrench, Sparkles, BarChart3, HelpCircle,   Target, Search, FileSearch,
   Save
 } from 'lucide-react'
 import { candidateApi, authApiService, documentApi } from '../services/api'
@@ -659,7 +659,7 @@ export default function CandidateDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-light flex flex-col">
+      <div className="min-h-screen flex flex-col">
         <div className="flex-1 container mx-auto p-4 md:p-6 max-w-7xl">
           <div className="animate-pulse space-y-4">
             <div className="flex items-center gap-3">
@@ -690,7 +690,7 @@ export default function CandidateDashboard() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gray-light flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md rounded-[12px] shadow-lg">
           <CardHeader>
             <CardTitle className="text-center">Profil non trouvé</CardTitle>
@@ -728,6 +728,7 @@ export default function CandidateDashboard() {
   const navItems = [
     { id: 'dashboard', label: 'Mon dashboard', icon: Home },
     { id: 'profile', label: 'Mon profil', icon: User },
+    { id: 'offres', label: 'Offres d\'emploi', icon: FileSearch, path: '/offres' },
     { id: 'situation', label: 'Ma situation', icon: Search },
     { id: 'preferences', label: 'Préférences emploi', icon: Target },
     { id: 'documents', label: 'Mon CV', icon: FileText },
@@ -752,7 +753,7 @@ export default function CandidateDashboard() {
   const minCompletionForSubmit = 80
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F6F8]">
+    <div className="min-h-screen flex flex-col">
       <a href="#dashboard-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:px-3 focus:py-2 focus:bg-[#226D68] focus:text-white focus:rounded-md">
         Aller au contenu principal
       </a>
@@ -826,8 +827,8 @@ export default function CandidateDashboard() {
             <nav className="space-y-0.5">
               {navItems.map((item) => {
                 const Icon = item.icon
-                const path = item.id === 'dashboard' ? '/candidate/dashboard' : `/candidate/dashboard/${item.id}`
-                const isActive = activeTab === item.id || (item.id === 'situation' && activeTab === 'preferences')
+                const path = item.path || (item.id === 'dashboard' ? '/candidate/dashboard' : `/candidate/dashboard/${item.id}`)
+                const isActive = item.path ? false : (activeTab === item.id || (item.id === 'situation' && activeTab === 'preferences'))
                 return (
                   <Link
                     key={item.id}
@@ -873,7 +874,7 @@ export default function CandidateDashboard() {
 
         {/* Main */}
         <div className="flex-1 min-w-0">
-          <main id="dashboard-main" className="flex-1 overflow-y-auto min-w-0 bg-[#F4F6F8]" aria-label="Contenu du profil">
+          <main id="dashboard-main" className="flex-1 overflow-y-auto min-w-0" aria-label="Contenu du profil">
             <div className="max-w-4xl mx-auto px-4 py-6 pb-24 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
           {/* Vue Dashboard (style capture) */}
           {activeTab === 'dashboard' && (
