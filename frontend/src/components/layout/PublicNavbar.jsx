@@ -164,9 +164,6 @@ export default function PublicNavbar({ variant = 'light' }) {
             <Link to="/offres" className={`text-sm font-medium transition-colors ${linkBase}`}>
               Offres
             </Link>
-            <Link to={ROUTES.CONTACT} className={`text-sm font-medium transition-colors ${linkBase}`}>
-              Contactez-nous !
-            </Link>
           </div>
           <div className="hidden md:flex items-center gap-4">
             {isAuthenticated ? (
@@ -240,9 +237,6 @@ export default function PublicNavbar({ variant = 'light' }) {
           </Link>
           <Link to="/offres" className={`block text-sm py-2 ${mobileLink}`} onClick={() => setMobileMenuOpen(false)}>
             Offres
-          </Link>
-          <Link to={ROUTES.CONTACT} className={`block text-sm py-2 ${mobileLink}`} onClick={() => setMobileMenuOpen(false)}>
-            Contactez-nous !
           </Link>
           <div className={`pt-3 ${mobileBorder} flex flex-col gap-2`}>
             {isAuthenticated ? (

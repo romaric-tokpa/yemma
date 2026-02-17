@@ -199,18 +199,17 @@ export default function CandidateJobsPage() {
                 {jobs.map((job) => (
                   <Link key={job.id} to={ROUTES.JOB_OFFER_DETAIL(job.id)}>
                     <Card className="border border-gray-200 bg-white rounded-xl hover:border-[#226D68]/40 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col h-full group">
-                      <div className="p-4 pb-0">
-                        {job.company_logo_url ? (
+                      <div className="p-4 pb-0 flex flex-col gap-1">
+                        {job.company_logo_url && (
                           <img
                             src={job.company_logo_url}
                             alt={job.company_name || ''}
                             className="h-9 w-auto max-w-[100px] object-contain object-left"
                           />
-                        ) : (
-                          <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">
-                            {job.company_name || 'Yemma'}
-                          </p>
                         )}
+                        <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">
+                          {job.company_name || 'Yemma'}
+                        </p>
                       </div>
                       <div className="px-4 pt-3">
                         <h3 className="font-semibold text-[#2C2C2C] text-sm leading-tight line-clamp-2 group-hover:text-[#226D68] transition-colors">

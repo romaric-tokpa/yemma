@@ -566,6 +566,12 @@ export const candidateApi = {
     return response.data
   },
 
+  /** Liste les IDs des offres auxquelles l'utilisateur a postulé */
+  getMyJobApplications: async () => {
+    const response = await api.get('/api/v1/jobs/my-applications')
+    return response.data
+  },
+
   /** Enregistre un clic sur "Créer mon compte" depuis la modal Postuler (sans auth) */
   trackJobRegisterClick: async (jobId) => {
     try {
@@ -598,6 +604,20 @@ export const candidateApi = {
 
   adminGetJobApplications: async (jobId) => {
     const response = await api.get(`/api/v1/admin/jobs/${jobId}/applications`, { timeout: 60000 })
+    return response.data
+  },
+
+  /** Met à jour le statut d'une candidature (étape de recrutement). Si status=REJECTED, rejection_reason est obligatoire. */
+  adminUpdateApplicationStatus: async (jobId, applicationId, statusValue, rejectionReason = null) => {
+    const body = { status: statusValue }
+    if (statusValue === 'REJECTED' && rejectionReason) {
+      body.rejection_reason = rejectionReason
+    }
+    const response = await api.patch(
+      `/api/v1/admin/jobs/${jobId}/applications/${applicationId}/status`,
+      body,
+      { timeout: 10000 }
+    )
     return response.data
   },
 

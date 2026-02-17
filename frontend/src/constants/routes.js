@@ -48,6 +48,7 @@ export const ROUTES = {
   ADMIN_JOBS: '/admin/jobs',
   ADMIN_JOB_NEW: '/admin/jobs/new',
   ADMIN_JOB_EDIT: (id) => `/admin/jobs/${id}/edit`,
+  ADMIN_JOB_CANDIDATURES: (id) => `/admin/jobs/${id}/candidatures`,
 
   // Routes recherche
   SEARCH: '/search',
@@ -58,6 +59,7 @@ export const ROUTES = {
   ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_COMPANIES: '/admin/companies',
   ADMIN_STATISTICS: '/admin/statistics',
+  ADMIN_STATISTICS_OFFRES: '/admin/statistics/offres',
   ADMIN_REVIEW: (candidateId) => `/admin/review/${candidateId}`,
   
   // Routes par défaut selon le rôle

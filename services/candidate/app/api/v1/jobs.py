@@ -6,6 +6,7 @@ Endpoints API pour les offres d'emploi (effet Leurre)
 from datetime import datetime, timezone
 from typing import List, Optional
 import logging
+import traceback
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -49,6 +50,25 @@ async def list_jobs(
         sector=sector,
     )
     return [JobOfferResponse.model_validate(j) for j in jobs]
+
+
+@router.get("/jobs/my-applications")
+async def get_my_applications(
+    current_user: Optional[TokenData] = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Liste les candidatures de l'utilisateur : job_ids et statut par offre."""
+    current_user = require_current_user(current_user)
+    profile = await ProfileRepository.get_by_user_id(session, current_user.user_id)
+    if not profile:
+        return {"job_ids": [], "applications": []}
+    apps = await ApplicationRepository.list_applications_by_candidate(session, profile.id)
+    job_ids = [a[0] for a in apps]
+    applications = [
+        {"job_id": a[0], "status": a[1], "rejection_reason": a[2] if len(a) > 2 else None}
+        for a in apps
+    ]
+    return {"job_ids": job_ids, "applications": applications}
 
 
 @router.get("/jobs/{job_id}", response_model=JobOfferResponse)
@@ -233,26 +253,84 @@ async def admin_list_job_applications(
     _: TokenData = Depends(require_admin_role_dep),
 ):
     """Liste les candidatures pour une offre (admin)."""
-    job = await JobOfferRepository.get_by_id(session, job_id)
-    if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre non trouvée")
-    rows = await ApplicationRepository.list_by_job(session, job_id)
-    result = []
-    for app, profile in rows:
-        result.append(JobApplicationResponse(
-            id=app.id,
-            candidate_id=app.candidate_id,
-            job_offer_id=app.job_offer_id,
-            status=app.status,
-            applied_at=app.applied_at,
-            cover_letter=app.cover_letter,
-            first_name=profile.first_name if profile else None,
-            last_name=profile.last_name if profile else None,
-            email=profile.email if profile else None,
-            profile_title=profile.profile_title if profile else None,
-            profile_status=profile.status.value if profile and hasattr(profile.status, "value") else (str(profile.status) if profile else None),
-        ))
-    return result
+    try:
+        job = await JobOfferRepository.get_by_id(session, job_id)
+        if not job:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre non trouvée")
+        rows = await ApplicationRepository.list_by_job(session, job_id)
+        result = []
+        for app, profile in rows:
+            profile_status_val = None
+            if profile and profile.status is not None:
+                profile_status_val = getattr(profile.status, "value", None) or str(profile.status)
+            result.append(JobApplicationResponse(
+                id=app.id,
+                candidate_id=app.candidate_id,
+                job_offer_id=app.job_offer_id,
+                status=str(app.status) if app.status is not None else "PENDING",
+                applied_at=app.applied_at,
+                cover_letter=app.cover_letter,
+                first_name=profile.first_name if profile else None,
+                last_name=profile.last_name if profile else None,
+                email=profile.email if profile else None,
+                profile_title=profile.profile_title if profile else None,
+                profile_status=profile_status_val,
+                photo_url=profile.photo_url if profile else None,
+            ))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("admin_list_job_applications error: %s\n%s", e, traceback.format_exc())
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+APPLICATION_STATUS_VALUES = [
+    "PENDING",
+    "TO_INTERVIEW",
+    "INTERVIEW_SCHEDULED",
+    "INTERVIEW_DONE",
+    "HIRED",
+    "REJECTED",
+    "EXTERNAL_REDIRECT",
+    "REVIEWED",  # rétrocompatibilité
+    "ACCEPTED",  # rétrocompatibilité
+]
+
+
+class ApplicationStatusUpdate(BaseModel):
+    """Corps pour la mise à jour du statut d'une candidature"""
+    status: str = Field(..., description="Nouveau statut")
+    rejection_reason: Optional[str] = Field(default=None, max_length=2000, description="Motif de refus (obligatoire si status=REJECTED)")
+
+
+@router.patch("/admin/jobs/{job_id}/applications/{application_id}/status")
+async def admin_update_application_status(
+    job_id: int,
+    application_id: int,
+    body: ApplicationStatusUpdate = Body(...),
+    session: AsyncSession = Depends(get_session),
+    _: TokenData = Depends(require_admin_role_dep),
+):
+    """Met à jour le statut d'une candidature (étape de recrutement). Si REJECTED, rejection_reason peut être fourni."""
+    status_value = body.status
+    if status_value not in APPLICATION_STATUS_VALUES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Statut invalide. Valeurs acceptées : {', '.join(APPLICATION_STATUS_VALUES)}",
+        )
+    if status_value == "REJECTED" and (not body.rejection_reason or not body.rejection_reason.strip()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Veuillez rédiger les motifs de refus pour informer le candidat.",
+        )
+    app = await ApplicationRepository.update_status(
+        session, application_id, job_id, status_value,
+        rejection_reason=body.rejection_reason if status_value == "REJECTED" else None,
+    )
+    if not app:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidature non trouvée")
+    return {"id": app.id, "status": app.status}
 
 
 @router.patch("/admin/jobs/{job_id}", response_model=JobOfferResponse)

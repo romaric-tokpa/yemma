@@ -4,20 +4,21 @@
  * Responsive et redesign moderne.
  */
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { candidateApi } from '@/services/api'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { Link } from 'react-router-dom'
+import { ROUTES } from '@/constants/routes'
 import {
   Users, CheckCircle, Loader2, TrendingUp, RefreshCw, Calendar,
   BarChart3, PieChart, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, Archive,
-  Briefcase, FileText, Eye, EyeOff, Clock,
+  Briefcase, FileText, Eye, EyeOff, Clock, UserPlus, Target, Building2,
 } from 'lucide-react'
 
-export default function AdminStatisticsPage() {
+export default function AdminStatisticsPage({ defaultTab }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [profileStats, setProfileStats] = useState(null)
   const [statsBySector, setStatsBySector] = useState([])
   const [loadingStatsBySector, setLoadingStatsBySector] = useState(false)
@@ -35,7 +36,13 @@ export default function AdminStatisticsPage() {
       groupBy: 'month',
     }
   })
-  const [statsTab, setStatsTab] = useState('overview')
+  const [statsTab, setStatsTab] = useState(() =>
+    location.pathname.endsWith('/offres') ? 'jobs' : (defaultTab || 'overview')
+  )
+
+  useEffect(() => {
+    if (location.pathname.endsWith('/offres')) setStatsTab('jobs')
+  }, [location.pathname])
   const [jobStats, setJobStats] = useState(null)
   const [loadingJobStats, setLoadingJobStats] = useState(false)
 
@@ -236,18 +243,35 @@ export default function AdminStatisticsPage() {
             { id: 'sectors', label: 'Par secteur', shortLabel: 'Secteurs', icon: PieChart },
             { id: 'period', label: 'Par période', shortLabel: 'Période', icon: Calendar },
             { id: 'jobs', label: 'Offres d\'emploi', shortLabel: 'Offres', icon: Briefcase },
-          ].map(({ id, label, shortLabel, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setStatsTab(id)}
-              className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-all shrink-0 ${statsTab === id ? 'bg-[#226D68] text-white shadow-sm' : 'text-[#6b7280] hover:text-[#2C2C2C] hover:bg-gray-50'}`}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden">{shortLabel}</span>
-            </button>
-          ))}
+          ].map(({ id, label, shortLabel, icon: Icon }) => {
+            const isActive = statsTab === id
+            const content = (
+              <>
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sm:hidden">{shortLabel}</span>
+              </>
+            )
+            return id === 'jobs' ? (
+              <Link
+                key={id}
+                to={ROUTES.ADMIN_STATISTICS_OFFRES}
+                onClick={() => setStatsTab('jobs')}
+                className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-all shrink-0 no-underline ${isActive ? 'bg-[#226D68] text-white shadow-sm' : 'text-[#6b7280] hover:text-[#2C2C2C] hover:bg-gray-50'}`}
+              >
+                {content}
+              </Link>
+            ) : (
+              <button
+                key={id}
+                type="button"
+                onClick={() => { setStatsTab(id); if (location.pathname.endsWith('/offres')) navigate(ROUTES.ADMIN_STATISTICS) }}
+                className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-all shrink-0 ${isActive ? 'bg-[#226D68] text-white shadow-sm' : 'text-[#6b7280] hover:text-[#2C2C2C] hover:bg-gray-50'}`}
+              >
+                {content}
+              </button>
+            )
+          })}
         </div>
 
         {/* Content */}
@@ -508,46 +532,48 @@ export default function AdminStatisticsPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
-                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
-                          <Briefcase className="w-4 h-4" />
-                          Total offres
+                    {/* KPI offres */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                      {[
+                        { icon: Briefcase, label: 'Total offres', value: jobStats.total ?? 0, color: 'text-[#2C2C2C]' },
+                        { icon: Eye, label: 'Publiées', value: jobStats.by_status?.PUBLISHED ?? 0, color: 'text-[#1a5a55]' },
+                        { icon: Clock, label: 'Expirées', value: jobStats.expired_published ?? 0, color: 'text-[#c04a2f]' },
+                        { icon: FileText, label: 'Candidatures', value: jobStats.applications ?? 0, color: 'text-[#226D68]' },
+                        { icon: Eye, label: 'Vues pages', value: jobStats.total_view_count ?? 0, color: 'text-[#6b7280]' },
+                        { icon: UserPlus, label: 'Clics inscription', value: jobStats.total_register_click_count ?? 0, color: 'text-[#6b7280]' },
+                      ].map(({ icon: Icon, label, value, color }) => (
+                        <div key={label} className="rounded-xl border border-gray-200 bg-white shadow-sm p-4">
+                          <div className="flex items-center gap-2 text-[#6b7280] text-xs mb-1">
+                            <Icon className="w-3.5 h-3.5 shrink-0" />
+                            {label}
+                          </div>
+                          <p className={`text-xl font-bold tabular-nums ${color}`}>{typeof value === 'number' ? value.toLocaleString('fr-FR') : value}</p>
                         </div>
-                        <p className="text-2xl font-bold text-[#2C2C2C] tabular-nums">{jobStats.total ?? 0}</p>
-                      </div>
-                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
-                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
-                          <Eye className="w-4 h-4" />
-                          Publiées
-                        </div>
-                        <p className="text-2xl font-bold text-[#1a5a55] tabular-nums">{jobStats.by_status?.PUBLISHED ?? 0}</p>
-                      </div>
-                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
-                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
-                          <Clock className="w-4 h-4" />
-                          Expirées (publiées)
-                        </div>
-                        <p className="text-2xl font-bold text-[#c04a2f] tabular-nums">{jobStats.expired_published ?? 0}</p>
-                      </div>
-                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
-                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
-                          <FileText className="w-4 h-4" />
-                          Candidatures
-                        </div>
-                        <p className="text-2xl font-bold text-[#226D68] tabular-nums">{jobStats.applications ?? 0}</p>
-                      </div>
+                      ))}
                     </div>
+                    {/* Moyenne candidatures par offre */}
+                    {(jobStats.by_status?.PUBLISHED ?? 0) > 0 && (
+                      <div className="rounded-xl border border-gray-200 bg-[#E8F4F3]/30 p-4 flex items-center gap-3">
+                        <Target className="w-8 h-8 text-[#226D68] shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-[#2C2C2C]">Moyenne candidatures par offre publiée</p>
+                          <p className="text-2xl font-bold text-[#226D68] tabular-nums">{jobStats.avg_applications_per_job ?? 0}</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Répartition offres par statut */}
                     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                       <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-[#E8F4F3]/60 to-white flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="text-sm font-semibold text-[#2C2C2C]">Répartition par statut</h3>
-                        <Link
-                          to="/admin/jobs"
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]"
-                        >
-                          Gérer les offres
-                          <ChevronRight className="w-4 h-4" />
-                        </Link>
+                        <h3 className="text-sm font-semibold text-[#2C2C2C]">Offres par statut</h3>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm" onClick={loadJobStats} disabled={loadingJobStats} className="h-8 w-8 p-0 text-[#6b7280] hover:text-[#226D68]">
+                            <RefreshCw className={`w-4 h-4 ${loadingJobStats ? 'animate-spin' : ''}`} />
+                          </Button>
+                          <Link to="/admin/jobs" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]">
+                            Gérer les offres
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        </div>
                       </div>
                       <div className="p-4 sm:p-5">
                         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -570,6 +596,85 @@ export default function AdminStatisticsPage() {
                         </div>
                       </div>
                     </div>
+                    {/* Pipeline candidatures (étapes de recrutement) */}
+                    {jobStats.applications_by_status && Object.keys(jobStats.applications_by_status).length > 0 && (
+                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-[#E8F4F3]/60 to-white">
+                          <h3 className="text-sm font-semibold text-[#2C2C2C]">Pipeline candidatures — par étape</h3>
+                          <p className="text-xs text-[#6b7280] mt-0.5">Répartition des candidatures selon l&apos;étape de recrutement</p>
+                        </div>
+                        <div className="p-4 sm:p-5">
+                          {(() => {
+                            const LABELS = {
+                              PENDING: 'En attente',
+                              TO_INTERVIEW: 'À voir en entretien',
+                              INTERVIEW_SCHEDULED: 'Entretien programmé',
+                              INTERVIEW_DONE: 'Entretien réalisé',
+                              HIRED: 'Embauché',
+                              REJECTED: 'Refusé',
+                              EXTERNAL_REDIRECT: 'Externe',
+                              REVIEWED: 'Examiné',
+                              ACCEPTED: 'Accepté',
+                            }
+                            const byStatus = jobStats.applications_by_status
+                            const maxCount = Math.max(...Object.values(byStatus), 1)
+                            const order = ['PENDING', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_DONE', 'HIRED', 'REJECTED', 'REVIEWED', 'ACCEPTED', 'EXTERNAL_REDIRECT']
+                            const sorted = order.filter(k => (byStatus[k] ?? 0) > 0).concat(Object.keys(byStatus).filter(k => !order.includes(k)))
+                            return (
+                              <div className="space-y-3">
+                                {sorted.map((key) => {
+                                  const count = byStatus[key] ?? 0
+                                  const pct = (count / maxCount) * 100
+                                  const isHired = key === 'HIRED'
+                                  const isRejected = key === 'REJECTED'
+                                  return (
+                                    <div key={key} className="flex items-center gap-3 min-w-0">
+                                      <span className="text-sm text-[#2C2C2C] w-40 sm:w-48 truncate shrink-0">{LABELS[key] || key}</span>
+                                      <div className="flex-1 min-w-0 h-7 rounded-lg bg-gray-100 overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-lg transition-all ${isHired ? 'bg-[#226D68]' : isRejected ? 'bg-red-400' : 'bg-[#226D68]/70'}`}
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-sm font-semibold tabular-nums text-[#2C2C2C] w-10 text-right shrink-0">{count}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                    {/* Top offres par candidatures */}
+                    {jobStats.top_jobs_by_applications?.length > 0 && (
+                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-[#E8F4F3]/60 to-white flex flex-wrap items-center justify-between gap-3">
+                          <h3 className="text-sm font-semibold text-[#2C2C2C]">Top offres par candidatures</h3>
+                          <Link to="/admin/jobs" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]">
+                            Voir toutes
+                            <ChevronRight className="w-4 h-4" />
+                          </Link>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {jobStats.top_jobs_by_applications.slice(0, 8).map((job, i) => (
+                            <Link
+                              key={job.job_id}
+                              to={`/admin/jobs/${job.job_id}/candidatures`}
+                              className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-[#E8F4F3]/30 transition-colors"
+                            >
+                              <span className="text-sm text-[#6b7280] w-6 shrink-0">{i + 1}.</span>
+                              <Building2 className="w-4 h-4 text-[#6b7280] shrink-0 hidden sm:block" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-[#2C2C2C] truncate">{job.title}</p>
+                                {job.company_name && <p className="text-xs text-[#6b7280] truncate">{job.company_name}</p>}
+                              </div>
+                              <span className="text-sm font-semibold text-[#226D68] tabular-nums shrink-0">{job.applications} candidature{job.applications !== 1 ? 's' : ''}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

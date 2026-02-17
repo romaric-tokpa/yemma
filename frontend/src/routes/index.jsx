@@ -44,6 +44,7 @@ const AdminReview = lazy(() => import('@/pages/AdminReview'))
 const AdminInvitationsPage = lazy(() => import('@/pages/AdminInvitationsPage'))
 const AdminJobManager = lazy(() => import('@/pages/AdminJobManager'))
 const AdminJobFormPage = lazy(() => import('@/pages/AdminJobFormPage'))
+const AdminJobCandidateListPage = lazy(() => import('@/pages/AdminJobCandidateListPage'))
 const CreateAdminAccount = lazy(() => import('@/pages/CreateAdminAccount'))
 
 // Page 404
@@ -289,6 +290,14 @@ export default function AppRoutes() {
         } 
       />
       <Route 
+        path="/admin/statistics/offres" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminStatisticsPage defaultTab="jobs" />
+          </AuthGuard>
+        } 
+      />
+      <Route 
         path="/admin/statistics" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
@@ -329,6 +338,14 @@ export default function AppRoutes() {
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminJobFormPage />
+          </AuthGuard>
+        }
+      />
+      <Route 
+        path="/admin/jobs/:id/candidatures" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminJobCandidateListPage />
           </AuthGuard>
         }
       />

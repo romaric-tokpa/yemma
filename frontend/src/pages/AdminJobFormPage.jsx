@@ -177,6 +177,16 @@ export default function AdminJobFormPage() {
                 Informations principales
               </h4>
               <div>
+                <Label htmlFor="company_name">Nom de l&apos;entreprise qui recrute</Label>
+                <Input
+                  id="company_name"
+                  value={form.company_name}
+                  onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
+                  placeholder="Ex: Acme Corp, StartupXYZ..."
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
                 <Label htmlFor="title">Titre du poste *</Label>
                 <Input
                   id="title"
@@ -277,26 +287,15 @@ export default function AdminJobFormPage() {
               </div>
             </div>
 
-            {/* Section Entreprise */}
+            {/* Section Logo entreprise (nom déjà en haut) */}
             <div className="space-y-4 pt-4 border-t border-gray-100">
               <h4 className="font-semibold text-[#2C2C2C] flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-[#226D68]" />
-                Entreprise (optionnel)
+                Logo de l&apos;entreprise (optionnel)
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="company_name">Nom de l'entreprise</Label>
-                  <Input
-                    id="company_name"
-                    value={form.company_name}
-                    onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
-                    placeholder="Ex: Acme Corp"
-                    className="mt-1.5"
-                  />
-                </div>
-                <div>
-                  <Label>Logo de l'entreprise</Label>
-                  <div className="flex items-center gap-3 mt-1.5">
+              <div>
+                <Label>Logo de l&apos;entreprise</Label>
+                <div className="flex items-center gap-3 mt-1.5">
                     <input
                       id="company-logo-upload"
                       type="file"
@@ -368,7 +367,6 @@ export default function AdminJobFormPage() {
                       </label>
                     )}
                   </div>
-                </div>
               </div>
             </div>
 

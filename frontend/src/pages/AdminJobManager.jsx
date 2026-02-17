@@ -3,11 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   Briefcase, Plus, Loader2, MapPin, Pencil,
   ExternalLink, ChevronLeft, ChevronRight,
-  Calendar, RotateCcw, Eye, UserPlus, FileText, User,
+  Calendar, RotateCcw, Eye, UserPlus, FileText,
 } from 'lucide-react'
-import { candidateApi } from '@/services/api'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { candidateApi } from '@/services/api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import AdminLayout from '@/components/admin/AdminLayout'
@@ -37,7 +37,6 @@ const FILTERS = [
 ]
 
 export default function AdminJobManager() {
-  const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
@@ -47,13 +46,6 @@ export default function AdminJobManager() {
   const [renewDate, setRenewDate] = useState('')
   const [renewing, setRenewing] = useState(false)
   const [changingStatusId, setChangingStatusId] = useState(null)
-  const [applicationsJob, setApplicationsJob] = useState(null)
-  const [applicationsList, setApplicationsList] = useState([])
-  const [loadingApplications, setLoadingApplications] = useState(false)
-
-  useEffect(() => {
-    loadJobs()
-  }, [])
 
   useEffect(() => {
     if (renewJob) {
@@ -64,23 +56,8 @@ export default function AdminJobManager() {
   }, [renewJob])
 
   useEffect(() => {
-    if (!applicationsJob) {
-      setApplicationsList([])
-      return
-    }
-    const load = async () => {
-      setLoadingApplications(true)
-      try {
-        const data = await candidateApi.adminGetJobApplications(applicationsJob.id)
-        setApplicationsList(Array.isArray(data) ? data : [])
-      } catch {
-        setApplicationsList([])
-      } finally {
-        setLoadingApplications(false)
-      }
-    }
-    load()
-  }, [applicationsJob])
+    loadJobs()
+  }, [])
 
   const loadJobs = async () => {
     try {
@@ -325,15 +302,14 @@ export default function AdminJobManager() {
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          <button
-                            type="button"
-                            onClick={() => setApplicationsJob(job)}
+                          <Link
+                            to={`/admin/jobs/${job.id}/candidatures`}
                             className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55] hover:underline"
                             title="Voir les candidatures"
                           >
                             <FileText className="h-3.5 w-3.5" />
                             Candidatures
-                          </button>
+                          </Link>
                         </td>
                         <td className="py-3 px-4">
                           <select
@@ -435,60 +411,6 @@ export default function AdminJobManager() {
           </>
         )}
       </div>
-
-      {/* Modal Candidatures */}
-      <Dialog open={!!applicationsJob} onOpenChange={(open) => !open && setApplicationsJob(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Candidatures</DialogTitle>
-            <DialogDescription>
-              {applicationsJob ? `${applicationsJob.title} — Profils ayant postulé` : ''}
-            </DialogDescription>
-          </DialogHeader>
-          {applicationsJob && (
-            <div className="py-2 max-h-[60vh] overflow-y-auto">
-              {loadingApplications ? (
-                <div className="flex items-center justify-center py-12 gap-2 text-[#6b7280]">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span className="text-sm">Chargement…</span>
-                </div>
-              ) : applicationsList.length === 0 ? (
-                <p className="text-sm text-[#6b7280] py-8 text-center">Aucune candidature pour cette offre.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {applicationsList.map((app) => (
-                    <li key={app.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-100 bg-[#F8FAFC]/50 hover:bg-[#E8F4F3]/30 transition-colors">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-[#2C2C2C] truncate">
-                          {[app.first_name, app.last_name].filter(Boolean).join(' ') || '—'}
-                        </p>
-                        {app.email && (
-                          <p className="text-xs text-[#6b7280] truncate">{app.email}</p>
-                        )}
-                        {app.profile_title && (
-                          <p className="text-xs text-[#226D68] mt-0.5 truncate">{app.profile_title}</p>
-                        )}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setApplicationsJob(null)
-                          navigate(`/admin/review/${app.candidate_id}`)
-                        }}
-                        className="shrink-0 h-8 text-xs border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3]"
-                      >
-                        <User className="h-3.5 w-3.5 mr-1" />
-                        Voir le profil
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Modal Reconduire */}
       <Dialog open={!!renewJob} onOpenChange={(open) => !open && setRenewJob(null)}>

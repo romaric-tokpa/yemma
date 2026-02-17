@@ -240,10 +240,14 @@ class JobStatus(str, Enum):
 
 
 class ApplicationStatus(str, Enum):
-    """Statut d'une candidature"""
-    PENDING = "PENDING"
-    REVIEWED = "REVIEWED"
-    ACCEPTED = "ACCEPTED"
+    """Statut d'une candidature (étapes de recrutement)"""
+    PENDING = "PENDING"  # En attente
+    TO_INTERVIEW = "TO_INTERVIEW"  # À voir en entretien
+    INTERVIEW_SCHEDULED = "INTERVIEW_SCHEDULED"  # Entretien programmé
+    INTERVIEW_DONE = "INTERVIEW_DONE"  # Entretien réalisé
+    HIRED = "HIRED"  # Embauché
+    REJECTED = "REJECTED"  # Refusé
+    EXTERNAL_REDIRECT = "EXTERNAL_REDIRECT"  # Candidature externe (redirection)
 
 
 class JobOffer(SQLModel, table=True):
@@ -289,9 +293,10 @@ class Application(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     candidate_id: int = Field(foreign_key="profiles.id", index=True)
     job_offer_id: int = Field(foreign_key="job_offers.id", index=True)
-    status: str = Field(default="PENDING", max_length=50)  # PENDING, REVIEWED, ACCEPTED
+    status: str = Field(default="PENDING", max_length=50)  # PENDING, REVIEWED, ACCEPTED, REJECTED, etc.
     applied_at: datetime = Field(default_factory=datetime.utcnow)
     cover_letter: Optional[str] = Field(default=None)
+    rejection_reason: Optional[str] = Field(default=None, max_length=2000, description="Motif de refus (visible par le candidat)")
 
     # Relations
     job_offer: JobOffer = Relationship(back_populates="applications")

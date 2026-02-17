@@ -41,6 +41,19 @@ import SupportWidget from '../components/candidate/SupportWidget'
 import { Toast } from '../components/common/Toast'
 import { ROUTES } from '../constants/routes'
 
+/** Libellés des étapes de candidature (côté candidat) */
+const APPLICATION_STATUS_LABELS = {
+  PENDING: 'En attente',
+  TO_INTERVIEW: 'À voir en entretien',
+  INTERVIEW_SCHEDULED: 'Entretien programmé',
+  INTERVIEW_DONE: 'Entretien réalisé',
+  HIRED: 'Embauché',
+  REJECTED: 'Refusé',
+  EXTERNAL_REDIRECT: 'Externe',
+  REVIEWED: 'Examiné',
+  ACCEPTED: 'Accepté',
+}
+
 // Charte graphique Yemma (landing)
 const CHARTE = {
   vert: '#226D68',
@@ -303,6 +316,7 @@ export default function CandidateDashboard() {
   const completionGuideRef = useRef(null)
   // États pour l'onglet Offres d'emploi
   const [jobsOffres, setJobsOffres] = useState([])
+  const [appliedJobIds, setAppliedJobIds] = useState(new Set())
   const [jobsLoading, setJobsLoading] = useState(false)
   const [jobDetail, setJobDetail] = useState(null)
   const [jobDetailLoading, setJobDetailLoading] = useState(false)
@@ -312,6 +326,10 @@ export default function CandidateDashboard() {
   const [filterLocation, setFilterLocation] = useState('')
   const [filterContract, setFilterContract] = useState('')
   const [filterSector, setFilterSector] = useState('')
+  const [offresSubTab, setOffresSubTab] = useState('explorer') // 'explorer' | 'candidatures'
+  const [appliedJobs, setAppliedJobs] = useState([]) // Offres postulées (chargées séparément pour l'onglet Mes candidatures)
+  const [appliedJobsLoading, setAppliedJobsLoading] = useState(false)
+  const [applicationStatusByJobId, setApplicationStatusByJobId] = useState({}) // { job_id: { status, rejection_reason } } — mis à jour quand l'admin change l'étape
   const [debouncedTitle, setDebouncedTitle] = useState('')
   const [debouncedLocation, setDebouncedLocation] = useState('')
   // Mode édition du profil (intégré dans l'onglet Profil)
@@ -378,13 +396,24 @@ export default function CandidateDashboard() {
   const loadJobsOffres = useCallback(async () => {
     try {
       setJobsLoading(true)
-      const data = await candidateApi.listJobs({
-        title: debouncedTitle || undefined,
-        location: debouncedLocation || undefined,
-        contract_type: filterContract || undefined,
-        sector: filterSector || undefined,
-      })
-      setJobsOffres(Array.isArray(data) ? data : [])
+      const [jobsData, applicationsData] = await Promise.all([
+        candidateApi.listJobs({
+          title: debouncedTitle || undefined,
+          location: debouncedLocation || undefined,
+          contract_type: filterContract || undefined,
+          sector: filterSector || undefined,
+        }),
+        candidateApi.getMyJobApplications().catch(() => ({ job_ids: [] })),
+      ])
+      setJobsOffres(Array.isArray(jobsData) ? jobsData : [])
+      setAppliedJobIds(new Set(Array.isArray(applicationsData?.job_ids) ? applicationsData.job_ids : []))
+      const statusMap = {}
+      for (const a of applicationsData?.applications || []) {
+        if (a?.job_id != null) {
+          statusMap[a.job_id] = { status: a.status || 'PENDING', rejection_reason: a.rejection_reason }
+        }
+      }
+      setApplicationStatusByJobId(statusMap)
     } catch (err) {
       console.error('Erreur chargement offres:', err)
       setJobsOffres([])
@@ -396,7 +425,45 @@ export default function CandidateDashboard() {
 
   useEffect(() => {
     if (activeTab === 'offres') loadJobsOffres()
-  }, [activeTab, loadJobsOffres])
+  }, [activeTab, loadJobsOffres, offerId])
+
+  // Charger les offres postulées pour l'onglet Mes candidatures (indépendant des filtres)
+  const loadAppliedJobs = useCallback(async () => {
+    try {
+      const data = await candidateApi.getMyJobApplications().catch(() => ({ job_ids: [], applications: [] }))
+      const { job_ids, applications } = data
+      if (!job_ids?.length) {
+        setAppliedJobs([])
+        setApplicationStatusByJobId({})
+        return
+      }
+      const statusMap = {}
+      for (const a of applications || []) {
+        if (a?.job_id != null) {
+          statusMap[a.job_id] = { status: a.status || 'PENDING', rejection_reason: a.rejection_reason }
+        }
+      }
+      setApplicationStatusByJobId(statusMap)
+      setAppliedJobsLoading(true)
+      const results = await Promise.allSettled(
+        job_ids.map((id) => candidateApi.getJob(id))
+      )
+      const jobs = results
+        .filter((r) => r.status === 'fulfilled' && r.value)
+        .map((r) => r.value)
+      setAppliedJobs(jobs)
+    } catch {
+      setAppliedJobs([])
+    } finally {
+      setAppliedJobsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (activeTab === 'offres' && offresSubTab === 'candidatures') {
+      loadAppliedJobs()
+    }
+  }, [activeTab, offresSubTab, loadAppliedJobs, appliedJobIds.size])
 
   // Charger le détail d'une offre quand offerId est dans l'URL
   const loadJobDetail = useCallback(async (id) => {
@@ -432,14 +499,19 @@ export default function CandidateDashboard() {
     try {
       const res = await candidateApi.applyToJob(jobDetail.id)
       if (res.redirect_url) {
+        setHasAppliedToJob(true)
+        setAppliedJobIds((prev) => new Set([...prev, jobDetail.id]))
         window.open(res.redirect_url, '_blank')
         setToast({ message: 'Redirection vers le site de candidature.', type: 'success' })
       } else if (res.application_email) {
+        setHasAppliedToJob(true)
+        setAppliedJobIds((prev) => new Set([...prev, jobDetail.id]))
         const subject = encodeURIComponent(`Candidature: ${jobDetail.title || ''}`)
         window.location.href = `mailto:${res.application_email}?subject=${subject}`
         setToast({ message: 'Ouverture du client mail.', type: 'success' })
       } else {
         setHasAppliedToJob(true)
+        setAppliedJobIds((prev) => new Set([...prev, jobDetail.id]))
         setToast({ message: 'Candidature envoyée avec succès !', type: 'success' })
       }
     } catch (err) {
@@ -1337,10 +1409,10 @@ export default function CandidateDashboard() {
               ) : (
                 <>
               <div className="flex flex-col min-h-0">
-              {/* En-tête compact */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 shrink-0">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] font-heading tracking-tight">
+              {/* En-tête compact - responsive */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 shrink-0">
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl lg:text-2xl font-bold text-[#2C2C2C] font-heading tracking-tight">
                     Offres d&apos;emploi
                   </h1>
                   <p className="text-sm text-[#6b7280] mt-0.5">
@@ -1348,16 +1420,46 @@ export default function CandidateDashboard() {
                   </p>
                 </div>
                 {!jobsLoading && (
-                  <span className="text-sm font-medium text-[#6b7280]">
-                    {jobsOffres.length} offre{jobsOffres.length !== 1 ? 's' : ''} trouvée{jobsOffres.length !== 1 ? 's' : ''}
-                    {(filterTitle || filterLocation || filterContract || filterSector) && ' pour vos critères'}
+                  <span className="text-sm font-medium text-[#6b7280] shrink-0">
+                    {offresSubTab === 'candidatures'
+                      ? `${appliedJobIds.size} candidature${appliedJobIds.size !== 1 ? 's' : ''}`
+                      : `${jobsOffres.filter((j) => !appliedJobIds.has(j.id)).length} offre${jobsOffres.filter((j) => !appliedJobIds.has(j.id)).length !== 1 ? 's' : ''} à explorer`}
+                    {(filterTitle || filterLocation || filterContract || filterSector) && (
+                      <span className="hidden sm:inline"> pour vos critères</span>
+                    )}
                   </span>
                 )}
               </div>
 
-              {/* Barre de filtres compacte */}
-              <div className="flex flex-wrap items-end gap-3 mb-6 shrink-0">
-                <div className="flex-1 min-w-[140px] max-w-[200px]">
+              {/* Onglets Offres à explorer / Mes candidatures - responsive */}
+              <Tabs value={offresSubTab} onValueChange={setOffresSubTab} className="mb-4 shrink-0 w-full">
+                <TabsList className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto bg-[#E8F4F3]/50 border border-[#226D68]/20 rounded-lg p-1 h-auto gap-0 sm:gap-0">
+                  <TabsTrigger
+                    value="explorer"
+                    className="data-[state=active]:bg-[#226D68] data-[state=active]:text-white rounded-md px-3 sm:px-4 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-1.5 sm:gap-2 min-w-0"
+                  >
+                    <FileSearch className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                    <span className="truncate">Offres à explorer</span>
+                    <span className="text-[10px] sm:text-xs opacity-80 shrink-0">
+                      ({jobsOffres.filter((j) => !appliedJobIds.has(j.id)).length})
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="candidatures"
+                    className="data-[state=active]:bg-[#226D68] data-[state=active]:text-white rounded-md px-3 sm:px-4 py-2.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-1.5 sm:gap-2 min-w-0"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                    <span className="truncate">Mes candidatures</span>
+                    <span className="text-[10px] sm:text-xs opacity-80 shrink-0">
+                      ({appliedJobIds.size})
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {/* Barre de filtres - responsive (stack mobile, grille tablette, ligne desktop) */}
+              <div className="flex flex-col sm:grid sm:grid-cols-2 lg:flex lg:flex-row lg:flex-wrap lg:items-end gap-3 mb-6 shrink-0">
+                <div className="w-full lg:min-w-[140px] lg:max-w-[200px] lg:flex-1">
                   <label className="sr-only">Intitulé de poste</label>
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280]" />
@@ -1365,11 +1467,11 @@ export default function CandidateDashboard() {
                       placeholder="Poste..."
                       value={filterTitle}
                       onChange={(e) => setFilterTitle(e.target.value)}
-                      className="pl-8 h-9 rounded-lg border-gray-200 text-sm focus:border-[#226D68] focus:ring-1 focus:ring-[#226D68]/20"
+                      className="pl-8 h-9 rounded-lg border-gray-200 text-sm focus:border-[#226D68] focus:ring-1 focus:ring-[#226D68]/20 w-full"
                     />
                   </div>
                 </div>
-                <div className="flex-1 min-w-[140px] max-w-[200px]">
+                <div className="w-full lg:min-w-[140px] lg:max-w-[200px] lg:flex-1">
                   <label className="sr-only">Localisation</label>
                   <div className="relative">
                     <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280]" />
@@ -1377,11 +1479,11 @@ export default function CandidateDashboard() {
                       placeholder="Ville, pays..."
                       value={filterLocation}
                       onChange={(e) => setFilterLocation(e.target.value)}
-                      className="pl-8 h-9 rounded-lg border-gray-200 text-sm focus:border-[#226D68] focus:ring-1 focus:ring-[#226D68]/20"
+                      className="pl-8 h-9 rounded-lg border-gray-200 text-sm focus:border-[#226D68] focus:ring-1 focus:ring-[#226D68]/20 w-full"
                     />
                   </div>
                 </div>
-                <div className="w-[140px]">
+                <div className="w-full sm:w-auto lg:w-[140px]">
                   <label className="sr-only">Type de contrat</label>
                   <select
                     value={filterContract}
@@ -1394,7 +1496,7 @@ export default function CandidateDashboard() {
                     ))}
                   </select>
                 </div>
-                <div className="w-[200px] min-w-[180px]">
+                <div className="w-full sm:col-span-2 lg:col-span-auto lg:w-[200px] lg:min-w-[180px]">
                   <label className="sr-only">Secteur d&apos;activité</label>
                   <SearchableSelect
                     id="filter-sector"
@@ -1402,16 +1504,16 @@ export default function CandidateDashboard() {
                     value={filterSector}
                     onChange={setFilterSector}
                     placeholder="Secteur..."
-                    className="h-9 text-sm rounded-lg border-gray-200"
+                    className="h-9 text-sm rounded-lg border-gray-200 w-full"
                   />
                 </div>
                 {(filterTitle || filterLocation || filterContract || filterSector) && (
                   <button
                     type="button"
                     onClick={() => { setFilterTitle(''); setFilterLocation(''); setFilterContract(''); setFilterSector('') }}
-                    className="h-9 px-3 rounded-lg text-sm text-[#6b7280] hover:bg-gray-100 hover:text-[#226D68] transition-colors flex items-center gap-1.5"
+                    className="h-9 px-3 rounded-lg text-sm text-[#6b7280] hover:bg-gray-100 hover:text-[#226D68] transition-colors flex items-center justify-center gap-1.5 w-full sm:col-span-2 lg:col-span-auto lg:w-auto"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4 shrink-0" />
                     Réinitialiser
                   </button>
                 )}
@@ -1431,62 +1533,189 @@ export default function CandidateDashboard() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-4">
-                  {jobsOffres.map((job) => (
-                    <Link key={job.id} to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)}>
-                      <Card className="border border-gray-200 bg-white rounded-xl hover:border-[#226D68]/40 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col h-full group">
-                        <div className="p-4 pb-0">
-                          {job.company_logo_url ? (
-                            <img src={job.company_logo_url} alt={job.company_name || ''} className="h-9 w-auto max-w-[100px] object-contain object-left" />
-                          ) : (
-                            <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">{job.company_name || 'Yemma'}</p>
-                          )}
+                <div className="space-y-6 pb-4">
+                  {/* Onglet Offres à explorer */}
+                  {offresSubTab === 'explorer' && (
+                    <>
+                      {jobsOffres.filter((j) => !appliedJobIds.has(j.id)).length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-4 lg:gap-5">
+                          {jobsOffres.filter((j) => !appliedJobIds.has(j.id)).map((job) => (
+                            <Link key={job.id} to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)} className="block min-w-0">
+                              <Card className="border border-gray-200 bg-white rounded-xl hover:border-[#226D68]/40 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col h-full group">
+                                <div className="p-4 pb-0">
+                                  {job.company_logo_url ? (
+                                    <img src={job.company_logo_url} alt={job.company_name || ''} className="h-9 w-auto max-w-[100px] object-contain object-left" />
+                                  ) : (
+                                    <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">{job.company_name || 'Yemma'}</p>
+                                  )}
+                                </div>
+                                <div className="px-4 pt-3">
+                                  <h3 className="font-semibold text-[#2C2C2C] text-sm leading-tight line-clamp-2 group-hover:text-[#226D68] transition-colors">{job.title}</h3>
+                                </div>
+                                <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-[#6b7280]">
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                    {job.location}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                    {job.contract_type}
+                                  </span>
+                                  {job.salary_range && (
+                                    <span className="flex items-center gap-1 text-[#226D68] font-medium">
+                                      FCFA {job.salary_range}
+                                    </span>
+                                  )}
+                                  {job.sector && (
+                                    <span className="flex items-center gap-1 truncate max-w-full">
+                                      <Briefcase className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                      <span className="truncate">{job.sector}</span>
+                                    </span>
+                                  )}
+                                  {job.created_at && (
+                                    <span className="flex items-center gap-1" title="Publié le">
+                                      <Calendar className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                      Publié {formatDate(job.created_at)}
+                                    </span>
+                                  )}
+                                  {job.expires_at && (
+                                    <span className="flex items-center gap-1 text-amber-700" title="Expire le">
+                                      <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                      Expire {formatDate(job.expires_at)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="px-4 pb-4 pt-2 mt-auto">
+                                  <span className="inline-flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-[#226D68] group-hover:bg-[#1a5a55] text-white text-xs font-medium transition-colors">
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Postuler
+                                  </span>
+                                </div>
+                              </Card>
+                            </Link>
+                          ))}
                         </div>
-                        <div className="px-4 pt-3">
-                          <h3 className="font-semibold text-[#2C2C2C] text-sm leading-tight line-clamp-2 group-hover:text-[#226D68] transition-colors">{job.title}</h3>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 p-6 sm:p-8 text-center">
+                          <FileSearch className="h-12 w-12 text-[#9ca3af] mx-auto mb-4" />
+                          <p className="text-sm font-medium text-[#2C2C2C]">
+                            {(filterTitle || filterLocation || filterContract || filterSector)
+                              ? 'Aucune offre ne correspond à vos filtres.'
+                              : appliedJobIds.size > 0
+                                ? 'Vous avez postulé à toutes les offres correspondant à vos critères.'
+                                : 'Aucune offre publiée pour le moment.'}
+                          </p>
+                          <p className="text-xs text-[#6b7280] mt-1">
+                            {(filterTitle || filterLocation || filterContract || filterSector)
+                              ? 'Modifiez vos filtres pour découvrir d\'autres opportunités.'
+                              : 'Revenez plus tard pour de nouvelles offres.'}
+                          </p>
                         </div>
-                        <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-[#6b7280]">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                            {job.location}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                            {job.contract_type}
-                          </span>
-                          {job.salary_range && (
-                            <span className="flex items-center gap-1 text-[#226D68] font-medium">
-                              FCFA {job.salary_range}
-                            </span>
-                          )}
-                          {job.sector && (
-                            <span className="flex items-center gap-1 truncate max-w-full">
-                              <Briefcase className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                              <span className="truncate">{job.sector}</span>
-                            </span>
-                          )}
-                          {job.created_at && (
-                            <span className="flex items-center gap-1" title="Publié le">
-                              <Calendar className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                              Publié {formatDate(job.created_at)}
-                            </span>
-                          )}
-                          {job.expires_at && (
-                            <span className="flex items-center gap-1 text-amber-700" title="Expire le">
-                              <Calendar className="h-3.5 w-3.5 shrink-0" />
-                              Expire {formatDate(job.expires_at)}
-                            </span>
-                          )}
+                      )}
+                    </>
+                  )}
+
+                  {/* Onglet Mes candidatures */}
+                  {offresSubTab === 'candidatures' && (
+                    <>
+                      {appliedJobsLoading ? (
+                        <div className="flex justify-center py-24">
+                          <Loader2 className="h-8 w-8 animate-spin text-[#226D68]" />
                         </div>
-                        <div className="px-4 pb-4 mt-auto">
-                          <span className="inline-flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-[#226D68] group-hover:bg-[#1a5a55] text-white text-xs font-medium transition-colors">
-                            <FileText className="h-3.5 w-3.5" />
-                            Postuler
-                          </span>
+                      ) : appliedJobs.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-4 lg:gap-5">
+                          {appliedJobs.map((job) => (
+                            <Link key={job.id} to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)} className="block min-w-0">
+                              <Card className="border border-[#226D68]/30 bg-[#E8F4F3]/30 rounded-xl hover:border-[#226D68]/50 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col h-full group">
+                                <div className="p-4 pb-0 flex items-start justify-between gap-2">
+                                  {job.company_logo_url ? (
+                                    <img src={job.company_logo_url} alt={job.company_name || ''} className="h-9 w-auto max-w-[100px] object-contain object-left" />
+                                  ) : (
+                                    <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">{job.company_name || 'Yemma'}</p>
+                                  )}
+                                  <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                                    (applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]) === 'HIRED'
+                                      ? 'bg-[#226D68]/20 text-[#1a5a55]'
+                                      : (applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]) === 'REJECTED'
+                                      ? 'bg-red-100 text-red-700'
+                                      : ['TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_DONE'].includes(applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id])
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-[#226D68]/15 text-[#1a5a55]'
+                                  }`}>
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    {APPLICATION_STATUS_LABELS[applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]] || 'Postulé'}
+                                  </span>
+                                </div>
+                                {(applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]) === 'REJECTED' && applicationStatusByJobId[job.id]?.rejection_reason && (
+                                  <div className="px-4 py-2 bg-red-50/80 border-t border-red-100">
+                                    <p className="text-xs text-red-700 leading-relaxed line-clamp-2" title={applicationStatusByJobId[job.id].rejection_reason}>
+                                      {applicationStatusByJobId[job.id].rejection_reason}
+                                    </p>
+                                  </div>
+                                )}
+                                <div className="px-4 pt-3">
+                                  <h3 className="font-semibold text-[#2C2C2C] text-sm leading-tight line-clamp-2 group-hover:text-[#226D68] transition-colors">{job.title}</h3>
+                                </div>
+                                <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-[#6b7280]">
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                    {job.location}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                    {job.contract_type}
+                                  </span>
+                                  {job.salary_range && (
+                                    <span className="flex items-center gap-1 text-[#226D68] font-medium">
+                                      FCFA {job.salary_range}
+                                    </span>
+                                  )}
+                                  {job.sector && (
+                                    <span className="flex items-center gap-1 truncate max-w-full">
+                                      <Briefcase className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                      <span className="truncate">{job.sector}</span>
+                                    </span>
+                                  )}
+                                  {job.created_at && (
+                                    <span className="flex items-center gap-1" title="Publié le">
+                                      <Calendar className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                                      Publié {formatDate(job.created_at)}
+                                    </span>
+                                  )}
+                                  {job.expires_at && (
+                                    <span className="flex items-center gap-1 text-amber-700" title="Expire le">
+                                      <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                      Expire {formatDate(job.expires_at)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="px-4 pb-4 mt-auto">
+                                  <span className="inline-flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-[#226D68]/80 group-hover:bg-[#226D68] text-white text-xs font-medium transition-colors">
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    Voir l&apos;offre
+                                  </span>
+                                </div>
+                              </Card>
+                            </Link>
+                          ))}
                         </div>
-                      </Card>
-                    </Link>
-                  ))}
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-[#226D68]/30 bg-[#E8F4F3]/20 p-6 sm:p-8 text-center">
+                          <CheckCircle2 className="h-12 w-12 text-[#226D68] mx-auto mb-4" />
+                          <p className="text-sm font-medium text-[#2C2C2C]">Vous n&apos;avez pas encore postulé à des offres.</p>
+                          <p className="text-xs text-[#6b7280] mt-1">Passez à l&apos;onglet &quot;Offres à explorer&quot; pour découvrir et postuler aux offres disponibles.</p>
+                          <button
+                            type="button"
+                            onClick={() => setOffresSubTab('explorer')}
+                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#226D68] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a5a55] transition-colors"
+                          >
+                            <FileSearch className="h-4 w-4" />
+                            Explorer les offres
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
               </div>

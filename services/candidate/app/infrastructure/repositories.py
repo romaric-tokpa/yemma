@@ -537,7 +537,7 @@ class JobOfferRepository:
 
     @staticmethod
     async def get_stats(session: AsyncSession) -> dict:
-        """Statistiques des offres par statut + total candidatures."""
+        """Statistiques des offres par statut + total candidatures + métriques acquisition + pipeline."""
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Comptage par statut
         stmt = select(JobOffer.status, func.count(JobOffer.id).label("count")).group_by(JobOffer.status)
@@ -560,11 +560,46 @@ class JobOfferRepository:
         stmt_apps = select(func.count(Application.id)).select_from(Application)
         apps_result = await session.execute(stmt_apps)
         applications_count = apps_result.scalar() or 0
+        # Métriques acquisition (vues, clics)
+        stmt_views = select(func.coalesce(func.sum(JobOffer.view_count), 0)).select_from(JobOffer)
+        stmt_clicks = select(func.coalesce(func.sum(JobOffer.register_click_count), 0)).select_from(JobOffer)
+        views_result = await session.execute(stmt_views)
+        clicks_result = await session.execute(stmt_clicks)
+        total_view_count = int(views_result.scalar() or 0)
+        total_register_click_count = int(clicks_result.scalar() or 0)
+        # Pipeline candidatures par statut
+        stmt_pipeline = select(Application.status, func.count(Application.id).label("count")).group_by(Application.status)
+        pipeline_result = await session.execute(stmt_pipeline)
+        pipeline_rows = pipeline_result.all()
+        applications_by_status = {}
+        for row in pipeline_rows:
+            status_val = str(row.status) if row.status else "PENDING"
+            applications_by_status[status_val] = row.count
+        # Top offres par nombre de candidatures
+        stmt_top = (
+            select(JobOffer.id, JobOffer.title, JobOffer.company_name, func.count(Application.id).label("app_count"))
+            .outerjoin(Application, JobOffer.id == Application.job_offer_id)
+            .group_by(JobOffer.id, JobOffer.title, JobOffer.company_name)
+            .order_by(func.count(Application.id).desc())
+        )
+        top_result = await session.execute(stmt_top)
+        top_jobs = [
+            {"job_id": r.id, "title": r.title, "company_name": r.company_name or "", "applications": r.app_count}
+            for r in top_result.all()[:10]
+        ]
+        # Moyenne candidatures par offre publiée
+        published_count = by_status.get("PUBLISHED", 0)
+        avg_applications = round(applications_count / published_count, 1) if published_count > 0 else 0
         return {
             "total": sum(by_status.values()),
             "by_status": by_status,
             "expired_published": expired_count,
             "applications": applications_count,
+            "total_view_count": total_view_count,
+            "total_register_click_count": total_register_click_count,
+            "applications_by_status": applications_by_status,
+            "top_jobs_by_applications": top_jobs,
+            "avg_applications_per_job": avg_applications,
         }
 
     @staticmethod
@@ -632,6 +667,34 @@ class ApplicationRepository:
         return result.scalar_one_or_none() is not None
 
     @staticmethod
+    async def list_job_ids_by_candidate(session: AsyncSession, candidate_id: int) -> List[int]:
+        """Liste les IDs des offres auxquelles le candidat a postulé."""
+        result = await session.execute(
+            select(Application.job_offer_id).where(Application.candidate_id == candidate_id).distinct()
+        )
+        return [row[0] for row in result.all()]
+
+    @staticmethod
+    async def list_applications_by_candidate(
+        session: AsyncSession, candidate_id: int
+    ) -> List[tuple]:
+        """Liste les candidatures du candidat : [(job_offer_id, status, rejection_reason), ...] (une par offre)."""
+        result = await session.execute(
+            select(Application.job_offer_id, Application.status, Application.rejection_reason)
+            .where(Application.candidate_id == candidate_id)
+            .order_by(Application.applied_at.desc())
+        )
+        rows = result.all()
+        seen = set()
+        out = []
+        for row in rows:
+            job_id, status, rejection_reason = row[0], row[1], row[2] if len(row) > 2 else None
+            if job_id not in seen:
+                seen.add(job_id)
+                out.append((job_id, status or "PENDING", rejection_reason))
+        return out
+
+    @staticmethod
     async def list_by_job(session: AsyncSession, job_offer_id: int) -> List[tuple]:
         """Liste les candidatures pour une offre avec profil. Retourne [(Application, Profile|None), ...]"""
         result = await session.execute(
@@ -649,3 +712,33 @@ class ApplicationRepository:
         )
         profiles = {p.id: p for p in profiles_result.scalars().all()}
         return [(a, profiles.get(a.candidate_id)) for a in apps]
+
+    @staticmethod
+    async def update_status(
+        session: AsyncSession,
+        application_id: int,
+        job_offer_id: int,
+        new_status: str,
+        rejection_reason: Optional[str] = None,
+    ) -> Optional[Application]:
+        """Met à jour le statut d'une candidature (admin). Vérifie que l'application appartient à l'offre."""
+        result = await session.execute(
+            select(Application).where(
+                and_(
+                    Application.id == application_id,
+                    Application.job_offer_id == job_offer_id,
+                )
+            )
+        )
+        app = result.scalar_one_or_none()
+        if not app:
+            return None
+        app.status = new_status
+        if new_status == "REJECTED" and rejection_reason is not None:
+            app.rejection_reason = rejection_reason.strip() or None
+        elif new_status != "REJECTED":
+            app.rejection_reason = None
+        session.add(app)
+        await session.commit()
+        await session.refresh(app)
+        return app

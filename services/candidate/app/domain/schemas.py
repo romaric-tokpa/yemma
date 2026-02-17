@@ -343,6 +343,7 @@ class JobApplicationResponse(BaseModel):
     email: Optional[str] = None
     profile_title: Optional[str] = None
     profile_status: Optional[str] = None
+    photo_url: Optional[str] = None
 
     class Config:
         from_attributes = True
