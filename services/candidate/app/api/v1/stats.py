@@ -14,6 +14,24 @@ from app.domain.models import Profile, ProfileStatus
 
 router = APIRouter()
 
+# Cache in-memory pour les stats (TTL 60s) - évite les requêtes DB répétées
+_STATS_CACHE: Dict[str, tuple[Any, datetime]] = {}
+_CACHE_TTL_SECONDS = 60
+
+
+def _get_cached(key: str) -> Optional[Any]:
+    if key not in _STATS_CACHE:
+        return None
+    value, expires = _STATS_CACHE[key]
+    if datetime.utcnow() > expires:
+        del _STATS_CACHE[key]
+        return None
+    return value
+
+
+def _set_cache(key: str, value: Any) -> None:
+    _STATS_CACHE[key] = (value, datetime.utcnow() + timedelta(seconds=_CACHE_TTL_SECONDS))
+
 
 def _parse_date(value: Optional[str]):
     if not value:
@@ -59,7 +77,11 @@ async def get_profiles_stats(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators can access this resource"
         )
-    
+
+    cached = _get_cached("profiles_stats")
+    if cached is not None:
+        return cached
+
     # Compter les profils par statut
     statement = select(
         Profile.status,
@@ -87,7 +109,8 @@ async def get_profiles_stats(
         count = row.count
         if status_value in stats:
             stats[status_value] = count
-    
+
+    _set_cache("profiles_stats", stats)
     return stats
 
 
@@ -111,6 +134,10 @@ async def get_profiles_stats_by_sector(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators can access this resource"
         )
+
+    cached = _get_cached("profiles_stats_by_sector")
+    if cached is not None:
+        return cached
 
     # Libellé secteur : null ou vide -> "Non renseigné"
     sector_label = case(
@@ -148,6 +175,7 @@ async def get_profiles_stats_by_sector(
         for sector, data in by_sector.items()
     ]
     out.sort(key=lambda x: (-x["total"], x["sector"]))
+    _set_cache("profiles_stats_by_sector", out)
     return out
 
 
@@ -175,6 +203,12 @@ async def get_profiles_stats_by_period(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only administrators can access this resource",
         )
+
+    cache_key = f"profiles_stats_by_period:{from_date}:{to_date}:{group_by}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     if group_by not in ("day", "month", "year"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -301,5 +335,6 @@ async def get_profiles_stats_by_period(
             by_period[p] = {"period": p, "inscriptions": 0, "validated": 0, "rejected": 0}
 
     out = [by_period[p] for p in sorted(by_period.keys())]
+    _set_cache(cache_key, out)
     return out
 

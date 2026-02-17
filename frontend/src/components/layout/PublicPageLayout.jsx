@@ -8,13 +8,13 @@ import PublicFooter from '@/components/layout/PublicFooter'
  */
 export default function PublicPageLayout({ children, title, subtitle, badge, heroImage }) {
   return (
-    <div className="min-h-screen min-h-[100dvh] flex flex-col overflow-x-hidden w-full max-w-[100vw]">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col overflow-x-hidden w-full max-w-[100vw] min-w-0">
       <PublicNavbar variant="light" />
 
       {/* Hero compact avec animations */}
       {(title || subtitle || badge) && (
         <section className="pt-16 md:pt-20 pb-8 md:pb-12 bg-[#F4F6F8] overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 lg:gap-12">
               <div className="flex-1 text-center lg:text-left">
                 {badge && (

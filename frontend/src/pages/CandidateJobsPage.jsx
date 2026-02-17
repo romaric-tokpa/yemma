@@ -90,7 +90,7 @@ export default function CandidateJobsPage() {
       />
       <PublicNavbar variant="light" />
 
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 pb-24 sm:pb-24 lg:px-8 lg:pb-8">
+      <main className="flex-1 mx-auto w-full max-w-7xl min-w-0 px-3 xs:px-4 py-6 pb-24 sm:pb-24 lg:px-8 lg:pb-8">
         <div className="flex flex-col min-h-0">
           {/* En-tête compact - identique au dashboard */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 shrink-0">
@@ -112,7 +112,7 @@ export default function CandidateJobsPage() {
 
           {/* Barre de filtres compacte - identique au dashboard */}
           <div className="flex flex-wrap items-end gap-3 mb-6 shrink-0">
-            <div className="flex-1 min-w-[140px] max-w-[200px]">
+            <div className="flex-1 min-w-0 xs:min-w-[140px] max-w-full sm:max-w-[200px]">
               <label className="sr-only">Intitulé de poste</label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280]" />
@@ -124,7 +124,7 @@ export default function CandidateJobsPage() {
                 />
               </div>
             </div>
-            <div className="flex-1 min-w-[140px] max-w-[200px]">
+            <div className="flex-1 min-w-0 xs:min-w-[140px] max-w-full sm:max-w-[200px]">
               <label className="sr-only">Localisation</label>
               <div className="relative">
                 <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280]" />
@@ -136,7 +136,7 @@ export default function CandidateJobsPage() {
                 />
               </div>
             </div>
-            <div className="w-[140px]">
+            <div className="w-full xs:w-[140px] min-w-0">
               <label className="sr-only">Type de contrat</label>
               <select
                 value={filterContract}
@@ -149,7 +149,7 @@ export default function CandidateJobsPage() {
                 ))}
               </select>
             </div>
-            <div className="w-[200px] min-w-[180px]">
+            <div className="w-full sm:w-[200px] min-w-0 sm:min-w-[140px]">
               <label className="sr-only">Secteur d&apos;activité</label>
               <SearchableSelect
                 id="filter-sector"

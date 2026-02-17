@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Toast } from '@/components/common/Toast'
 import { formatDate } from '@/utils/dateUtils'
 import { ROUTES } from '@/constants/routes'
@@ -165,7 +165,7 @@ export default function AdminJobCandidateListPage() {
   if (error || !job) {
     return (
       <AdminLayout>
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="w-full min-w-0 px-3 xs:px-4 sm:px-6 lg:px-8 py-6">
           <Card className="border-gray-200">
             <CardContent className="py-12 text-center">
               <Briefcase className="h-10 w-10 text-[#6b7280] mx-auto mb-3" />
@@ -182,7 +182,7 @@ export default function AdminJobCandidateListPage() {
 
   return (
     <AdminLayout>
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
+      <div className="w-full min-w-0 px-3 xs:px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
         {/* En-tête compact */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -384,10 +384,10 @@ export default function AdminJobCandidateListPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Motifs de refus</DialogTitle>
+              <DialogDescription className="text-sm text-[#6b7280]">
+                Rédigez les motifs de refus pour informer le candidat. Ce message sera visible dans son espace.
+              </DialogDescription>
             </DialogHeader>
-            <p className="text-sm text-[#6b7280]">
-              Rédigez les motifs de refus pour informer le candidat. Ce message sera visible dans son espace.
-            </p>
             <Textarea
               placeholder="Ex. : Profil ne correspondant pas au poste recherché…"
               value={rejectReason}

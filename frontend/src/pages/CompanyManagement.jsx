@@ -1,37 +1,34 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { TeamTab } from '../components/company/TeamTab'
 import { SubscriptionTab } from '../components/company/SubscriptionTab'
 import { HistoryTab } from '../components/company/HistoryTab'
 import { companyApi } from '../services/api'
 import { Loader2, Users, CreditCard, History } from 'lucide-react'
+import { ROUTES } from '@/constants/routes'
+
+const pathToSubtab = (path) => {
+  if (path.endsWith('/subscription')) return 'subscription'
+  if (path.endsWith('/history')) return 'history'
+  return 'team'
+}
 
 export default function CompanyManagement({ embedded }) {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const subtabParam = searchParams.get('subtab')
+  const location = useLocation()
+  const navigate = useNavigate()
   const [company, setCompany] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeSubtab, setActiveSubtab] = useState(subtabParam === 'subscription' ? 'subscription' : subtabParam === 'history' ? 'history' : 'team')
-
-  useEffect(() => {
-    if (subtabParam === 'subscription' || subtabParam === 'history') {
-      setActiveSubtab(subtabParam)
-    }
-  }, [subtabParam])
+  const activeSubtab = pathToSubtab(location.pathname)
 
   useEffect(() => {
     loadCompany()
   }, [])
 
   const handleSubtabChange = (value) => {
-    setActiveSubtab(value)
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev)
-      if (value === 'team') next.delete('subtab')
-      else next.set('subtab', value)
-      return next
-    })
+    if (value === 'team') navigate(ROUTES.COMPANY_DASHBOARD_MANAGEMENT_TEAM)
+    else if (value === 'subscription') navigate(ROUTES.COMPANY_DASHBOARD_MANAGEMENT_SUBSCRIPTION)
+    else navigate(ROUTES.COMPANY_DASHBOARD_MANAGEMENT_HISTORY)
   }
 
   const loadCompany = async () => {

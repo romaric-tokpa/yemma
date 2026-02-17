@@ -372,9 +372,11 @@ export default function CandidateDashboard() {
     loadProfile()
   }, [])
 
-  // Synchroniser activeTab avec l'URL (route /candidate/dashboard/:tab ou /candidate/dashboard/offres/:offerId)
+  // Synchroniser activeTab avec l'URL (pathname ou params)
   useEffect(() => {
-    if (offerId) {
+    const path = location.pathname
+    // Routes /candidate/dashboard/offres, /offres/candidatures, /offres/:offerId
+    if (path.includes('/candidate/dashboard/offres')) {
       setActiveTab('offres')
       return
     }
@@ -387,7 +389,7 @@ export default function CandidateDashboard() {
       setActiveTab('dashboard')
       if (tab) navigate('/candidate/dashboard', { replace: true })
     }
-  }, [tab, offerId, navigate])
+  }, [tab, offerId, location.pathname, navigate])
 
   // Debounce des filtres offres (400ms) - titre et localisation uniquement
   useEffect(() => { const t = setTimeout(() => setDebouncedTitle(filterTitle), 400); return () => clearTimeout(t) }, [filterTitle])
@@ -458,6 +460,14 @@ export default function CandidateDashboard() {
       setAppliedJobsLoading(false)
     }
   }, [])
+
+  // Synchroniser offresSubTab avec l'URL (/offres vs /offres/candidatures)
+  useEffect(() => {
+    if (activeTab !== 'offres') return
+    const path = location.pathname
+    if (path.includes('/offres/candidatures')) setOffresSubTab('candidatures')
+    else if (path.includes('/offres')) setOffresSubTab('explorer')
+  }, [activeTab, location.pathname])
 
   useEffect(() => {
     if (activeTab === 'offres' && offresSubTab === 'candidatures') {
@@ -1431,8 +1441,8 @@ export default function CandidateDashboard() {
                 )}
               </div>
 
-              {/* Onglets Offres à explorer / Mes candidatures - responsive */}
-              <Tabs value={offresSubTab} onValueChange={setOffresSubTab} className="mb-4 shrink-0 w-full">
+              {/* Onglets Offres à explorer / Mes candidatures - routes dédiées */}
+              <Tabs value={offresSubTab} onValueChange={(v) => { setOffresSubTab(v); navigate(v === 'candidatures' ? ROUTES.CANDIDATE_OFFRES_CANDIDATURES : ROUTES.CANDIDATE_OFFRES_LISTE) }} className="mb-4 shrink-0 w-full">
                 <TabsList className="grid grid-cols-2 sm:inline-flex w-full sm:w-auto bg-[#E8F4F3]/50 border border-[#226D68]/20 rounded-lg p-1 h-auto gap-0 sm:gap-0">
                   <TabsTrigger
                     value="explorer"

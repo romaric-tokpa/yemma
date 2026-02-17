@@ -143,9 +143,25 @@ export default function AppRoutes() {
         }
       />
       
-      {/* Dashboard candidat - offres avec détail intégré */}
+      {/* Dashboard candidat - offres avec sous-onglets et détail */}
+      <Route 
+        path="/candidate/dashboard/offres/candidatures" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+            <CandidateDashboard />
+          </AuthGuard>
+        } 
+      />
       <Route 
         path="/candidate/dashboard/offres/:offerId" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+            <CandidateDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/candidate/dashboard/offres" 
         element={
           <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
             <CandidateDashboard />
@@ -198,7 +214,47 @@ export default function AppRoutes() {
         } 
       />
       
-      {/* Dashboard entreprise */}
+      {/* Dashboard entreprise - routes par onglet */}
+      <Route 
+        path="/company/dashboard/management/history" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/management/subscription" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/management/team" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/management" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/search" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
       <Route 
         path="/company/dashboard" 
         element={
@@ -208,22 +264,20 @@ export default function AppRoutes() {
         } 
       />
       
-      {/* Gestion entreprise (admin uniquement) - redirige vers dashboard avec tab */}
+      {/* Alias - redirections vers les nouvelles routes */}
       <Route 
         path="/company/management" 
         element={
           <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
-            <Navigate to="/company/dashboard?tab=management" replace />
+            <Navigate to="/company/dashboard/management" replace />
           </AuthGuard>
         } 
       />
-      
-      {/* Recherche de candidats */}
       <Route 
         path="/company/search" 
         element={
           <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
-            <Navigate to="/company/dashboard?tab=search" replace />
+            <Navigate to="/company/dashboard/search" replace />
           </AuthGuard>
         } 
       />
@@ -266,7 +320,23 @@ export default function AppRoutes() {
 
       {/* Routes protégées - Admin */}
       <Route 
-        path="/admin/dashboard" 
+        path="/admin/companies/abonnements" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/companies/recruteurs" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/companies/liste" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminDashboard />
@@ -275,6 +345,14 @@ export default function AppRoutes() {
       />
       <Route 
         path="/admin/companies" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/dashboard" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminDashboard />
@@ -298,6 +376,22 @@ export default function AppRoutes() {
         } 
       />
       <Route 
+        path="/admin/statistics/periode" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminStatisticsPage defaultTab="period" />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/statistics/secteurs" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminStatisticsPage defaultTab="sectors" />
+          </AuthGuard>
+        } 
+      />
+      <Route 
         path="/admin/statistics" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
@@ -308,6 +402,30 @@ export default function AppRoutes() {
       <Route 
         path="/admin/raccourcis" 
         element={<Navigate to="/admin/dashboard" replace />}
+      />
+      <Route 
+        path="/admin/review/:candidateId/evaluation" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminReview defaultTab="evaluation" />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/review/:candidateId/documents" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminReview defaultTab="documents" />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/admin/review/:candidateId/profile" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminReview defaultTab="profile" />
+          </AuthGuard>
+        } 
       />
       <Route 
         path="/admin/review/:candidateId" 

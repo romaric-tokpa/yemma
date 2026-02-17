@@ -134,7 +134,7 @@ export default function AdminJobManager() {
 
   return (
     <AdminLayout>
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+      <div className="w-full min-w-0 px-3 xs:px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
         {/* En-tête */}
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -142,7 +142,7 @@ export default function AdminJobManager() {
               <h1 className="text-2xl font-bold text-[#2C2C2C] font-heading">Gestion des offres</h1>
               <p className="text-[#6b7280] mt-1">Créez et publiez des offres. Les offres arrivées à leur date d&apos;expiration sont automatiquement dépublier et archivées. Consultez l&apos;historique (expirées, fermées) et reconduisez les offres si besoin.</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link to="/offres" target="_blank" rel="noopener noreferrer" className="text-sm text-[#6b7280] hover:text-[#226D68] flex items-center gap-1.5">
                 <ExternalLink className="h-4 w-4" />
                 Voir la page publique

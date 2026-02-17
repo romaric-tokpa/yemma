@@ -36,12 +36,16 @@ export default function AdminStatisticsPage({ defaultTab }) {
       groupBy: 'month',
     }
   })
-  const [statsTab, setStatsTab] = useState(() =>
-    location.pathname.endsWith('/offres') ? 'jobs' : (defaultTab || 'overview')
-  )
+  const pathToTab = (path) => {
+    if (path.endsWith('/offres')) return 'jobs'
+    if (path.endsWith('/secteurs')) return 'sectors'
+    if (path.endsWith('/periode')) return 'period'
+    return defaultTab || 'overview'
+  }
+  const [statsTab, setStatsTab] = useState(() => pathToTab(location.pathname))
 
   useEffect(() => {
-    if (location.pathname.endsWith('/offres')) setStatsTab('jobs')
+    setStatsTab(pathToTab(location.pathname))
   }, [location.pathname])
   const [jobStats, setJobStats] = useState(null)
   const [loadingJobStats, setLoadingJobStats] = useState(false)
@@ -236,14 +240,14 @@ export default function AdminStatisticsPage({ defaultTab }) {
           })}
         </div>
 
-        {/* Tabs — aligné dashboard */}
+        {/* Tabs — routes dédiées */}
         <div className="flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white p-1.5 mb-6 w-full sm:w-fit shadow-sm overflow-x-auto">
           {[
-            { id: 'overview', label: 'Vue d\'ensemble', shortLabel: 'Vue', icon: BarChart3 },
-            { id: 'sectors', label: 'Par secteur', shortLabel: 'Secteurs', icon: PieChart },
-            { id: 'period', label: 'Par période', shortLabel: 'Période', icon: Calendar },
-            { id: 'jobs', label: 'Offres d\'emploi', shortLabel: 'Offres', icon: Briefcase },
-          ].map(({ id, label, shortLabel, icon: Icon }) => {
+            { id: 'overview', label: 'Vue d\'ensemble', shortLabel: 'Vue', icon: BarChart3, path: ROUTES.ADMIN_STATISTICS },
+            { id: 'sectors', label: 'Par secteur', shortLabel: 'Secteurs', icon: PieChart, path: ROUTES.ADMIN_STATISTICS_SECTEURS },
+            { id: 'period', label: 'Par période', shortLabel: 'Période', icon: Calendar, path: ROUTES.ADMIN_STATISTICS_PERIODE },
+            { id: 'jobs', label: 'Offres d\'emploi', shortLabel: 'Offres', icon: Briefcase, path: ROUTES.ADMIN_STATISTICS_OFFRES },
+          ].map(({ id, label, shortLabel, icon: Icon, path }) => {
             const isActive = statsTab === id
             const content = (
               <>
@@ -252,24 +256,14 @@ export default function AdminStatisticsPage({ defaultTab }) {
                 <span className="sm:hidden">{shortLabel}</span>
               </>
             )
-            return id === 'jobs' ? (
+            return (
               <Link
                 key={id}
-                to={ROUTES.ADMIN_STATISTICS_OFFRES}
-                onClick={() => setStatsTab('jobs')}
+                to={path}
                 className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-all shrink-0 no-underline ${isActive ? 'bg-[#226D68] text-white shadow-sm' : 'text-[#6b7280] hover:text-[#2C2C2C] hover:bg-gray-50'}`}
               >
                 {content}
               </Link>
-            ) : (
-              <button
-                key={id}
-                type="button"
-                onClick={() => { setStatsTab(id); if (location.pathname.endsWith('/offres')) navigate(ROUTES.ADMIN_STATISTICS) }}
-                className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium transition-all shrink-0 ${isActive ? 'bg-[#226D68] text-white shadow-sm' : 'text-[#6b7280] hover:text-[#2C2C2C] hover:bg-gray-50'}`}
-              >
-                {content}
-              </button>
             )
           })}
         </div>

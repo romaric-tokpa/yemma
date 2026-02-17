@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   Building2,
   Users,
@@ -46,12 +46,11 @@ export default function CompanyDashboard() {
   }, [])
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search)
-    const tabParam = searchParams.get('tab')
-    if (tabParam === 'search') setActiveTab('search')
-    else if (tabParam === 'management' || location.pathname.includes('/company/management')) setActiveTab('management')
-    else if (location.pathname === '/company/dashboard' && !tabParam) setActiveTab('overview')
-  }, [location])
+    const path = location.pathname
+    if (path.includes('/company/dashboard/search')) setActiveTab('search')
+    else if (path.includes('/company/dashboard/management')) setActiveTab('management')
+    else setActiveTab('overview')
+  }, [location.pathname])
 
   const loadData = async () => {
     try {
@@ -99,8 +98,8 @@ export default function CompanyDashboard() {
 
   const goToTab = (id, subtab) => {
     setActiveTab(id)
-    if (id === 'search') navigate('/company/dashboard?tab=search')
-    else if (id === 'management') navigate(subtab ? `/company/dashboard?tab=management&subtab=${subtab}` : '/company/dashboard?tab=management')
+    if (id === 'search') navigate('/company/dashboard/search')
+    else if (id === 'management') navigate(subtab ? `/company/dashboard/management/${subtab}` : '/company/dashboard/management')
     else navigate('/company/dashboard')
   }
 
@@ -187,10 +186,11 @@ export default function CompanyDashboard() {
           {sidebarItems.map((item) => {
             const Icon = item.icon
             const isActive = activeTab === item.id
+            const href = item.id === 'overview' ? '/company/dashboard' : item.id === 'search' ? '/company/dashboard/search' : '/company/dashboard/management'
             return (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => goToTab(item.id)}
+                to={href}
                 className={`
                   w-full flex items-center gap-2 h-9 px-2.5 rounded-md text-sm font-medium transition-colors
                   ${isActive ? 'bg-[#E8F4F3] text-[#226D68]' : 'text-[#2C2C2C]/70 hover:bg-[#F4F6F8]'}
@@ -198,7 +198,7 @@ export default function CompanyDashboard() {
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 {effectiveSidebarOpen && <span className="truncate">{item.label}</span>}
-              </button>
+              </Link>
             )
           })}
         </nav>

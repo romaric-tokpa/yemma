@@ -80,6 +80,8 @@ export default function AdminLayout({ children }) {
   const isActive = (path) => {
     if (path === '/admin/dashboard') return location.pathname === '/admin/dashboard'
     if (path === '/admin/jobs') return location.pathname.startsWith('/admin/jobs')
+    if (path === '/admin/companies') return location.pathname.startsWith('/admin/companies')
+    if (path === '/admin/statistics') return location.pathname.startsWith('/admin/statistics')
     return location.pathname === path
   }
 
@@ -254,17 +256,17 @@ export default function AdminLayout({ children }) {
 
         {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />}
 
-        <main id="admin-main" className={`flex-1 min-w-0 flex flex-col ${isCvtheque ? 'overflow-hidden' : 'overflow-y-auto'}`} aria-label="Contenu administration">
+        <main id="admin-main" className={`flex-1 min-w-0 flex flex-col overflow-x-hidden ${isCvtheque ? 'overflow-hidden' : 'overflow-y-auto'}`} aria-label="Contenu administration">
           {isCvtheque ? (
-            <div className="flex-1 flex flex-col min-h-0 w-full max-w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-5">
+            <div className="flex-1 flex flex-col min-h-0 w-full max-w-full min-w-0 px-3 sm:px-4 lg:px-6 py-4 sm:py-5">
               {children}
             </div>
           ) : isJobs ? (
-            <div className="flex-1 w-full max-w-full px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
+            <div className="flex-1 w-full max-w-full min-w-0 px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
               {children}
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
+            <div className="w-full max-w-4xl mx-auto min-w-0 px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
               {children}
             </div>
           )}

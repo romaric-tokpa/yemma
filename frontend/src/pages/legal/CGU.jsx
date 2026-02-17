@@ -31,7 +31,7 @@ export default function CGU() {
       >
         {/* Section 1 - Objet et acceptation */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#E8F4F3] border border-[#226D68]/20">
@@ -55,7 +55,7 @@ export default function CGU() {
 
         {/* Section 2 - Description des services - fond vert */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#E8F4F3' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row-reverse gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-white shadow-sm border border-[#e76f51]/20">
@@ -83,7 +83,7 @@ export default function CGU() {
 
         {/* Section 3 - Inscription et compte */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#E8F4F3] border border-[#226D68]/20">
@@ -107,7 +107,7 @@ export default function CGU() {
 
         {/* Section 4 - Obligations - fond pêche */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#FDEEDC' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row-reverse gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-white shadow-md border border-[#e76f51]/20">
@@ -137,7 +137,7 @@ export default function CGU() {
 
         {/* Section 5 - Bloc sombre */}
         <section className="py-12 md:py-16 bg-[#0B3C5D] overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
               <motion.div {...fadeInUp} className="bg-white/5 rounded-2xl p-6 border border-white/10">
                 <BookOpen className="w-10 h-10 text-[#226D68] mb-4" />
@@ -160,7 +160,7 @@ export default function CGU() {
 
         {/* Section 6 - Responsabilité et modération */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
               <motion.div {...fadeInUp} className="bg-[#F4F6F8] rounded-2xl p-6 border border-gray-200">
                 <h2 className="text-lg font-bold text-[#226D68] mb-3">7. Responsabilité et limitation</h2>
@@ -186,7 +186,7 @@ export default function CGU() {
 
         {/* Section 7 - Droit applicable et contact */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#E8F4F3' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-white shadow-sm border border-[#226D68]/20">

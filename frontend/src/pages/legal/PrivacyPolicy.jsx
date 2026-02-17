@@ -31,7 +31,7 @@ export default function PrivacyPolicy() {
       >
         {/* Section 1 - Introduction */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#E8F4F3] border border-[#226D68]/20">
@@ -55,7 +55,7 @@ export default function PrivacyPolicy() {
 
         {/* Section 2 - Responsable du traitement - fond vert */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#E8F4F3' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="bg-white rounded-2xl p-8 shadow-sm border border-[#226D68]/10">
               <div className="flex items-start gap-4 mb-6">
                 <div className="p-3 rounded-xl bg-[#FDF2F0]">
@@ -86,7 +86,7 @@ export default function PrivacyPolicy() {
 
         {/* Section 3 - Données collectées */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row-reverse gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#E8F4F3] border border-[#226D68]/20">
@@ -126,7 +126,7 @@ export default function PrivacyPolicy() {
 
         {/* Section 4 - Finalités - fond pêche */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#FDEEDC' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="grid md:grid-cols-2 gap-8">
               <div className="bg-white rounded-2xl p-6 shadow-sm">
                 <h2 className="text-lg font-bold text-[#e76f51] mb-4">4. Finalités du traitement</h2>
@@ -158,7 +158,7 @@ export default function PrivacyPolicy() {
 
         {/* Section 5 - Destinataires & Cookies - bloc sombre */}
         <section className="py-12 md:py-16 bg-[#0B3C5D] overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
               <motion.div {...fadeInUp} className="bg-white/5 rounded-2xl p-6 border border-white/10">
                 <Users className="w-10 h-10 text-[#226D68] mb-4" />
@@ -186,7 +186,7 @@ export default function PrivacyPolicy() {
 
         {/* Section 6 - Vos droits */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#E8F4F3] border border-[#226D68]/20">
@@ -211,7 +211,7 @@ export default function PrivacyPolicy() {
 
         {/* Section 7 - Sécurité & Contact */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#E8F4F3' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
               <motion.div {...fadeInUp} className="bg-white rounded-2xl p-6 shadow-sm">
                 <div className="flex items-start gap-3">

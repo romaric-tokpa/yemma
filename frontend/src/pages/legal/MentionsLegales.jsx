@@ -31,7 +31,7 @@ export default function MentionsLegales() {
       >
         {/* Section 1 - Éditeur */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#E8F4F3] border border-[#226D68]/20">
@@ -66,7 +66,7 @@ export default function MentionsLegales() {
 
         {/* Section 2 - Fond vert clair */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#E8F4F3' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
               <motion.div {...fadeInUp} className="bg-white rounded-2xl p-6 shadow-sm border-l-4 border-[#e76f51]">
                 <h2 className="text-lg font-bold text-[#e76f51] mb-3">2. Directeur de la publication</h2>
@@ -96,7 +96,7 @@ export default function MentionsLegales() {
 
         {/* Section 3 - Propriété intellectuelle */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row-reverse gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#FDF2F0] border border-[#e76f51]/20">
@@ -120,7 +120,7 @@ export default function MentionsLegales() {
 
         {/* Section 4 - Données personnelles - fond pêche */}
         <section className="py-12 md:py-16 overflow-hidden" style={{ backgroundColor: '#FDEEDC' }}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-white shadow-md border border-[#226D68]/20">
@@ -152,7 +152,7 @@ export default function MentionsLegales() {
 
         {/* Section 5 - Bloc sombre */}
         <section className="py-12 md:py-16 bg-[#0B3C5D] overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-8">
               <motion.div {...fadeInUp} className="bg-white/5 rounded-2xl p-6 border border-white/10">
                 <h2 className="text-lg font-bold text-white mb-3">6. Limitation de responsabilité</h2>
@@ -177,7 +177,7 @@ export default function MentionsLegales() {
 
         {/* Section 6 - Droit applicable */}
         <section className="py-12 md:py-16 bg-white overflow-hidden">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
             <motion.div {...fadeInUp} className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
               <div className="lg:w-1/3 flex-shrink-0">
                 <div className="p-6 rounded-2xl bg-[#E8F4F3] border border-[#226D68]/20">

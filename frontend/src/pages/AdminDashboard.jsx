@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { candidateApi, companyApi, paymentApiService } from '@/services/api'
 import { formatDateTime } from '@/utils/dateUtils'
 import AdminLayout from '@/components/admin/AdminLayout'
+import { ROUTES } from '@/constants/routes'
 import { 
   Users, FileCheck, Clock, CheckCircle, XCircle, Archive, 
   Loader2, User, RefreshCw, Calendar,
@@ -32,11 +33,19 @@ const STATUS_LABELS = {
   ARCHIVED: 'Archivé',
 }
 
+const pathToSubsection = (path) => {
+  if (path.endsWith('/abonnements')) return 'subscriptions'
+  if (path.endsWith('/recruteurs')) return 'recruiters'
+  if (path.endsWith('/liste') || path.endsWith('/companies')) return 'list'
+  return 'list'
+}
+
 export default function AdminDashboard() {
   const location = useLocation()
   const navigate = useNavigate()
-  const activeSection = location.pathname === '/admin/companies' || location.state?.section === 'companies' ? 'companies' : 'accueil'
-  const [activeSubsection, setActiveSubsection] = useState('list') // 'list', 'recruiters', 'subscriptions'
+  const path = location.pathname
+  const activeSection = path.includes('/admin/companies') ? 'companies' : 'accueil'
+  const activeSubsection = pathToSubsection(path)
   
   const [stats, setStats] = useState({
     DRAFT: 0,
@@ -219,12 +228,11 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleSubsectionClick = (subsection) => {
-    setActiveSubsection(subsection)
-    if (subsection === 'recruiters') {
+  useEffect(() => {
+    if (activeSubsection === 'recruiters' && activeSection === 'companies') {
       loadAllRecruitersByCompany()
     }
-  }
+  }, [activeSubsection, activeSection])
 
   // Gérer la sélection d'une entreprise (dans l'Annuaire)
   const handleSelectCompany = (company) => {
@@ -383,22 +391,21 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Onglets */}
+              {/* Onglets — routes dédiées */}
               <div className="flex flex-wrap items-center gap-1 rounded-xl border border-gray-200 bg-white p-1.5 mb-6 w-full sm:w-fit shadow-sm">
                 {[
-                  { id: 'list', label: 'Annuaire', Icon: Building },
-                  { id: 'recruiters', label: 'Recruteurs', Icon: UserCheck },
-                  { id: 'subscriptions', label: 'Abonnements', Icon: CreditCard },
-                ].map(({ id, label, Icon }) => (
-                  <button
+                  { id: 'list', label: 'Annuaire', Icon: Building, path: ROUTES.ADMIN_COMPANIES_LISTE },
+                  { id: 'recruiters', label: 'Recruteurs', Icon: UserCheck, path: ROUTES.ADMIN_COMPANIES_RECRUTEURS },
+                  { id: 'subscriptions', label: 'Abonnements', Icon: CreditCard, path: ROUTES.ADMIN_COMPANIES_ABONNEMENTS },
+                ].map(({ id, label, Icon, path }) => (
+                  <Link
                     key={id}
-                    type="button"
-                    onClick={() => handleSubsectionClick(id)}
-                    className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${activeSubsection === id ? 'bg-[#226D68] text-white shadow-sm' : 'text-[#6b7280] hover:text-[#2C2C2C] hover:bg-gray-50'}`}
+                    to={path}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all no-underline ${activeSubsection === id ? 'bg-[#226D68] text-white shadow-sm' : 'text-[#6b7280] hover:text-[#2C2C2C] hover:bg-gray-50'}`}
                   >
                     <Icon className="h-4 w-4" />
                     {label}
-                  </button>
+                  </Link>
                 ))}
               </div>
               {activeSubsection === 'list' && (

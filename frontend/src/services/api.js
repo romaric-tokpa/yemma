@@ -662,7 +662,7 @@ export const candidateApi = {
   /** Nombre de candidats inscrits et validés par secteur d'activité */
   getProfileStatsBySector: async () => {
     try {
-      const response = await api.get('/api/v1/profiles/stats/by-sector')
+      const response = await api.get('/api/v1/profiles/stats/by-sector', { timeout: 60000 })
       return Array.isArray(response.data) ? response.data : []
     } catch (err) {
       console.warn('getProfileStatsBySector:', err?.response?.status, err?.message)
@@ -681,7 +681,7 @@ export const candidateApi = {
       if (fromDate) params.set('from_date', fromDate)
       if (toDate) params.set('to_date', toDate)
       if (groupBy) params.set('group_by', groupBy)
-      const response = await api.get(`/api/v1/profiles/stats/by-period?${params.toString()}`)
+      const response = await api.get(`/api/v1/profiles/stats/by-period?${params.toString()}`, { timeout: 60000 })
       return Array.isArray(response.data) ? response.data : []
     } catch (err) {
       console.warn('getProfileStatsByPeriod:', err?.response?.status, err?.message)
@@ -691,7 +691,7 @@ export const candidateApi = {
   getProfileStats: async () => {
     // Essayer d'utiliser l'endpoint stats si disponible
     try {
-      const response = await api.get('/api/v1/profiles/stats')
+      const response = await api.get('/api/v1/profiles/stats', { timeout: 60000 })
       console.log('✅ Réponse de getProfileStats:', response.data)
       if (response.data && typeof response.data === 'object') {
         return response.data

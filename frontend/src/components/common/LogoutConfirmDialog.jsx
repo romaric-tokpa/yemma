@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,9 +30,9 @@ export function LogoutConfirmDialog({ open, onOpenChange, onConfirm }) {
               <DialogTitle className="text-base font-semibold text-[#2C2C2C]">
                 Se déconnecter ?
               </DialogTitle>
-              <p className="text-sm text-[#9ca3af] leading-relaxed">
+              <DialogDescription className="text-sm text-[#9ca3af] leading-relaxed">
                 Vous devrez vous reconnecter pour accéder à votre espace.
-              </p>
+              </DialogDescription>
             </DialogHeader>
           </div>
         </div>

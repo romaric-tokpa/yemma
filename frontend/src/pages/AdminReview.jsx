@@ -3,7 +3,7 @@
  * Affiche le profil complet, les documents et le formulaire d'évaluation.
  */
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import CandidateDataView from '@/components/admin/CandidateDataView'
 import DocumentViewer from '@/components/admin/DocumentViewer'
 import EvaluationForm from '@/components/admin/EvaluationForm'
@@ -44,9 +44,16 @@ const STATUS_LABELS = {
   ARCHIVED: 'Archivé',
 }
 
-export default function AdminReview() {
+const pathToTab = (path) => {
+  if (path.endsWith('/documents')) return 'documents'
+  if (path.endsWith('/evaluation')) return 'evaluation'
+  return 'profile'
+}
+
+export default function AdminReview({ defaultTab }) {
   const { candidateId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [candidateData, setCandidateData] = useState(null)
   const [documents, setDocuments] = useState([])
   const [selectedDocument, setSelectedDocument] = useState(null)
@@ -59,6 +66,12 @@ export default function AdminReview() {
   const [unarchiveLoading, setUnarchiveLoading] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
   const [unarchiveDialogOpen, setUnarchiveDialogOpen] = useState(false)
+  const activeTab = pathToTab(location.pathname) || defaultTab || 'profile'
+
+  const goToTab = (tab) => {
+    if (tab === 'profile') navigate(`/admin/review/${candidateId}`)
+    else navigate(`/admin/review/${candidateId}/${tab}`)
+  }
 
   const fetchCandidateData = async () => {
     try {
@@ -214,7 +227,7 @@ export default function AdminReview() {
   const defaultAvatar = candidateData ? generateAvatarUrl(candidateData.first_name, candidateData.last_name) : ''
   const displayPhoto = (photoUrl && !photoError && !photoUrl.includes('ui-avatars.com')) ? photoUrl : defaultAvatar
   const fullName = candidateData ? `${candidateData.first_name || ''} ${candidateData.last_name || ''}`.trim() || 'Candidat' : ''
-  const location = candidateData ? [candidateData.city, candidateData.country].filter(Boolean).join(', ') : ''
+    const candidateLocation = candidateData ? [candidateData.city, candidateData.country].filter(Boolean).join(', ') : ''
 
   return (
     <AdminLayout>
@@ -306,7 +319,7 @@ export default function AdminReview() {
                   <p className="text-white/95 text-sm sm:text-base mb-3">{candidateData.profile_title}</p>
                 )}
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/90">
-                  {location && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{location}</span>}
+                  {candidateLocation && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{candidateLocation}</span>}
                   {candidateData?.email && <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{candidateData.email}</span>}
                   {candidateData?.phone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{candidateData.phone}</span>}
                   {candidateData?.total_experience != null && (
@@ -413,8 +426,8 @@ export default function AdminReview() {
           </div>
         )}
 
-        {/* Tabs */}
-        <Tabs defaultValue="profile" className="w-full">
+        {/* Tabs — routes dédiées */}
+        <Tabs value={activeTab} onValueChange={goToTab} className="w-full">
           <TabsList className="bg-white border border-gray-200 p-1 rounded-xl mb-4 h-11">
             <TabsTrigger value="profile" className="rounded-lg px-4 data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
               <User className="w-4 h-4 mr-2" />
@@ -497,9 +510,9 @@ export default function AdminReview() {
                   <DialogTitle className="text-lg font-semibold text-[#2C2C2C]">
                     Archiver ce profil ?
                   </DialogTitle>
-                  <p className="text-sm text-[#6b7280] leading-relaxed">
+                  <DialogDescription className="text-sm text-[#6b7280] leading-relaxed">
                     Le profil sera retiré de la liste de validation et de l&apos;index de recherche (CVthèque). Vous pourrez le déarchiver ultérieurement.
-                  </p>
+                  </DialogDescription>
                 </DialogHeader>
               </div>
             </div>
@@ -538,9 +551,9 @@ export default function AdminReview() {
                   <DialogTitle className="text-lg font-semibold text-[#2C2C2C]">
                     Déarchiver ce profil ?
                   </DialogTitle>
-                  <p className="text-sm text-[#6b7280] leading-relaxed">
+                  <DialogDescription className="text-sm text-[#6b7280] leading-relaxed">
                     Le profil sera restauré dans la liste de validation et l&apos;index de recherche (CVthèque).
-                  </p>
+                  </DialogDescription>
                 </DialogHeader>
               </div>
             </div>

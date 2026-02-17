@@ -132,7 +132,7 @@ export default function JobOfferDetailPage() {
           backgroundSize: '24px 24px, 100% 100%',
         }}
       >
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+        <div className="max-w-3xl mx-auto min-w-0 px-3 xs:px-4 sm:px-6">
           {/* Lien retour */}
           <Link
             to="/offres"

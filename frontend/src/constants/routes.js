@@ -58,9 +58,29 @@ export const ROUTES = {
   // Routes admin
   ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_COMPANIES: '/admin/companies',
+  ADMIN_COMPANIES_LISTE: '/admin/companies/liste',
+  ADMIN_COMPANIES_RECRUTEURS: '/admin/companies/recruteurs',
+  ADMIN_COMPANIES_ABONNEMENTS: '/admin/companies/abonnements',
   ADMIN_STATISTICS: '/admin/statistics',
+  ADMIN_STATISTICS_SECTEURS: '/admin/statistics/secteurs',
+  ADMIN_STATISTICS_PERIODE: '/admin/statistics/periode',
   ADMIN_STATISTICS_OFFRES: '/admin/statistics/offres',
   ADMIN_REVIEW: (candidateId) => `/admin/review/${candidateId}`,
+  ADMIN_REVIEW_PROFILE: (candidateId) => `/admin/review/${candidateId}/profile`,
+  ADMIN_REVIEW_DOCUMENTS: (candidateId) => `/admin/review/${candidateId}/documents`,
+  ADMIN_REVIEW_EVALUATION: (candidateId) => `/admin/review/${candidateId}/evaluation`,
+
+  // Routes entreprise - onglets avec routes
+  COMPANY_DASHBOARD_OVERVIEW: '/company/dashboard',
+  COMPANY_DASHBOARD_SEARCH: '/company/dashboard/search',
+  COMPANY_DASHBOARD_MANAGEMENT: '/company/dashboard/management',
+  COMPANY_DASHBOARD_MANAGEMENT_TEAM: '/company/dashboard/management/team',
+  COMPANY_DASHBOARD_MANAGEMENT_SUBSCRIPTION: '/company/dashboard/management/subscription',
+  COMPANY_DASHBOARD_MANAGEMENT_HISTORY: '/company/dashboard/management/history',
+
+  // Routes candidat - sous-onglets offres
+  CANDIDATE_OFFRES_LISTE: '/candidate/dashboard/offres',
+  CANDIDATE_OFFRES_CANDIDATURES: '/candidate/dashboard/offres/candidatures',
   
   // Routes par défaut selon le rôle
   DEFAULT_ROUTES: {

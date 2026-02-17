@@ -1136,6 +1136,9 @@ export default function EditProfile() {
             <DialogTitle className="text-base font-semibold text-gray-anthracite truncate">
               {previewDocument?.original_filename || 'Document'}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Prévisualisation du document
+            </DialogDescription>
           </DialogHeader>
           <div className="overflow-auto flex-1 min-h-0 p-4">
             {previewDocument?.url && <iframe title="Aperçu du document" src={previewDocument.url} className="w-full min-h-[60vh] border border-border rounded-lg" />}
