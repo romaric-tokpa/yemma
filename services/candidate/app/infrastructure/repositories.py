@@ -2,9 +2,10 @@
 Repositories pour les opérations de base de données
 """
 import logging
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 from sqlmodel import SQLModel
 
@@ -469,15 +470,49 @@ class JobOfferRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def increment_view_count(session: AsyncSession, job_id: int) -> bool:
+        """Incrémente le compteur de vues pour une offre publiée."""
+        from sqlalchemy import update
+        job = await JobOfferRepository.get_by_id(session, job_id)
+        if not job or job.status != JobStatus.PUBLISHED:
+            return False
+        stmt = update(JobOffer).where(JobOffer.id == job_id).values(
+            view_count=JobOffer.view_count + 1
+        )
+        await session.execute(stmt)
+        await session.commit()
+        return True
+
+    @staticmethod
+    async def increment_register_click_count(session: AsyncSession, job_id: int) -> bool:
+        """Incrémente le compteur de clics sur Créer mon compte (depuis modal Postuler)."""
+        from sqlalchemy import update
+        job = await JobOfferRepository.get_by_id(session, job_id)
+        if not job or job.status != JobStatus.PUBLISHED:
+            return False
+        stmt = update(JobOffer).where(JobOffer.id == job_id).values(
+            register_click_count=JobOffer.register_click_count + 1
+        )
+        await session.execute(stmt)
+        await session.commit()
+        return True
+
+    @staticmethod
     async def list_published(
         session: AsyncSession,
         title: Optional[str] = None,
         location: Optional[str] = None,
         contract_type: Optional[str] = None,
         company: Optional[str] = None,
+        sector: Optional[str] = None,
     ) -> List[JobOffer]:
-        """Liste les offres publiées, avec filtres optionnels"""
-        stmt = select(JobOffer).where(JobOffer.status == JobStatus.PUBLISHED)
+        """Liste les offres publiées et non expirées, avec filtres optionnels"""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        stmt = select(JobOffer).where(
+            JobOffer.status == JobStatus.PUBLISHED,
+            # Exclure les offres expirées (expires_at null = pas de limite)
+            (JobOffer.expires_at.is_(None)) | (JobOffer.expires_at > now),
+        )
         if title:
             stmt = stmt.where(JobOffer.title.ilike(f"%{title}%"))
         if location:
@@ -486,6 +521,8 @@ class JobOfferRepository:
             stmt = stmt.where(JobOffer.contract_type == contract_type)
         if company:
             stmt = stmt.where(JobOffer.company_name.ilike(f"%{company}%"))
+        if sector:
+            stmt = stmt.where(JobOffer.sector.ilike(f"%{sector}%"))
         stmt = stmt.order_by(JobOffer.created_at.desc())
         result = await session.execute(stmt)
         return list(result.scalars().all())
@@ -497,6 +534,57 @@ class JobOfferRepository:
             select(JobOffer).order_by(JobOffer.created_at.desc())
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    async def get_stats(session: AsyncSession) -> dict:
+        """Statistiques des offres par statut + total candidatures."""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        # Comptage par statut
+        stmt = select(JobOffer.status, func.count(JobOffer.id).label("count")).group_by(JobOffer.status)
+        result = await session.execute(stmt)
+        rows = result.all()
+        by_status = {"DRAFT": 0, "PUBLISHED": 0, "CLOSED": 0, "ARCHIVED": 0}
+        for row in rows:
+            status_val = row.status.value if hasattr(row.status, "value") else str(row.status)
+            if status_val in by_status:
+                by_status[status_val] = row.count
+        # Offres PUBLISHED expirées (expires_at <= now)
+        stmt_expired = select(func.count(JobOffer.id)).where(
+            JobOffer.status == JobStatus.PUBLISHED,
+            JobOffer.expires_at.isnot(None),
+            JobOffer.expires_at <= now,
+        )
+        expired_result = await session.execute(stmt_expired)
+        expired_count = expired_result.scalar() or 0
+        # Total candidatures
+        stmt_apps = select(func.count(Application.id)).select_from(Application)
+        apps_result = await session.execute(stmt_apps)
+        applications_count = apps_result.scalar() or 0
+        return {
+            "total": sum(by_status.values()),
+            "by_status": by_status,
+            "expired_published": expired_count,
+            "applications": applications_count,
+        }
+
+    @staticmethod
+    async def archive_expired(session: AsyncSession) -> int:
+        """Archive les offres PUBLISHED dont expires_at est dépassé. Retourne le nombre archivé."""
+        from sqlalchemy import update
+        # Utiliser UTC naive pour compatibilité avec les colonnes DateTime sans timezone
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        stmt = (
+            update(JobOffer)
+            .where(
+                JobOffer.status == JobStatus.PUBLISHED,
+                JobOffer.expires_at.isnot(None),
+                JobOffer.expires_at <= now,
+            )
+            .values(status=JobStatus.ARCHIVED)
+        )
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount
 
     @staticmethod
     async def update(session: AsyncSession, job_id: int, data: dict) -> Optional[JobOffer]:
@@ -543,3 +631,21 @@ class ApplicationRepository:
         )
         return result.scalar_one_or_none() is not None
 
+    @staticmethod
+    async def list_by_job(session: AsyncSession, job_offer_id: int) -> List[tuple]:
+        """Liste les candidatures pour une offre avec profil. Retourne [(Application, Profile|None), ...]"""
+        result = await session.execute(
+            select(Application)
+            .where(Application.job_offer_id == job_offer_id)
+            .order_by(Application.applied_at.desc())
+        )
+        apps = list(result.scalars().all())
+        if not apps:
+            return []
+        from app.domain.models import Profile
+        profile_ids = [a.candidate_id for a in apps]
+        profiles_result = await session.execute(
+            select(Profile).where(Profile.id.in_(profile_ids))
+        )
+        profiles = {p.id: p for p in profiles_result.scalars().all()}
+        return [(a, profiles.get(a.candidate_id)) for a in apps]

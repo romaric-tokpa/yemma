@@ -511,14 +511,6 @@ async def partial_update_my_profile(
     if not profile:
         raise ProfileNotFoundError(str(current_user.user_id))
     
-    # Si le profil est VALIDATED, IN_REVIEW ou SUBMITTED, on permet la modification
-    # mais on le remet en SUBMITTED pour revalidation (pas DRAFT)
-    should_resubmit = profile.status in [
-        ProfileStatus.VALIDATED, 
-        ProfileStatus.IN_REVIEW, 
-        ProfileStatus.SUBMITTED
-    ]
-    
     # On ne peut pas modifier un profil ARCHIVED
     if profile.status == ProfileStatus.ARCHIVED:
         raise InvalidProfileStatusError(
@@ -526,39 +518,9 @@ async def partial_update_my_profile(
             "DRAFT, REJECTED, VALIDATED, IN_REVIEW or SUBMITTED"
         )
     
+    # Les candidats VALIDATED, IN_REVIEW ou SUBMITTED peuvent modifier leur profil
+    # sans réinitialiser le statut ni l'évaluation (admin_score, admin_report, validated_at)
     profile_update_data = {}
-    
-    # Si le profil était validé/soumis/en review, le remettre en SUBMITTED pour revalidation
-    if should_resubmit:
-        from datetime import datetime
-        was_validated = profile.status == ProfileStatus.VALIDATED
-        profile_update_data["status"] = ProfileStatus.SUBMITTED
-        profile_update_data["submitted_at"] = datetime.utcnow()
-        # Réinitialiser les champs de validation (sera réévalué par l'admin)
-        profile_update_data["validated_at"] = None
-        profile_update_data["admin_score"] = None
-        profile_update_data["admin_report"] = None
-        profile_update_data["rejected_at"] = None
-        profile_update_data["rejection_reason"] = None
-        
-        # Si le profil était validé, le supprimer de l'index ElasticSearch
-        # car il ne doit plus être visible dans la CVthèque jusqu'à revalidation
-        if was_validated:
-            try:
-                from app.core.config import settings
-                from app.infrastructure.internal_auth import get_service_token_header
-                import httpx
-                
-                headers = get_service_token_header("candidate-service")
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    await client.delete(
-                        f"{settings.SEARCH_SERVICE_URL}/api/v1/candidates/index/{profile.id}",
-                        headers=headers
-                    )
-                logger.info(f"Profile {profile.id} removed from search index (status changed from VALIDATED to SUBMITTED)")
-            except Exception as e:
-                # Log l'erreur mais ne bloque pas la mise à jour du profil
-                logger.warning(f"Failed to remove profile {profile.id} from search index: {str(e)}")
     
     # Étape 0 : Consentements
     if update_data.step0:
@@ -833,53 +795,18 @@ async def update_profile(
             )
     
     # Vérifier le statut - permettre la mise à jour du statut uniquement pour les services internes
-    # Les utilisateurs normaux peuvent modifier les profils en DRAFT, REJECTED, ou VALIDATED/IN_REVIEW/SUBMITTED
-    # Si le profil est VALIDATED/IN_REVIEW/SUBMITTED, il sera automatiquement remis en SUBMITTED pour revalidation
     update_dict = update_data.model_dump(exclude_unset=True)
-    is_status_update = "status" in update_dict
     is_internal_service = service_info is not None
     
-    # Si le profil est VALIDATED, IN_REVIEW ou SUBMITTED et que l'utilisateur modifie le profil,
-    # le remettre en SUBMITTED pour revalidation (sauf si c'est un service interne qui met à jour le statut explicitement)
     if not is_internal_service:
         if profile.status == ProfileStatus.ARCHIVED:
             raise InvalidProfileStatusError(
                 profile.status.value,
                 "DRAFT, REJECTED, VALIDATED, IN_REVIEW or SUBMITTED"
             )
-        
-        # Si le profil est validé/soumis/en review et qu'on modifie (sans changer le statut explicitement),
-        # le remettre en SUBMITTED pour revalidation
-        if profile.status in [ProfileStatus.VALIDATED, ProfileStatus.IN_REVIEW, ProfileStatus.SUBMITTED] and not is_status_update:
-            from datetime import datetime
-            was_validated = profile.status == ProfileStatus.VALIDATED
-            update_dict["status"] = ProfileStatus.SUBMITTED.value
-            update_dict["submitted_at"] = datetime.utcnow().isoformat()
-            # Réinitialiser les champs de validation
-            update_dict["validated_at"] = None
-            update_dict["admin_score"] = None
-            update_dict["admin_report"] = None
-            update_dict["rejected_at"] = None
-            update_dict["rejection_reason"] = None
-            
-            # Si le profil était validé, le supprimer de l'index ElasticSearch
-            # car il ne doit plus être visible dans la CVthèque jusqu'à revalidation
-            if was_validated:
-                try:
-                    from app.core.config import settings
-                    from app.infrastructure.internal_auth import get_service_token_header
-                    import httpx
-                    
-                    headers = get_service_token_header("candidate-service")
-                    async with httpx.AsyncClient(timeout=10.0) as client:
-                        await client.delete(
-                            f"{settings.SEARCH_SERVICE_URL}/api/v1/candidates/index/{profile_id}",
-                            headers=headers
-                        )
-                    logger.info(f"Profile {profile_id} removed from search index (status changed from VALIDATED to SUBMITTED)")
-                except Exception as e:
-                    # Log l'erreur mais ne bloque pas la mise à jour du profil
-                    logger.warning(f"Failed to remove profile {profile_id} from search index: {str(e)}")
+        # Les candidats VALIDATED/IN_REVIEW/SUBMITTED peuvent modifier leur profil
+        # sans réinitialiser le statut ni l'évaluation
+    
     # Pour les services internes, permettre la mise à jour du statut et fixer les dates de validation/rejet
     if is_internal_service:
         from datetime import datetime

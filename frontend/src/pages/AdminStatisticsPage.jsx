@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { candidateApi } from '@/services/api'
 import AdminLayout from '@/components/admin/AdminLayout'
+import { Link } from 'react-router-dom'
 import {
   Users, CheckCircle, Loader2, TrendingUp, RefreshCw, Calendar,
-  BarChart3, PieChart, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, Archive
+  BarChart3, PieChart, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, Archive,
+  Briefcase, FileText, Eye, EyeOff, Clock,
 } from 'lucide-react'
 
 export default function AdminStatisticsPage() {
@@ -34,6 +36,8 @@ export default function AdminStatisticsPage() {
     }
   })
   const [statsTab, setStatsTab] = useState('overview')
+  const [jobStats, setJobStats] = useState(null)
+  const [loadingJobStats, setLoadingJobStats] = useState(false)
 
   const loadStats = async () => {
     try {
@@ -58,6 +62,18 @@ export default function AdminStatisticsPage() {
     }
   }
 
+  const loadJobStats = async () => {
+    try {
+      setLoadingJobStats(true)
+      const data = await candidateApi.adminJobsStats()
+      setJobStats(data && typeof data === 'object' ? data : null)
+    } catch {
+      setJobStats(null)
+    } finally {
+      setLoadingJobStats(false)
+    }
+  }
+
   const loadStatsByPeriod = async (overrideFilter) => {
     const filter = overrideFilter || periodFilter
     try {
@@ -77,6 +93,7 @@ export default function AdminStatisticsPage() {
 
   useEffect(() => {
     if (statsTab === 'period') loadStatsByPeriod()
+    if (statsTab === 'jobs') loadJobStats()
   }, [statsTab])
 
   const totalInscrits = statsBySector.reduce((s, r) => s + (r.total ?? 0), 0)
@@ -218,6 +235,7 @@ export default function AdminStatisticsPage() {
             { id: 'overview', label: 'Vue d\'ensemble', shortLabel: 'Vue', icon: BarChart3 },
             { id: 'sectors', label: 'Par secteur', shortLabel: 'Secteurs', icon: PieChart },
             { id: 'period', label: 'Par période', shortLabel: 'Période', icon: Calendar },
+            { id: 'jobs', label: 'Offres d\'emploi', shortLabel: 'Offres', icon: Briefcase },
           ].map(({ id, label, shortLabel, icon: Icon }) => (
             <button
               key={id}
@@ -263,7 +281,7 @@ export default function AdminStatisticsPage() {
                 </div>
                 <div className="mt-6 pt-6 border-t border-gray-100">
                   <p className="text-xs text-[#6b7280]">
-                    <strong>Par secteur</strong> : viviers et taux par secteur. <strong>Par période</strong> : inscriptions et décisions dans le temps.
+                    <strong>Par secteur</strong> : viviers et taux par secteur. <strong>Par période</strong> : inscriptions et décisions dans le temps. <strong>Offres</strong> : statistiques des offres d&apos;emploi.
                   </p>
                 </div>
               </div>
@@ -470,6 +488,90 @@ export default function AdminStatisticsPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {statsTab === 'jobs' && (
+              <div className="space-y-6">
+                {loadingJobStats ? (
+                  <div className="flex gap-3 items-center justify-center py-16 text-[#6b7280] rounded-2xl border border-gray-200 bg-white">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#226D68]" />
+                    <span className="text-sm">Chargement des statistiques offres…</span>
+                  </div>
+                ) : !jobStats ? (
+                  <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white p-8 sm:p-12 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                      <Briefcase className="w-7 h-7 text-[#6b7280]" />
+                    </div>
+                    <p className="text-base font-semibold text-[#2C2C2C]">Aucune donnée disponible</p>
+                    <p className="text-sm text-[#6b7280] mt-2">Les statistiques des offres d&apos;emploi n&apos;ont pas pu être chargées.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
+                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
+                          <Briefcase className="w-4 h-4" />
+                          Total offres
+                        </div>
+                        <p className="text-2xl font-bold text-[#2C2C2C] tabular-nums">{jobStats.total ?? 0}</p>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
+                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
+                          <Eye className="w-4 h-4" />
+                          Publiées
+                        </div>
+                        <p className="text-2xl font-bold text-[#1a5a55] tabular-nums">{jobStats.by_status?.PUBLISHED ?? 0}</p>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
+                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
+                          <Clock className="w-4 h-4" />
+                          Expirées (publiées)
+                        </div>
+                        <p className="text-2xl font-bold text-[#c04a2f] tabular-nums">{jobStats.expired_published ?? 0}</p>
+                      </div>
+                      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 sm:p-5">
+                        <div className="flex items-center gap-2 text-[#6b7280] text-sm mb-1">
+                          <FileText className="w-4 h-4" />
+                          Candidatures
+                        </div>
+                        <p className="text-2xl font-bold text-[#226D68] tabular-nums">{jobStats.applications ?? 0}</p>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-[#E8F4F3]/60 to-white flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="text-sm font-semibold text-[#2C2C2C]">Répartition par statut</h3>
+                        <Link
+                          to="/admin/jobs"
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]"
+                        >
+                          Gérer les offres
+                          <ChevronRight className="w-4 h-4" />
+                        </Link>
+                      </div>
+                      <div className="p-4 sm:p-5">
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {[
+                            { key: 'DRAFT', label: 'Brouillons', icon: EyeOff, color: 'text-[#6b7280]' },
+                            { key: 'PUBLISHED', label: 'Publiées', icon: Eye, color: 'text-[#1a5a55]' },
+                            { key: 'CLOSED', label: 'Fermées', icon: Archive, color: 'text-[#6b7280]' },
+                            { key: 'ARCHIVED', label: 'Archivées', icon: Archive, color: 'text-[#6b7280]' },
+                          ].map(({ key, label, icon: Icon, color }) => (
+                            <div key={key} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/80">
+                              <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                                <Icon className={`w-5 h-5 ${color}`} />
+                              </div>
+                              <div>
+                                <p className="text-xs text-[#6b7280]">{label}</p>
+                                <p className={`text-lg font-semibold tabular-nums ${color}`}>{jobStats.by_status?.[key] ?? 0}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </>

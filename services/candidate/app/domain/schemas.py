@@ -318,6 +318,8 @@ class JobOfferResponse(BaseModel):
     company_logo_url: Optional[str] = None
     external_application_url: Optional[str] = None
     application_email: Optional[str] = None
+    view_count: Optional[int] = 0
+    register_click_count: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -326,4 +328,22 @@ class JobOfferResponse(BaseModel):
 class ApplicationCreate(BaseModel):
     """Schéma pour une candidature (optionnel : lettre de motivation)"""
     cover_letter: Optional[str] = Field(default=None)
+
+
+class JobApplicationResponse(BaseModel):
+    """Candidature avec infos profil pour l'admin"""
+    id: int
+    candidate_id: int
+    job_offer_id: int
+    status: str
+    applied_at: Optional[datetime] = None
+    cover_letter: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    profile_title: Optional[str] = None
+    profile_status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 

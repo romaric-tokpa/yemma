@@ -462,7 +462,17 @@ export default function AdminReview() {
                   <CheckCircle2 className="h-5 w-5 text-[#226D68]" />
                   Grille d&apos;évaluation
                 </h3>
-                <p className="text-sm text-[#6b7280] mt-0.5">Valider ou rejeter le profil</p>
+                <p className="text-sm text-[#6b7280] mt-0.5">
+                  {candidateData?.status === 'VALIDATED'
+                    ? 'Modifier l\'évaluation et mettre à jour avec les nouvelles informations du candidat'
+                    : 'Valider ou rejeter le profil'}
+                </p>
+                {candidateData?.status === 'VALIDATED' && (
+                  <p className="text-xs text-[#6b7280] mt-2 flex items-center gap-1.5">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Cliquez sur &quot;Actualiser&quot; en haut pour recharger les dernières modifications du candidat avant de mettre à jour l&apos;évaluation.
+                  </p>
+                )}
               </div>
               <div className="p-4 sm:p-6">
                 <EvaluationForm

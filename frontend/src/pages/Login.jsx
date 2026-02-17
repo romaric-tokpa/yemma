@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link, useLocation } from 'react-router-dom'
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ROUTES, getDefaultRouteForRole } from '@/constants/routes'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,15 +10,16 @@ import { authApiService, candidateApi, companyApi } from '@/services/api'
 import { loginSchema } from '@/schemas/auth'
 import { AlertCircle, Mail, Lock, User, Building, ArrowRight } from 'lucide-react'
 import { SEO } from '@/components/seo/SEO'
-import PublicNavbar from '@/components/layout/PublicNavbar'
 import RegisterCandidatIllustration from '@/components/landing/RegisterCandidatIllustration'
 
 export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const from = location.state?.from || null
+  const redirectUrl = searchParams.get('redirect')
+  const from = location.state?.from || redirectUrl || null
   const successMessage = location.state?.message || null
 
   const form = useForm({
@@ -90,8 +91,7 @@ export default function Login() {
         keywords="connexion recrutement, login Yemma, espace candidat, espace recruteur"
         canonical="/login"
       />
-      <PublicNavbar variant="light" />
-      <div className="min-h-screen min-h-[100dvh] flex flex-col lg:flex-row overflow-x-hidden w-full max-w-[100vw] pt-14 md:pt-16">
+      <div className="min-h-screen min-h-[100dvh] flex flex-col lg:flex-row overflow-x-hidden w-full max-w-[100vw]">
         {/* Bande décorative gauche - style capture */}
         <div
           className="hidden lg:block w-16 lg:w-20 shrink-0"

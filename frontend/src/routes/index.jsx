@@ -142,7 +142,15 @@ export default function AppRoutes() {
         }
       />
       
-      {/* Dashboard candidat - chaque section a sa route */}
+      {/* Dashboard candidat - offres avec détail intégré */}
+      <Route 
+        path="/candidate/dashboard/offres/:offerId" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_CANDIDAT']}>
+            <CandidateDashboard />
+          </AuthGuard>
+        } 
+      />
       <Route 
         path="/candidate/dashboard/:tab" 
         element={

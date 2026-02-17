@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useLocation, Link, useParams, useSearchParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,8 +9,8 @@ import {
   Plus, Trash2, Eye, EyeOff, Mail, Phone, Calendar, LogOut,
   Home, Settings, Menu, X, TrendingUp, FileCheck,
   Flag, Download, Image as ImageIcon, Loader2, Upload,
-  Wrench, Sparkles, BarChart3, HelpCircle,   Target, Search, FileSearch,
-  Save
+  Wrench, Sparkles, BarChart3, HelpCircle, Target, Search,   FileSearch,
+  Save, Building2, ArrowLeft, ArrowRight, Shield
 } from 'lucide-react'
 import { candidateApi, authApiService, documentApi } from '../services/api'
 import { Button } from '../components/ui/button'
@@ -36,9 +36,10 @@ import {
   certificationToApiPayload,
   jobPreferencesToApiPayload,
 } from '../utils/profilePayloads'
-import { formatDateTime } from '../utils/dateUtils'
+import { formatDateTime, formatDate } from '../utils/dateUtils'
 import SupportWidget from '../components/candidate/SupportWidget'
 import { Toast } from '../components/common/Toast'
+import { ROUTES } from '../constants/routes'
 
 // Charte graphique Yemma (landing)
 const CHARTE = {
@@ -236,12 +237,12 @@ function SettingsPageContent({ onSuccess, onError }) {
   )
 }
 
-const VALID_TABS = ['dashboard', 'profile', 'situation', 'preferences', 'documents', 'experiences', 'educations', 'skills', 'certifications', 'settings']
+const VALID_TABS = ['dashboard', 'profile', 'offres', 'situation', 'preferences', 'documents', 'experiences', 'educations', 'skills', 'certifications', 'settings']
 
 export default function CandidateDashboard() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { tab } = useParams()
+  const { tab, offerId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -289,6 +290,9 @@ export default function CandidateDashboard() {
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [submittingProfile, setSubmittingProfile] = useState(false)
   const [submitError, setSubmitError] = useState(null)
+  // Modale compléter profil (postuler à une offre)
+  const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false)
+  const [profileCompletionMessage, setProfileCompletionMessage] = useState('')
   
   // États pour les filtres et recherche des compétences
   const [skillSearchQuery, setSkillSearchQuery] = useState('')
@@ -297,6 +301,19 @@ export default function CandidateDashboard() {
   // Guide de complétion du profil (visible quand < 100%)
   const [showCompletionGuide, setShowCompletionGuide] = useState(false)
   const completionGuideRef = useRef(null)
+  // États pour l'onglet Offres d'emploi
+  const [jobsOffres, setJobsOffres] = useState([])
+  const [jobsLoading, setJobsLoading] = useState(false)
+  const [jobDetail, setJobDetail] = useState(null)
+  const [jobDetailLoading, setJobDetailLoading] = useState(false)
+  const [applyingToJob, setApplyingToJob] = useState(false)
+  const [hasAppliedToJob, setHasAppliedToJob] = useState(false)
+  const [filterTitle, setFilterTitle] = useState('')
+  const [filterLocation, setFilterLocation] = useState('')
+  const [filterContract, setFilterContract] = useState('')
+  const [filterSector, setFilterSector] = useState('')
+  const [debouncedTitle, setDebouncedTitle] = useState('')
+  const [debouncedLocation, setDebouncedLocation] = useState('')
   // Mode édition du profil (intégré dans l'onglet Profil)
   const [profileEditMode, setProfileEditMode] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -337,8 +354,12 @@ export default function CandidateDashboard() {
     loadProfile()
   }, [])
 
-  // Synchroniser activeTab avec l'URL (route /candidate/dashboard/:tab)
+  // Synchroniser activeTab avec l'URL (route /candidate/dashboard/:tab ou /candidate/dashboard/offres/:offerId)
   useEffect(() => {
+    if (offerId) {
+      setActiveTab('offres')
+      return
+    }
     const urlTab = tab || 'dashboard'
     // "situation" affiche le contenu "preferences"
     const resolvedTab = urlTab === 'situation' ? 'preferences' : urlTab
@@ -348,7 +369,98 @@ export default function CandidateDashboard() {
       setActiveTab('dashboard')
       if (tab) navigate('/candidate/dashboard', { replace: true })
     }
-  }, [tab, navigate])
+  }, [tab, offerId, navigate])
+
+  // Debounce des filtres offres (400ms) - titre et localisation uniquement
+  useEffect(() => { const t = setTimeout(() => setDebouncedTitle(filterTitle), 400); return () => clearTimeout(t) }, [filterTitle])
+  useEffect(() => { const t = setTimeout(() => setDebouncedLocation(filterLocation), 400); return () => clearTimeout(t) }, [filterLocation])
+
+  const loadJobsOffres = useCallback(async () => {
+    try {
+      setJobsLoading(true)
+      const data = await candidateApi.listJobs({
+        title: debouncedTitle || undefined,
+        location: debouncedLocation || undefined,
+        contract_type: filterContract || undefined,
+        sector: filterSector || undefined,
+      })
+      setJobsOffres(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error('Erreur chargement offres:', err)
+      setJobsOffres([])
+      setToast({ message: 'Impossible de charger les offres.', type: 'error' })
+    } finally {
+      setJobsLoading(false)
+    }
+  }, [debouncedTitle, debouncedLocation, filterContract, filterSector])
+
+  useEffect(() => {
+    if (activeTab === 'offres') loadJobsOffres()
+  }, [activeTab, loadJobsOffres])
+
+  // Charger le détail d'une offre quand offerId est dans l'URL
+  const loadJobDetail = useCallback(async (id) => {
+    if (!id) return
+    try {
+      setJobDetailLoading(true)
+      setJobDetail(null)
+      setHasAppliedToJob(false)
+      const data = await candidateApi.getJob(id)
+      setJobDetail(data)
+      try {
+        const status = await candidateApi.getJobApplicationStatus(id)
+        setHasAppliedToJob(!!status?.applied)
+      } catch {
+        setHasAppliedToJob(false)
+      }
+    } catch {
+      setJobDetail(null)
+      setToast({ message: 'Offre introuvable.', type: 'error' })
+    } finally {
+      setJobDetailLoading(false)
+    }
+  }, [])
+  useEffect(() => {
+    if (offerId) loadJobDetail(offerId)
+    else setJobDetail(null)
+  }, [offerId, loadJobDetail])
+
+  const handleApplyToJob = useCallback(async () => {
+    if (!jobDetail) return
+    setApplyingToJob(true)
+    setShowCompleteProfileModal(false)
+    try {
+      const res = await candidateApi.applyToJob(jobDetail.id)
+      if (res.redirect_url) {
+        window.open(res.redirect_url, '_blank')
+        setToast({ message: 'Redirection vers le site de candidature.', type: 'success' })
+      } else if (res.application_email) {
+        const subject = encodeURIComponent(`Candidature: ${jobDetail.title || ''}`)
+        window.location.href = `mailto:${res.application_email}?subject=${subject}`
+        setToast({ message: 'Ouverture du client mail.', type: 'success' })
+      } else {
+        setHasAppliedToJob(true)
+        setToast({ message: 'Candidature envoyée avec succès !', type: 'success' })
+      }
+    } catch (err) {
+      const status = err.response?.status
+      const detail = err.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : ''
+      if (status === 403 && (msg.includes('%') || msg.includes('profil'))) {
+        setProfileCompletionMessage(msg)
+        setShowCompleteProfileModal(true)
+      } else if (status === 404) {
+        setToast({ message: 'Offre introuvable.', type: 'error' })
+      } else if (status === 409) {
+        setHasAppliedToJob(true)
+        setToast({ message: 'Vous avez déjà postulé à cette offre.', type: 'info' })
+      } else {
+        setToast({ message: msg || 'Erreur lors de la candidature.', type: 'error' })
+      }
+    } finally {
+      setApplyingToJob(false)
+    }
+  }, [jobDetail])
 
   // Mode édition profil : synchronisé avec ?edit=1 sur l'onglet profile
   useEffect(() => {
@@ -380,7 +492,13 @@ export default function CandidateDashboard() {
 
   useEffect(() => {
     const loadPhotoUrl = async () => {
-      if (!profile?.id) {
+      const profileId = profile?.id
+      if (!profileId || (typeof profileId !== 'number' && typeof profileId !== 'string')) {
+        setCurrentPhotoUrl(null)
+        return
+      }
+      const id = typeof profileId === 'number' ? profileId : parseInt(profileId, 10)
+      if (Number.isNaN(id) || id <= 0) {
         setCurrentPhotoUrl(null)
         return
       }
@@ -399,7 +517,7 @@ export default function CandidateDashboard() {
         }
       }
       try {
-        const docs = await documentApi.getCandidateDocuments(profile.id)
+        const docs = await documentApi.getCandidateDocuments(id)
         const photoDoc = docs
           ?.filter(doc =>
             (doc.document_type === 'PROFILE_PHOTO' || doc.document_type === 'OTHER') && !doc.deleted_at
@@ -409,15 +527,27 @@ export default function CandidateDashboard() {
           const serveUrl = documentApi.getDocumentServeUrl(photoDoc.id)
           setCurrentPhotoUrl(serveUrl)
           setPhotoError(false)
-          if (!profile.photo_url || profile.photo_url !== serveUrl) {
-            await candidateApi.updateProfile(profile.id, { photo_url: serveUrl })
+          // Ne pas synchroniser si profil archivé (backend rejette) ou si déjà à jour
+          if (profile.status !== 'ARCHIVED' && (!profile.photo_url || profile.photo_url !== serveUrl)) {
+            try {
+              await candidateApi.updateProfile(id, { photo_url: serveUrl })
+            } catch (err) {
+              if (err.response?.status === 400) {
+                // Profil archivé ou autre erreur métier : ignorer silencieusement
+                return
+              }
+              throw err
+            }
           }
         } else {
           setCurrentPhotoUrl(null)
         }
       } catch (err) {
         setCurrentPhotoUrl(null)
-        if (err.response?.status !== 500) console.warn('Documents non chargés pour la photo:', err.message)
+        // Ne pas afficher de warning pour 400/404 : profil récent sans documents ou id invalide
+        if (err.response?.status === 500) {
+          console.warn('Documents non chargés pour la photo:', err.message)
+        }
       }
     }
     loadPhotoUrl()
@@ -437,17 +567,21 @@ export default function CandidateDashboard() {
         setSkills(Array.isArray(profileData.skills) ? profileData.skills : [])
         setJobPreferences(profileData.job_preferences ?? null)
         // Documents : service séparé, chargement en parallèle après réception du profil
-        try {
-          const docs = await documentApi.getCandidateDocuments(profileData.id)
-          setDocuments(docs || [])
-        } catch (docErr) {
-          if (docErr.response?.status === 500) {
-            const detail = docErr.response?.data?.detail
-            const msg = typeof detail === 'string' ? detail : 'Service documents temporairement indisponible.'
-            setToast({ message: msg, type: 'error' })
-          } else {
-            console.error('Error loading documents:', docErr)
+        const profileId = profileData.id
+        if (profileId != null && !Number.isNaN(Number(profileId)) && Number(profileId) > 0) {
+          try {
+            const docs = await documentApi.getCandidateDocuments(Number(profileId))
+            setDocuments(docs || [])
+          } catch (docErr) {
+            if (docErr.response?.status === 500) {
+              const detail = docErr.response?.data?.detail
+              const msg = typeof detail === 'string' ? detail : 'Service documents temporairement indisponible.'
+              setToast({ message: msg, type: 'error' })
+            }
+            // 400/404 : ignorer silencieusement (profil récent, id invalide)
+            setDocuments([])
           }
+        } else {
           setDocuments([])
         }
       }
@@ -724,18 +858,38 @@ export default function CandidateDashboard() {
     ? currentPhotoUrl 
     : defaultAvatar
 
-  // Navigation principale (style Freelance Republik)
-  const navItems = [
-    { id: 'dashboard', label: 'Mon dashboard', icon: Home },
-    { id: 'profile', label: 'Mon profil', icon: User },
-    { id: 'offres', label: 'Offres d\'emploi', icon: FileSearch, path: '/offres' },
-    { id: 'situation', label: 'Ma situation', icon: Search },
-    { id: 'preferences', label: 'Préférences emploi', icon: Target },
-    { id: 'documents', label: 'Mon CV', icon: FileText },
-    { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
-    { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
-    { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
-    { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
+  // Navigation principale - regroupée par sections
+  const navGroups = [
+    {
+      label: 'Accueil',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: Home },
+      ],
+    },
+    {
+      label: 'Mon profil',
+      items: [
+        { id: 'profile', label: 'Profil', icon: User },
+        { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
+        { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
+        { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
+        { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
+      ],
+    },
+    {
+      label: 'Emploi',
+      items: [
+        { id: 'offres', label: 'Offres d\'emploi', icon: FileSearch },
+        { id: 'situation', label: 'Ma situation', icon: Search },
+        { id: 'preferences', label: 'Préférences', icon: Target },
+      ],
+    },
+    {
+      label: 'Documents',
+      items: [
+        { id: 'documents', label: 'Mon CV', icon: FileText },
+      ],
+    },
   ]
 
   // Checklist complétion (alignée BRIEF)
@@ -761,9 +915,20 @@ export default function CandidateDashboard() {
       {/* Top bar - Logo, progression, user */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 safe-top">
         <div className="flex items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
-          <Link to="/" className="flex items-center gap-2 shrink-0">
-            <img src="/favicon.ico" alt="Yemma Solutions" className="h-8 w-8 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/logo-icon.svg' }} />
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-[#E8F4F3] text-[#2C2C2C]"
+                aria-label="Ouvrir le menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            )}
+            <Link to="/" className="flex items-center gap-2">
+              <img src="/favicon.ico" alt="Yemma Solutions" className="h-8 w-8 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/logo-icon.svg' }} />
+            </Link>
+          </div>
 
           {/* Barre de progression - compacte et élégante */}
           <div className="flex-1 min-w-0 max-w-xs sm:max-w-sm mx-2 sm:mx-4">
@@ -812,81 +977,156 @@ export default function CandidateDashboard() {
       </header>
 
       <div className="flex flex-1">
-        {/* Sidebar gauche - fond blanc (style capture) */}
+        {/* Sidebar redesignée - toujours visible sur desktop */}
         <aside className={`
-          fixed lg:static inset-y-0 left-0 z-40 w-64 flex flex-col
-          bg-white border-r border-gray-100 shadow-sm
-          transition-transform duration-300 lg:translate-x-0
+          fixed inset-y-0 left-0 z-40 w-72 flex flex-col shrink-0
+          lg:static lg:translate-x-0
+          bg-gradient-to-b from-[#F8FAFC] to-white
+          border-r border-gray-200/80
+          shadow-[4px_0_24px_-4px_rgba(34,109,104,0.06)]
+          transition-transform duration-300 ease-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
-          <div className="p-4 border-b border-gray-100">
-            <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-gray-100 text-[#2C2C2C]">
+          {/* En-tête sidebar - avatar + fermer mobile */}
+          <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-200/60">
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-2 -ml-1 rounded-lg hover:bg-white/80 text-[#6b7280] hover:text-[#2C2C2C] transition-colors"
+              aria-label="Fermer le menu"
+            >
               <X className="h-5 w-5" />
             </button>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#6b7280] mt-4 mb-3">Navigation</p>
-            <nav className="space-y-0.5">
-              {navItems.map((item) => {
-                const Icon = item.icon
-                const path = item.path || (item.id === 'dashboard' ? '/candidate/dashboard' : `/candidate/dashboard/${item.id}`)
-                const isActive = item.path ? false : (activeTab === item.id || (item.id === 'situation' && activeTab === 'preferences'))
-                return (
-                  <Link
-                    key={item.id}
-                    to={path}
-                    onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-colors ${
-                      isActive ? 'bg-[#E8F4F3] text-[#226D68]' : 'text-[#2C2C2C] hover:bg-gray-50'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
-                    {item.count != null && item.count > 0 && (
-                      <span className="ml-auto text-xs text-[#6b7280]">{item.count}</span>
-                    )}
-                  </Link>
-                )
-              })}
-            </nav>
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <img
+                src={displayPhoto}
+                alt=""
+                className="w-10 h-10 rounded-xl object-cover ring-2 ring-white shadow-sm shrink-0"
+                onError={(e) => { e.target.src = defaultAvatar }}
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{profile?.first_name || 'Candidat'}</p>
+                <p className="text-xs text-[#6b7280] truncate">
+                  {profile?.status === 'VALIDATED' ? (
+                    <span className="inline-flex items-center gap-1 text-[#226D68] font-medium">
+                      <Shield className="h-3 w-3 shrink-0" />
+                      Profil vérifié
+                    </span>
+                  ) : (
+                    'Mon espace'
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="flex-1" />
-          <div className="p-4 border-t border-gray-100 space-y-1">
+
+          {/* Navigation par groupes */}
+          <nav className="flex-1 overflow-y-auto py-4 px-3">
+            {navGroups.map((group) => (
+              <div key={group.label} className="mb-6 last:mb-0">
+                <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-widest text-[#9ca3af]">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon
+                    const path = item.path || (item.id === 'dashboard' ? '/candidate/dashboard' : `/candidate/dashboard/${item.id}`)
+                    const isActive = item.path ? false : (activeTab === item.id || (item.id === 'situation' && activeTab === 'preferences'))
+                    return (
+                      <Link
+                        key={item.id}
+                        to={path}
+                        onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+                        className={`
+                          group flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium
+                          transition-all duration-200
+                          ${isActive
+                            ? 'bg-[#226D68] text-white shadow-sm shadow-[#226D68]/20'
+                            : 'text-[#4b5563] hover:bg-white hover:text-[#226D68] hover:shadow-sm'
+                          }
+                        `}
+                      >
+                        <span className={`
+                          flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors
+                          ${isActive ? 'bg-white/20' : 'bg-[#E8F4F3]/60 group-hover:bg-[#E8F4F3]'}
+                        `}>
+                          <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-[#226D68]'}`} />
+                        </span>
+                        <span className="flex-1 min-w-0 truncate">{item.label}</span>
+                        {item.count != null && item.count > 0 && (
+                          <span className={`
+                            shrink-0 min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center rounded-md text-xs font-semibold
+                            ${isActive ? 'bg-white/25 text-white' : 'bg-[#E8F4F3] text-[#226D68]'}
+                          `}>
+                            {item.count}
+                          </span>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          {/* Pied de sidebar */}
+          <div className="p-3 border-t border-gray-200/60 bg-white/50 space-y-0.5">
             <Link
               to="/candidate/dashboard/settings"
               onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-[#E8F4F3] text-sm text-[#6b7280] hover:text-[#226D68] transition-colors"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[#6b7280] hover:bg-[#E8F4F3] hover:text-[#226D68] transition-colors"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-4 w-4 shrink-0" />
               Paramètres
             </Link>
-            <Link to="/contact" className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-[#E8F4F3] text-sm text-[#6b7280] hover:text-[#226D68] transition-colors">
-              <HelpCircle className="h-4 w-4" />
+            <Link
+              to="/contact"
+              onClick={() => window.innerWidth < 1024 && setSidebarOpen(false)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[#6b7280] hover:bg-[#E8F4F3] hover:text-[#226D68] transition-colors"
+            >
+              <HelpCircle className="h-4 w-4 shrink-0" />
               Besoin d&apos;aide ?
             </Link>
           </div>
         </aside>
 
         {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-        {!sidebarOpen && (
-          <Button variant="outline" size="icon" onClick={() => setSidebarOpen(true)} className="fixed bottom-4 left-4 z-50 lg:hidden h-12 w-12 rounded-full shadow-lg bg-white border-[#226D68]">
-            <Menu className="h-5 w-5 text-[#226D68]" />
-          </Button>
-        )}
 
         {/* Main */}
         <div className="flex-1 min-w-0">
           <main id="dashboard-main" className="flex-1 overflow-y-auto min-w-0" aria-label="Contenu du profil">
-            <div className="max-w-4xl mx-auto px-4 py-6 pb-24 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
+            <div className={`mx-auto px-4 py-6 pb-24 sm:pb-24 lg:px-8 lg:pb-8 safe-x ${activeTab === 'offres' && !offerId ? 'max-w-7xl' : 'max-w-4xl'}`}>
           {/* Vue Dashboard (style capture) */}
           {activeTab === 'dashboard' && (
             <>
               {/* Hero accueil */}
               <div className="mb-8">
-                <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2C2C] font-heading tracking-tight">
-                  Bonjour, {profile?.first_name || 'Candidat'}
-                </h1>
+                <div className="flex flex-wrap items-center gap-3 mb-2">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-[#2C2C2C] font-heading tracking-tight">
+                    Bonjour, {profile?.first_name || 'Candidat'}
+                  </h1>
+                  {profile?.status === 'VALIDATED' && (
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold text-white bg-gradient-to-r from-[#226D68] to-[#1a5a55] shadow-sm"
+                      title="Profil vérifié par Yemma - Qualifié et de confiance"
+                    >
+                      <Shield className="h-4 w-4 shrink-0" />
+                      Profil vérifié
+                    </span>
+                  )}
+                </div>
                 <p className="text-[#6b7280] mt-2 max-w-2xl">
-                  Complétez votre profil pour accéder à la validation. Une fois validé, vous entrez dans la CVthèque et devenez visible auprès des recruteurs.
+                  {profile?.status === 'VALIDATED'
+                    ? 'Votre profil est validé. Vous êtes visible dans la CVthèque et pouvez postuler aux offres d\'emploi.'
+                    : 'Complétez votre profil pour accéder à la validation. Une fois validé, vous entrez dans la CVthèque et devenez visible auprès des recruteurs.'}
                 </p>
+                {profile?.status === 'VALIDATED' && (
+                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#E8F4F3]/80 border border-[#226D68]/20">
+                    <CheckCircle2 className="h-5 w-5 text-[#226D68] shrink-0" />
+                    <p className="text-sm font-medium text-[#226D68]">
+                      Profil qualifié et de confiance — vérifié par nos experts RH
+                    </p>
+                  </div>
+                )}
               </div>
 
               {profile?.status === 'IN_REVIEW' && (
@@ -943,6 +1183,7 @@ export default function CandidateDashboard() {
               {/* Grille de sections - cartes redesignées */}
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
                 {[
+                  { id: 'offres', icon: FileSearch, label: 'Offres d\'emploi', value: 'Explorer', desc: 'CDI, CDD, stage… postulez en un clic', action: () => navigate('/candidate/dashboard/offres'), done: true },
                   { id: 'situation', icon: Search, label: 'Ma situation', value: jobPreferences?.availability || 'À compléter', desc: 'Disponibilité et préférences', action: () => setShowPreferencesDialog(true), done: !!jobPreferences?.availability },
                   { id: 'cv', icon: FileText, label: 'Mon CV', value: cvDoc ? `Importé le ${new Date(cvDoc.created_at).toLocaleDateString('fr-FR')}` : 'À uploader', desc: 'CV à jour pour la validation', action: () => setShowDocumentDialog(true), done: !!cvDoc },
                   { id: 'experiences', icon: Briefcase, label: 'Expériences', value: experiences.length, desc: 'Parcours professionnel', action: () => navigate('/candidate/dashboard/experiences'), done: experiences.length > 0 },
@@ -980,8 +1221,283 @@ export default function CandidateDashboard() {
             </>
           )}
 
-          {/* Contenu des onglets (profile, experiences, etc.) - masqué en vue dashboard */}
-          {activeTab !== 'dashboard' && (
+          {/* Onglet Offres d'emploi - intégré au dashboard (liste ou détail) */}
+          {activeTab === 'offres' && (
+            <>
+              {/* Vue détail d'une offre */}
+              {offerId ? (
+                <>
+                  <Link
+                    to={ROUTES.CANDIDATE_JOBS}
+                    className="inline-flex items-center gap-2 text-sm text-[#6b7280] hover:text-[#226D68] mb-6 transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Retour aux offres
+                  </Link>
+                  {jobDetailLoading ? (
+                    <div className="flex justify-center py-16">
+                      <Loader2 className="h-8 w-8 animate-spin text-[#226D68]" />
+                    </div>
+                  ) : jobDetail ? (
+                    <article className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <div className="px-4 sm:px-6 pt-6 pb-4 border-b border-gray-100 bg-gradient-to-b from-[#F8FAFC] to-white">
+                        <div className="flex items-start gap-4">
+                          {jobDetail.company_logo_url ? (
+                            <div className="h-14 w-14 rounded-xl border border-gray-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                              <img src={jobDetail.company_logo_url} alt={jobDetail.company_name || ''} className="h-10 w-10 object-contain" />
+                            </div>
+                          ) : (
+                            <div className="h-14 w-14 rounded-xl border border-[#226D68]/20 bg-[#E8F4F3]/50 flex items-center justify-center shrink-0">
+                              <Briefcase className="h-7 w-7 text-[#226D68]" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] leading-tight break-words">{jobDetail.title}</h1>
+                            {jobDetail.company_name && <p className="text-sm text-[#6b7280] mt-1 font-medium">{jobDetail.company_name}</p>}
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#E8F4F3]/80 text-[#226D68] text-xs font-medium">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                {jobDetail.location}
+                              </span>
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-100 text-[#2C2C2C] text-xs font-medium">{jobDetail.contract_type}</span>
+                              {jobDetail.salary_range && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-medium">
+                                  <span className="font-semibold shrink-0">FCFA</span>
+                                  <span className="break-words">{jobDetail.salary_range}</span>
+                                </span>
+                              )}
+                              {jobDetail.sector && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-800 text-xs font-medium">
+                                  <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                                  {jobDetail.sector}
+                                </span>
+                              )}
+                              {jobDetail.created_at && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 text-xs font-medium">
+                                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                  Publié le {formatDate(jobDetail.created_at)}
+                                </span>
+                              )}
+                              {jobDetail.expires_at && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-medium">
+                                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                  Expire le {formatDate(jobDetail.expires_at)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="px-4 sm:px-6 py-6 space-y-6">
+                        {jobDetail.description && (
+                          <div
+                            className="job-offer-description rich-text-content text-[#2C2C2C] [&_p]:text-[#4b5563] [&_p]:leading-relaxed [&_p]:mb-3 [&_h1]:font-bold [&_h2]:font-bold [&_h3]:font-bold [&_h4]:font-bold [&_h1]:uppercase [&_h2]:uppercase [&_h3]:uppercase [&_h4]:uppercase [&_h1]:tracking-wide [&_h2]:tracking-wide [&_h3]:tracking-wide [&_h4]:tracking-wide [&_h1]:text-xs [&_h2]:text-xs [&_h3]:text-xs [&_h4]:text-xs [&_h1]:mb-3 [&_h2]:mb-3 [&_h3]:mb-3 [&_h4]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_li]:text-[#4b5563] [&_li]:leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: jobDetail.description }}
+                          />
+                        )}
+                        {jobDetail.requirements && (
+                          <div className="rounded-xl border border-gray-100 bg-[#F8FAFC]/60 p-4 sm:p-5">
+                            <h4 className="font-bold text-[#2C2C2C] text-sm uppercase tracking-wide mb-3">Prérequis</h4>
+                            <p className="text-sm text-[#4b5563] leading-relaxed whitespace-pre-wrap break-words">{jobDetail.requirements}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+                        <Link to={ROUTES.CANDIDATE_JOBS}>
+                          <Button variant="outline">Retour aux offres</Button>
+                        </Link>
+                        <Button
+                          className={hasAppliedToJob ? 'bg-[#226D68]/60 text-white font-semibold h-11 px-6 cursor-default' : 'bg-[#226D68] hover:bg-[#1a5a55] text-white font-semibold h-11 px-6'}
+                          onClick={handleApplyToJob}
+                          disabled={applyingToJob || hasAppliedToJob}
+                        >
+                          {applyingToJob ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : hasAppliedToJob ? (
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                          ) : (
+                            <FileText className="h-4 w-4 mr-2" />
+                          )}
+                          {hasAppliedToJob ? 'Déjà postulé' : 'Postuler à cette offre'}
+                        </Button>
+                      </div>
+                    </article>
+                  ) : (
+                    <Card className="border-gray-200">
+                      <CardContent className="py-12 text-center">
+                        <Briefcase className="h-12 w-12 text-[#6b7280] mx-auto mb-4" />
+                        <p className="text-[#6b7280] mb-4">Offre introuvable.</p>
+                        <Link to={ROUTES.CANDIDATE_JOBS}>
+                          <Button variant="outline">Retour aux offres</Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              ) : (
+                <>
+              <div className="flex flex-col min-h-0">
+              {/* En-tête compact */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 shrink-0">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] font-heading tracking-tight">
+                    Offres d&apos;emploi
+                  </h1>
+                  <p className="text-sm text-[#6b7280] mt-0.5">
+                    CDI, CDD, stage, alternance… postulez en un clic.
+                  </p>
+                </div>
+                {!jobsLoading && (
+                  <span className="text-sm font-medium text-[#6b7280]">
+                    {jobsOffres.length} offre{jobsOffres.length !== 1 ? 's' : ''} trouvée{jobsOffres.length !== 1 ? 's' : ''}
+                    {(filterTitle || filterLocation || filterContract || filterSector) && ' pour vos critères'}
+                  </span>
+                )}
+              </div>
+
+              {/* Barre de filtres compacte */}
+              <div className="flex flex-wrap items-end gap-3 mb-6 shrink-0">
+                <div className="flex-1 min-w-[140px] max-w-[200px]">
+                  <label className="sr-only">Intitulé de poste</label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280]" />
+                    <Input
+                      placeholder="Poste..."
+                      value={filterTitle}
+                      onChange={(e) => setFilterTitle(e.target.value)}
+                      className="pl-8 h-9 rounded-lg border-gray-200 text-sm focus:border-[#226D68] focus:ring-1 focus:ring-[#226D68]/20"
+                    />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-[140px] max-w-[200px]">
+                  <label className="sr-only">Localisation</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280]" />
+                    <Input
+                      placeholder="Ville, pays..."
+                      value={filterLocation}
+                      onChange={(e) => setFilterLocation(e.target.value)}
+                      className="pl-8 h-9 rounded-lg border-gray-200 text-sm focus:border-[#226D68] focus:ring-1 focus:ring-[#226D68]/20"
+                    />
+                  </div>
+                </div>
+                <div className="w-[140px]">
+                  <label className="sr-only">Type de contrat</label>
+                  <select
+                    value={filterContract}
+                    onChange={(e) => setFilterContract(e.target.value)}
+                    className="h-9 w-full px-3 rounded-lg border border-gray-200 bg-white text-sm focus:border-[#226D68] focus:ring-1 focus:ring-[#226D68]/20 focus:outline-none"
+                  >
+                    <option value="">Tous contrats</option>
+                    {['CDI', 'CDD', 'Freelance', 'Stage', 'Alternance', 'Intérim'].map((ct) => (
+                      <option key={ct} value={ct}>{ct}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-[200px] min-w-[180px]">
+                  <label className="sr-only">Secteur d&apos;activité</label>
+                  <SearchableSelect
+                    id="filter-sector"
+                    options={SECTORS_FR}
+                    value={filterSector}
+                    onChange={setFilterSector}
+                    placeholder="Secteur..."
+                    className="h-9 text-sm rounded-lg border-gray-200"
+                  />
+                </div>
+                {(filterTitle || filterLocation || filterContract || filterSector) && (
+                  <button
+                    type="button"
+                    onClick={() => { setFilterTitle(''); setFilterLocation(''); setFilterContract(''); setFilterSector('') }}
+                    className="h-9 px-3 rounded-lg text-sm text-[#6b7280] hover:bg-gray-100 hover:text-[#226D68] transition-colors flex items-center gap-1.5"
+                  >
+                    <X className="h-4 w-4" />
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
+              {/* Zone résultats - pleine page */}
+              <div className="flex-1 min-h-0 overflow-auto">
+              {jobsLoading ? (
+                <div className="flex justify-center py-24">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#226D68]" />
+                </div>
+              ) : jobsOffres.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 rounded-xl border border-dashed border-gray-200 bg-gray-50/50">
+                  <Briefcase className="h-14 w-14 text-[#9ca3af] mb-4" />
+                  <p className="text-[#6b7280] font-medium">Aucune offre</p>
+                  <p className="text-sm text-[#9ca3af] mt-1">
+                    {(filterTitle || filterLocation || filterContract || filterSector) ? 'Modifiez vos filtres' : 'Aucune offre publiée pour le moment'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-4">
+                  {jobsOffres.map((job) => (
+                    <Link key={job.id} to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)}>
+                      <Card className="border border-gray-200 bg-white rounded-xl hover:border-[#226D68]/40 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col h-full group">
+                        <div className="p-4 pb-0">
+                          {job.company_logo_url ? (
+                            <img src={job.company_logo_url} alt={job.company_name || ''} className="h-9 w-auto max-w-[100px] object-contain object-left" />
+                          ) : (
+                            <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">{job.company_name || 'Yemma'}</p>
+                          )}
+                        </div>
+                        <div className="px-4 pt-3">
+                          <h3 className="font-semibold text-[#2C2C2C] text-sm leading-tight line-clamp-2 group-hover:text-[#226D68] transition-colors">{job.title}</h3>
+                        </div>
+                        <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-[#6b7280]">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                            {job.location}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                            {job.contract_type}
+                          </span>
+                          {job.salary_range && (
+                            <span className="flex items-center gap-1 text-[#226D68] font-medium">
+                              FCFA {job.salary_range}
+                            </span>
+                          )}
+                          {job.sector && (
+                            <span className="flex items-center gap-1 truncate max-w-full">
+                              <Briefcase className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                              <span className="truncate">{job.sector}</span>
+                            </span>
+                          )}
+                          {job.created_at && (
+                            <span className="flex items-center gap-1" title="Publié le">
+                              <Calendar className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
+                              Publié {formatDate(job.created_at)}
+                            </span>
+                          )}
+                          {job.expires_at && (
+                            <span className="flex items-center gap-1 text-amber-700" title="Expire le">
+                              <Calendar className="h-3.5 w-3.5 shrink-0" />
+                              Expire {formatDate(job.expires_at)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="px-4 pb-4 mt-auto">
+                          <span className="inline-flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-[#226D68] group-hover:bg-[#1a5a55] text-white text-xs font-medium transition-colors">
+                            <FileText className="h-3.5 w-3.5" />
+                            Postuler
+                          </span>
+                        </div>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              )}
+              </div>
+              </div>
+            </>
+            )}
+          </>
+          )}
+
+          {/* Contenu des onglets (profile, experiences, etc.) - masqué en vue dashboard et offres */}
+          {activeTab !== 'dashboard' && activeTab !== 'offres' && (
           <>
           {/* Bandeau profil (visible hors dashboard) */}
           <div className="mb-6">
@@ -1065,33 +1581,8 @@ export default function CandidateDashboard() {
             </div>
           </div>
 
-          {/* Barre d'onglets - sections détaillées */}
+          {/* Contenu des sections (Profil, Préférences, etc.) - navigation via la sidebar */}
           <Tabs value={activeTab} onValueChange={(v) => navigate(`/candidate/dashboard/${v}`)} className="w-full">
-            <TabsList className="w-full justify-start h-auto p-1 bg-gray-100/80 border border-gray-200 rounded-xl overflow-x-auto flex-wrap gap-1">
-              {[
-                { id: 'profile', label: 'Profil', icon: User },
-                { id: 'preferences', label: 'Préférences', icon: Target },
-                { id: 'documents', label: 'Documents', icon: FileText, count: documents.length },
-                { id: 'experiences', label: 'Expériences', icon: Briefcase, count: experiences.length },
-                { id: 'educations', label: 'Formations', icon: GraduationCap, count: educations.length },
-                { id: 'skills', label: 'Compétences', icon: Code, count: skills.length },
-                { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
-              ].map((item) => {
-                const Icon = item.icon
-                return (
-                  <TabsTrigger
-                    key={item.id}
-                    value={item.id}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium data-[state=active]:bg-[#226D68] data-[state=active]:text-white rounded-lg transition-colors"
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {item.label}
-                    {item.count != null && item.count > 0 && <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">{item.count}</Badge>}
-                  </TabsTrigger>
-                )
-              })}
-            </TabsList>
-
               {/* Contenu des onglets */}
               <TabsContent value="profile" className="mt-3">
                 <SectionHeader
@@ -2614,6 +3105,41 @@ export default function CandidateDashboard() {
               {confirmDialog?.variant === 'danger' && confirmDialog?.title?.includes('Déconnexion') ? 'Déconnexion' : confirmDialog?.variant === 'danger' ? 'Supprimer' : 'Confirmer'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale : Compléter le profil pour postuler */}
+      <Dialog open={showCompleteProfileModal} onOpenChange={setShowCompleteProfileModal}>
+        <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl border-0 shadow-xl">
+          <div className="bg-gradient-to-b from-[#E8F4F3] to-white pt-8 pb-6 px-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#226D68]/20 flex items-center justify-center mx-auto mb-4">
+              <FileCheck className="h-7 w-7 text-[#226D68]" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-[#2C2C2C]">
+                Complétez votre profil
+              </DialogTitle>
+              <DialogDescription className="text-[#6b7280] mt-2 text-sm leading-relaxed">
+                {profileCompletionMessage || "Les recruteurs ont besoin de savoir qui vous êtes. Complétez votre profil à 80% pour débloquer votre candidature."}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="px-6 pb-6 flex flex-col gap-3">
+            <Button
+              className="w-full h-11 bg-[#e76f51] hover:bg-[#d45a3f] text-white font-semibold rounded-lg"
+              onClick={() => { setShowCompleteProfileModal(false); navigate('/candidate/dashboard/profile?edit=1') }}
+            >
+              Compléter mon profil
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <button
+              type="button"
+              className="text-sm text-[#6b7280] hover:text-[#2C2C2C] pt-1"
+              onClick={() => setShowCompleteProfileModal(false)}
+            >
+              Plus tard
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
 

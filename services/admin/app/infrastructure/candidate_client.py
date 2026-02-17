@@ -173,6 +173,76 @@ async def update_candidate_status(candidate_id: int, status: str, report_data: O
         raise Exception(f"Erreur lors de la mise à jour du statut: {str(e)}")
 
 
+async def update_candidate_evaluation(candidate_id: int, report_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Met à jour uniquement l'évaluation (admin_report, admin_score) d'un candidat sans changer le statut.
+    Utile pour modifier l'évaluation d'un profil déjà validé.
+    """
+    from datetime import datetime
+
+    # Récupérer le profil actuel pour l'historique et le statut
+    current_profile = await get_candidate_profile(candidate_id)
+    current_admin_report = current_profile.get("admin_report") or {}
+    evaluation_history = current_admin_report.get("evaluation_history") or []
+    current_status = current_profile.get("status", "VALIDATED")
+
+    # Ajouter la nouvelle évaluation à l'historique
+    history_entry = {
+        "overall_score": report_data.get("overall_score"),
+        "technical_skills_rating": report_data.get("technical_skills_rating"),
+        "soft_skills_rating": report_data.get("soft_skills_rating"),
+        "communication_rating": report_data.get("communication_rating"),
+        "motivation_rating": report_data.get("motivation_rating"),
+        "soft_skills_tags": report_data.get("soft_skills_tags", []),
+        "interview_notes": report_data.get("interview_notes"),
+        "recommendations": report_data.get("recommendations"),
+        "summary": report_data.get("summary"),
+        "status": current_status,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    evaluation_history.insert(0, history_entry)
+    evaluation_history = evaluation_history[:10]
+
+    new_admin_report = {
+        **current_admin_report,
+        **report_data,
+        "evaluation_history": evaluation_history,
+    }
+
+    update_data = {
+        "admin_report": new_admin_report,
+        "admin_score": report_data.get("overall_score"),
+    }
+
+    try:
+        headers = get_service_token_header("admin-service")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.put(
+                f"{settings.CANDIDATE_SERVICE_URL}/api/v1/profiles/{candidate_id}",
+                json=update_data,
+                headers=headers
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise CandidateNotFoundError(str(candidate_id))
+        if e.response.status_code in (401, 403):
+            raise Exception(
+                f"Service candidat : erreur d'authentification ({e.response.status_code}). "
+                f"Vérifiez que INTERNAL_SERVICE_TOKEN_SECRET est identique."
+            )
+        detail = ""
+        try:
+            body = e.response.json()
+            detail = body.get("detail", str(body))
+        except Exception:
+            detail = e.response.text or str(e)
+        raise Exception(f"Service candidat ({e.response.status_code}): {detail}")
+    except httpx.HTTPError as e:
+        raise Exception(f"Erreur lors de la mise à jour de l'évaluation: {str(e)}")
+
+
 async def delete_candidate_profile(candidate_id: int) -> Dict[str, Any]:
     """
     Supprime un profil candidat (soft delete).

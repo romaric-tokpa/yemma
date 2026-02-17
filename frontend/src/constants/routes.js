@@ -40,6 +40,9 @@ export const ROUTES = {
   // Offres d'emploi (publiques)
   JOB_OFFERS: '/offres',
   JOB_OFFER_DETAIL: (id) => `/offres/${id}`,
+  // Offres intégrées au dashboard candidat (liste + détail)
+  CANDIDATE_JOBS: '/candidate/dashboard/offres',
+  CANDIDATE_JOB_DETAIL: (id) => `/candidate/dashboard/offres/${id}`,
 
   // Admin - Offres
   ADMIN_JOBS: '/admin/jobs',

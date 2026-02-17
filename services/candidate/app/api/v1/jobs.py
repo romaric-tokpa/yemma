@@ -3,10 +3,12 @@ Endpoints API pour les offres d'emploi (effet Leurre)
 - Candidat : lister, voir détail, postuler (avec vérification profil complet)
 - Admin : créer, modifier, publier/dépublier
 """
+from datetime import datetime, timezone
 from typing import List, Optional
 import logging
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -14,11 +16,16 @@ from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, require_current_user, require_admin_role_dep, TokenData
 from app.infrastructure.repositories import ProfileRepository, JobOfferRepository, ApplicationRepository
 from app.domain.models import Profile, JobOffer, JobStatus
-from app.domain.schemas import JobOfferCreate, JobOfferUpdate, JobOfferResponse, ApplicationCreate
+from app.domain.schemas import JobOfferCreate, JobOfferUpdate, JobOfferResponse, ApplicationCreate, JobApplicationResponse
 from app.core.completion import check_cv_exists, calculate_completion_percentage
 
 router = APIRouter(tags=["jobs"])
 logger = logging.getLogger(__name__)
+
+
+class RenewJobRequest(BaseModel):
+    """Corps de requête pour reconduire une offre."""
+    expires_at: str = Field(..., description="Nouvelle date d'expiration (YYYY-MM-DD)")
 
 
 # --- PUBLIC / CANDIDAT ---
@@ -28,16 +35,18 @@ async def list_jobs(
     title: Optional[str] = Query(None, description="Filtre par intitulé de poste (recherche partielle)"),
     location: Optional[str] = Query(None, description="Filtre par localisation"),
     contract_type: Optional[str] = Query(None, description="Filtre par type de contrat (CDI, CDD, etc.)"),
-    company: Optional[str] = Query(None, description="Filtre par nom d'entreprise ou secteur"),
+    company: Optional[str] = Query(None, description="Filtre par nom d'entreprise"),
+    sector: Optional[str] = Query(None, description="Filtre par secteur d'activité"),
     session: AsyncSession = Depends(get_session),
 ):
-    """Liste les offres publiées (accessible sans auth pour découverte)."""
+    """Liste les offres publiées (accessible sans auth pour découverte). Les offres expirées sont exclues."""
     jobs = await JobOfferRepository.list_published(
         session,
         title=title,
         location=location,
         contract_type=contract_type,
         company=company,
+        sector=sector,
     )
     return [JobOfferResponse.model_validate(j) for j in jobs]
 
@@ -47,13 +56,50 @@ async def get_job(
     job_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """Détail d'une offre (publique si publiée)."""
+    """Détail d'une offre (publique si publiée). Incrémente le compteur de vues à chaque consultation."""
     job = await JobOfferRepository.get_by_id(session, job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre non trouvée")
     if job.status != JobStatus.PUBLISHED:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre non trouvée")
+    # Exclure les offres expirées
+    if job.expires_at:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        exp = job.expires_at.replace(tzinfo=None) if job.expires_at.tzinfo else job.expires_at
+        if exp <= now:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre non trouvée")
+    # Incrémenter le compteur de vues (métrique d'acquisition)
+    await JobOfferRepository.increment_view_count(session, job_id)
+    job = await JobOfferRepository.get_by_id(session, job_id)
     return JobOfferResponse.model_validate(job)
+
+
+@router.post("/jobs/{job_id}/register-click")
+async def track_register_click(
+    job_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Enregistre un clic sur "Créer mon compte" depuis la modal affichée après avoir cliqué sur Postuler
+    sur la page /offres/{id}. Appelé par le frontend sans authentification.
+    """
+    ok = await JobOfferRepository.increment_register_click_count(session, job_id)
+    return {"ok": ok}
+
+
+@router.get("/jobs/{job_id}/application-status")
+async def get_application_status(
+    job_id: int,
+    current_user: Optional[TokenData] = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Indique si l'utilisateur connecté a déjà postulé à cette offre."""
+    current_user = require_current_user(current_user)
+    profile = await ProfileRepository.get_by_user_id(session, current_user.user_id)
+    if not profile:
+        return {"applied": False}
+    applied = await ApplicationRepository.exists(session, profile.id, job_id)
+    return {"applied": applied}
 
 
 @router.post("/jobs/{job_id}/apply")
@@ -125,14 +171,33 @@ async def apply_to_job(
 
 # --- ADMIN (protégé par rôle) ---
 
+@router.get("/admin/jobs/stats")
+async def admin_jobs_stats(
+    session: AsyncSession = Depends(get_session),
+    _: TokenData = Depends(require_admin_role_dep),
+):
+    """Statistiques des offres d'emploi (admin)."""
+    return await JobOfferRepository.get_stats(session)
+
+
 @router.get("/admin/jobs", response_model=List[JobOfferResponse])
 async def admin_list_jobs(
     session: AsyncSession = Depends(get_session),
     _: TokenData = Depends(require_admin_role_dep),
 ):
     """Liste toutes les offres (admin)."""
-    jobs = await JobOfferRepository.list_all(session)
-    return [JobOfferResponse.model_validate(j) for j in jobs]
+    try:
+        jobs = await JobOfferRepository.list_all(session)
+        return [JobOfferResponse.model_validate(j) for j in jobs]
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "view_count" in err_msg or "register_click_count" in err_msg or "does not exist" in err_msg or "column" in err_msg and "exist" in err_msg:
+            logger.warning("Colonnes view_count/register_click_count absentes. Migration requise: %s", e)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Migration requise. Exécutez : cd services/candidate && alembic upgrade head",
+            ) from e
+        raise
 
 
 @router.post("/admin/jobs", response_model=JobOfferResponse, status_code=status.HTTP_201_CREATED)
@@ -161,6 +226,35 @@ async def admin_get_job(
     return JobOfferResponse.model_validate(job)
 
 
+@router.get("/admin/jobs/{job_id}/applications", response_model=List[JobApplicationResponse])
+async def admin_list_job_applications(
+    job_id: int,
+    session: AsyncSession = Depends(get_session),
+    _: TokenData = Depends(require_admin_role_dep),
+):
+    """Liste les candidatures pour une offre (admin)."""
+    job = await JobOfferRepository.get_by_id(session, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre non trouvée")
+    rows = await ApplicationRepository.list_by_job(session, job_id)
+    result = []
+    for app, profile in rows:
+        result.append(JobApplicationResponse(
+            id=app.id,
+            candidate_id=app.candidate_id,
+            job_offer_id=app.job_offer_id,
+            status=app.status,
+            applied_at=app.applied_at,
+            cover_letter=app.cover_letter,
+            first_name=profile.first_name if profile else None,
+            last_name=profile.last_name if profile else None,
+            email=profile.email if profile else None,
+            profile_title=profile.profile_title if profile else None,
+            profile_status=profile.status.value if profile and hasattr(profile.status, "value") else (str(profile.status) if profile else None),
+        ))
+    return result
+
+
 @router.patch("/admin/jobs/{job_id}", response_model=JobOfferResponse)
 async def update_job(
     job_id: int,
@@ -170,7 +264,7 @@ async def update_job(
 ):
     """Met à jour une offre (admin)."""
     data = {k: v for k, v in job_data.model_dump(exclude_unset=True).items()}
-    if "status" in data and data["status"] not in ("DRAFT", "PUBLISHED", "CLOSED"):
+    if "status" in data and data["status"] not in ("DRAFT", "PUBLISHED", "CLOSED", "ARCHIVED"):
         data.pop("status")
     job = await JobOfferRepository.update(session, job_id, data)
     if not job:
@@ -178,15 +272,49 @@ async def update_job(
     return JobOfferResponse.model_validate(job)
 
 
-@router.patch("/admin/jobs/{job_id}/status", response_model=JobOfferResponse)
-async def update_job_status(
+@router.post("/admin/jobs/{job_id}/renew", response_model=JobOfferResponse)
+async def renew_job(
     job_id: int,
-    status_value: str = Query(..., description="DRAFT, PUBLISHED ou CLOSED"),
+    body: RenewJobRequest = Body(...),
     session: AsyncSession = Depends(get_session),
     _: TokenData = Depends(require_admin_role_dep),
 ):
-    """Publie, dépublie ou ferme une offre (admin)."""
-    if status_value not in ("DRAFT", "PUBLISHED", "CLOSED"):
+    """Reconduire une offre expirée ou archivée : nouvelle date d'expiration + republier."""
+    job = await JobOfferRepository.get_by_id(session, job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offre non trouvée")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    is_expired = job.expires_at and (job.expires_at.replace(tzinfo=None) if job.expires_at.tzinfo else job.expires_at) <= now
+    can_renew = job.status in (JobStatus.ARCHIVED, JobStatus.CLOSED) or (job.status == JobStatus.PUBLISHED and is_expired)
+    if not can_renew:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Seules les offres archivées, fermées ou expirées peuvent être reconduites.",
+        )
+    expires_at = body.expires_at.strip()
+    try:
+        exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+        if exp_dt.tzinfo:
+            exp_dt = exp_dt.replace(tzinfo=None)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date d'expiration invalide (format YYYY-MM-DD)")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if exp_dt <= now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La date d'expiration doit être dans le futur.")
+    exp_dt_end = exp_dt.replace(hour=23, minute=59, second=59, microsecond=0) if len(expires_at) <= 10 else exp_dt
+    job = await JobOfferRepository.update(session, job_id, {"expires_at": exp_dt_end, "status": JobStatus.PUBLISHED})
+    return JobOfferResponse.model_validate(job)
+
+
+@router.patch("/admin/jobs/{job_id}/status", response_model=JobOfferResponse)
+async def update_job_status(
+    job_id: int,
+    status_value: str = Query(..., description="DRAFT, PUBLISHED, CLOSED ou ARCHIVED"),
+    session: AsyncSession = Depends(get_session),
+    _: TokenData = Depends(require_admin_role_dep),
+):
+    """Publie, dépublie, ferme ou archive une offre (admin)."""
+    if status_value not in ("DRAFT", "PUBLISHED", "CLOSED", "ARCHIVED"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Statut invalide")
     job = await JobOfferRepository.update(session, job_id, {"status": status_value})
     if not job:

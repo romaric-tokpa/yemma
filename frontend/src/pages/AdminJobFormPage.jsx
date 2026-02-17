@@ -48,6 +48,7 @@ export default function AdminJobFormPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [toast, setToast] = useState(null)
+  const [jobStatus, setJobStatus] = useState(null)
 
   useEffect(() => {
     if (isEdit) {
@@ -55,6 +56,7 @@ export default function AdminJobFormPage() {
         try {
           setLoading(true)
           const job = await candidateApi.adminGetJob(parseInt(id, 10))
+          setJobStatus(job?.status)
           const appType = job.external_application_url ? 'external_url' : job.application_email ? 'email' : 'internal'
           setForm({
             title: job.title || '',
@@ -149,6 +151,13 @@ export default function AdminJobFormPage() {
           <ArrowLeft className="h-4 w-4" />
           Retour aux offres
         </Link>
+        {(jobStatus === 'ARCHIVED' || jobStatus === 'CLOSED') && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
+            <p className="text-sm text-amber-800">
+              Cette offre est {jobStatus === 'ARCHIVED' ? 'archivée (expirée)' : 'fermée'}. Vous pouvez modifier son contenu ici. Pour la republier, utilisez le bouton <strong>Reconduire</strong> dans la liste des offres.
+            </p>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 bg-[#F8FAFC]/60">

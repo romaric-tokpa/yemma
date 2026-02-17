@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
-  Briefcase, MapPin, DollarSign, FileText, Loader2, ArrowLeft, ArrowRight, UserPlus, FileCheck,
+  Briefcase, MapPin, FileText, Loader2, ArrowLeft, ArrowRight, UserPlus, Calendar,
 } from 'lucide-react'
 import { candidateApi, authApiService } from '@/services/api'
 import { ROUTES } from '@/constants/routes'
@@ -17,18 +17,16 @@ import { SEO } from '@/components/seo/SEO'
 import PublicNavbar from '@/components/layout/PublicNavbar'
 import PublicFooter from '@/components/layout/PublicFooter'
 import { Toast } from '@/components/common/Toast'
+import { formatDate } from '@/utils/dateUtils'
 
 export default function JobOfferDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [job, setJob] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [applying, setApplying] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [toast, setToast] = useState(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false)
-  const [profileCompletionMessage, setProfileCompletionMessage] = useState('')
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -62,67 +60,28 @@ export default function JobOfferDetailPage() {
     loadJob()
   }, [id])
 
-  const handleApplyClick = () => {
+  /** Redirection vers l'espace candidat pour postuler (seule voie de candidature) */
+  const goToApplyInDashboard = () => {
     if (!isAuthenticated) {
       setShowLoginModal(true)
       return
     }
-    doApply()
-  }
-
-  const doApply = async () => {
-    if (!job) return
-    setApplying(true)
-    setShowLoginModal(false)
-    setShowCompleteProfileModal(false)
-    try {
-      const res = await candidateApi.applyToJob(job.id)
-      if (res.redirect_url) {
-        window.open(res.redirect_url, '_blank')
-        setToast({ message: 'Redirection vers le site de candidature.', type: 'success' })
-      } else if (res.application_email) {
-        const subject = encodeURIComponent(`Candidature: ${job.title || ''}`)
-        window.location.href = `mailto:${res.application_email}?subject=${subject}`
-        setToast({ message: 'Ouverture du client mail.', type: 'success' })
-      } else {
-        setToast({ message: 'Candidature envoyée avec succès !', type: 'success' })
-      }
-    } catch (err) {
-      const status = err.response?.status
-      const detail = err.response?.data?.detail
-      const msg = typeof detail === 'string' ? detail : ''
-
-      if (status === 401) {
-        setShowLoginModal(true)
-        setProfileCompletionMessage('')
-      } else if (status === 403 && (msg.includes('%') || msg.includes('profil'))) {
-        setProfileCompletionMessage(msg)
-        setShowCompleteProfileModal(true)
-      } else if (status === 404) {
-        setToast({ message: 'Offre introuvable.', type: 'error' })
-      } else if (status === 409) {
-        setToast({ message: 'Vous avez déjà postulé à cette offre.', type: 'error' })
-      } else {
-        setToast({ message: msg || 'Erreur lors de la candidature.', type: 'error' })
-      }
-    } finally {
-      setApplying(false)
-    }
+    navigate(`/candidate/dashboard/offres/${id}`)
   }
 
   const goToRegister = () => {
     setShowLoginModal(false)
-    navigate(ROUTES.REGISTER_CANDIDAT)
+    if (job?.id) {
+      candidateApi.trackJobRegisterClick(job.id)
+    }
+    const redirect = `/candidate/dashboard/offres/${id}`
+    navigate(`${ROUTES.REGISTER_CANDIDAT}?redirect=${encodeURIComponent(redirect)}`)
   }
 
   const goToLogin = () => {
     setShowLoginModal(false)
-    navigate('/login')
-  }
-
-  const goToCompleteProfile = () => {
-    setShowCompleteProfileModal(false)
-    navigate('/candidate/dashboard/profile')
+    const redirect = `/candidate/dashboard/offres/${id}`
+    navigate(`/login?redirect=${encodeURIComponent(redirect)}`)
   }
 
   if (loading) {
@@ -218,8 +177,26 @@ export default function JobOfferDetailPage() {
                     </span>
                     {job.salary_range && (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-medium">
-                        <DollarSign className="h-3.5 w-3.5 shrink-0" />
+                        <span className="font-semibold shrink-0">FCFA</span>
                         <span className="break-words">{job.salary_range}</span>
+                      </span>
+                    )}
+                    {job.sector && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-800 text-xs font-medium">
+                        <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                        {job.sector}
+                      </span>
+                    )}
+                    {job.created_at && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 text-xs font-medium">
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                        Publié le {formatDate(job.created_at)}
+                      </span>
+                    )}
+                    {job.expires_at && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-medium">
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                        Expire le {formatDate(job.expires_at)}
                       </span>
                     )}
                   </div>
@@ -243,23 +220,23 @@ export default function JobOfferDetailPage() {
               )}
             </div>
 
-            {/* Pied avec CTA */}
-            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+            {/* Pied avec CTA - candidature uniquement depuis l'espace candidat */}
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 bg-white flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
               <Link to="/offres">
                 <Button variant="outline">Retour aux offres</Button>
               </Link>
-              <Button
-                className="bg-[#226D68] hover:bg-[#1a5a55] text-white font-semibold h-11 px-6"
-                onClick={handleApplyClick}
-                disabled={applying}
-              >
-                {applying ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <p className="text-sm text-[#6b7280] self-center sm:mr-2">
+                  Pour postuler, accédez à votre espace candidat.
+                </p>
+                <Button
+                  className="bg-[#226D68] hover:bg-[#1a5a55] text-white font-semibold h-11 px-6"
+                  onClick={goToApplyInDashboard}
+                >
                   <FileText className="h-4 w-4 mr-2" />
-                )}
-                Postuler à cette offre
-              </Button>
+                  {isAuthenticated ? 'Postuler depuis mon espace candidat' : 'Se connecter pour postuler'}
+                </Button>
+              </div>
             </div>
           </article>
         </div>
@@ -279,7 +256,7 @@ export default function JobOfferDetailPage() {
                 Créez votre compte
               </DialogTitle>
               <DialogDescription className="text-[#6b7280] mt-2 text-sm leading-relaxed">
-                Postulez en 1 clic via Google ou LinkedIn. Inscrivez-vous pour débloquer vos candidatures.
+                Inscrivez-vous pour accéder à votre espace candidat et postuler à cette offre.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -300,41 +277,6 @@ export default function JobOfferDetailPage() {
               onClick={() => setShowLoginModal(false)}
             >
               Annuler
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal : Compléter le profil */}
-      <Dialog open={showCompleteProfileModal} onOpenChange={setShowCompleteProfileModal}>
-        <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl border-0 shadow-xl">
-          <div className="bg-gradient-to-b from-[#E8F4F3] to-white pt-8 pb-6 px-6 text-center">
-            <div className="w-14 h-14 rounded-full bg-[#226D68]/20 flex items-center justify-center mx-auto mb-4">
-              <FileCheck className="h-7 w-7 text-[#226D68]" />
-            </div>
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold text-[#2C2C2C]">
-                Complétez votre profil
-              </DialogTitle>
-              <DialogDescription className="text-[#6b7280] mt-2 text-sm leading-relaxed">
-                {profileCompletionMessage || "Les recruteurs ont besoin de savoir qui vous êtes. Complétez votre profil à 80% pour débloquer votre candidature."}
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-          <div className="px-6 pb-6 flex flex-col gap-3">
-            <Button
-              className="w-full h-11 bg-[#e76f51] hover:bg-[#d45a3f] text-white font-semibold rounded-lg"
-              onClick={goToCompleteProfile}
-            >
-              Compléter mon profil
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <button
-              type="button"
-              className="text-sm text-[#6b7280] hover:text-[#2C2C2C] pt-1"
-              onClick={() => setShowCompleteProfileModal(false)}
-            >
-              Plus tard
             </button>
           </div>
         </DialogContent>

@@ -412,9 +412,12 @@ export const candidateApi = {
       }
     }
     
-    // Si last_step_completed est présent, l'ajouter
+    // Si last_step_completed est présent, l'ajouter (doit être 0-8)
     if (data.last_step_completed !== undefined && data.last_step_completed !== null) {
-      formattedData.last_step_completed = data.last_step_completed
+      const step = Number(data.last_step_completed)
+      if (!Number.isNaN(step) && step >= 0 && step <= 8) {
+        formattedData.last_step_completed = step
+      }
     }
     
     // Si d'autres champs de step1 sont présents, les mettre dans step1
@@ -426,14 +429,28 @@ export const candidateApi = {
     if (hasStep1Fields) {
       formattedData.step1 = {}
       step1Fields.forEach(field => {
-        if (data[field] !== undefined && data[field] !== null && data[field] !== '') {
-          formattedData.step1[field] = data[field]
+        if (data[field] === undefined || data[field] === null || data[field] === '') return
+        let value = data[field]
+        // Sanitiser total_experience : doit être un entier >= 0
+        if (field === 'total_experience') {
+          const n = Number(value)
+          if (Number.isNaN(n) || n < 0) return
+          value = Math.floor(n)
         }
+        // photo_url : max 500 caractères (contrainte backend)
+        if (field === 'photo_url' && typeof value === 'string' && (value.length === 0 || value.length > 500)) return
+        formattedData.step1[field] = value
       })
       // Ne pas envoyer step1 s'il est vide après filtrage
       if (Object.keys(formattedData.step1).length === 0) {
         delete formattedData.step1
       }
+    }
+    
+    // Ne pas envoyer de body vide : le backend peut rejeter {}
+    if (Object.keys(formattedData).length === 0) {
+      const response = await api.get('/api/v1/profiles/me')
+      return response.data
     }
     
     const response = await api.patch('/api/v1/profiles/me', formattedData)
@@ -528,6 +545,7 @@ export const candidateApi = {
     if (filters.location) params.append('location', filters.location)
     if (filters.contract_type) params.append('contract_type', filters.contract_type)
     if (filters.company) params.append('company', filters.company)
+    if (filters.sector) params.append('sector', filters.sector)
     const response = await api.get(`/api/v1/jobs?${params.toString()}`, { timeout: 30000 })
     return response.data
   },
@@ -542,8 +560,27 @@ export const candidateApi = {
     return response.data
   },
 
+  /** Vérifie si l'utilisateur connecté a déjà postulé à cette offre */
+  getJobApplicationStatus: async (jobId) => {
+    const response = await api.get(`/api/v1/jobs/${jobId}/application-status`)
+    return response.data
+  },
+
+  /** Enregistre un clic sur "Créer mon compte" depuis la modal Postuler (sans auth) */
+  trackJobRegisterClick: async (jobId) => {
+    try {
+      await api.post(`/api/v1/jobs/${jobId}/register-click`, null, { timeout: 5000 })
+    } catch {
+      // Silencieux : ne pas bloquer la navigation
+    }
+  },
+
   // ===== ADMIN - OFFRES D'EMPLOI =====
   // Timeout 60s pour les offres (proxy/nginx peuvent être lents en dev)
+  adminJobsStats: async () => {
+    const response = await api.get('/api/v1/admin/jobs/stats', { timeout: 60000 })
+    return response.data
+  },
   adminListJobs: async () => {
     const response = await api.get('/api/v1/admin/jobs', { timeout: 60000 })
     return response.data
@@ -559,6 +596,11 @@ export const candidateApi = {
     return response.data
   },
 
+  adminGetJobApplications: async (jobId) => {
+    const response = await api.get(`/api/v1/admin/jobs/${jobId}/applications`, { timeout: 60000 })
+    return response.data
+  },
+
   adminUpdateJob: async (jobId, data) => {
     const response = await api.patch(`/api/v1/admin/jobs/${jobId}`, data, { timeout: 60000 })
     return response.data
@@ -566,6 +608,13 @@ export const candidateApi = {
 
   adminUpdateJobStatus: async (jobId, status) => {
     const response = await api.patch(`/api/v1/admin/jobs/${jobId}/status?status_value=${encodeURIComponent(status)}`, null, { timeout: 60000 })
+    return response.data
+  },
+
+  /** Reconduire une offre expirée/archivée : nouvelle date d'expiration + republier */
+  adminRenewJob: async (jobId, expiresAt) => {
+    const dateStr = expiresAt ? expiresAt.slice(0, 10) : ''
+    const response = await api.post(`/api/v1/admin/jobs/${jobId}/renew`, { expires_at: dateStr }, { timeout: 60000 })
     return response.data
   },
 
@@ -741,6 +790,22 @@ export const adminApi = {
     return response.data
   },
 
+  // Mettre à jour l'évaluation d'un profil (validé ou non) sans changer le statut
+  updateEvaluation: async (candidateId, reportData) => {
+    const payload = {
+      overallScore: reportData.overallScore,
+      technicalSkills: reportData.technicalSkills || null,
+      softSkills: reportData.softSkills || null,
+      communication: reportData.communication || null,
+      motivation: reportData.motivation || null,
+      summary: reportData.summary,
+      interview_notes: reportData.interview_notes || '',
+      recommendations: reportData.recommendations || '',
+    }
+    const response = await adminApiClient.post(`/api/v1/admin/update-evaluation/${candidateId}`, payload)
+    return response.data
+  },
+
   // Archiver un profil
   archiveProfile: async (candidateId) => {
     const response = await adminApiClient.post(`/api/v1/admin/archive/${candidateId}`)
@@ -859,7 +924,11 @@ export const documentApi = {
 
   // Récupérer les documents d'un candidat
   getCandidateDocuments: async (candidateId) => {
-    const response = await documentApiClient.get(`/api/v1/documents/candidate/${candidateId}`)
+    const id = typeof candidateId === 'number' ? candidateId : parseInt(candidateId, 10)
+    if (Number.isNaN(id) || id <= 0) {
+      return []
+    }
+    const response = await documentApiClient.get(`/api/v1/documents/candidate/${id}`)
     return response.data
   },
 

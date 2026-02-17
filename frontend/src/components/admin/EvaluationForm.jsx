@@ -158,22 +158,37 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
     if (candidateId) loadEvaluation()
   }, [candidateId, candidateData?.admin_report, reset])
 
+  const isAlreadyValidated = candidateData?.status === 'VALIDATED'
+
   const onSubmit = async (data) => {
     setIsSubmitting(true)
     setError(null)
     const currentAction = data.action || action
     try {
       if (currentAction === 'validate') {
-        await adminApi.validateProfile(candidateId, {
-          overallScore: data.overallScore,
-          technicalSkills: data.technicalSkills ?? null,
-          softSkills: data.softSkills ?? null,
-          communication: data.communication ?? null,
-          motivation: data.motivation ?? null,
-          summary: data.summary,
-          interview_notes: data.interview_notes || '',
-          recommendations: data.recommendations || '',
-        })
+        if (isAlreadyValidated) {
+          await adminApi.updateEvaluation(candidateId, {
+            overallScore: data.overallScore,
+            technicalSkills: data.technicalSkills ?? null,
+            softSkills: data.softSkills ?? null,
+            communication: data.communication ?? null,
+            motivation: data.motivation ?? null,
+            summary: data.summary,
+            interview_notes: data.interview_notes || '',
+            recommendations: data.recommendations || '',
+          })
+        } else {
+          await adminApi.validateProfile(candidateId, {
+            overallScore: data.overallScore,
+            technicalSkills: data.technicalSkills ?? null,
+            softSkills: data.softSkills ?? null,
+            communication: data.communication ?? null,
+            motivation: data.motivation ?? null,
+            summary: data.summary,
+            interview_notes: data.interview_notes || '',
+            recommendations: data.recommendations || '',
+          })
+        }
       } else if (currentAction === 'reject') {
         await adminApi.rejectProfile(candidateId, {
           rejectionReason: data.summary || 'Non spécifié',
@@ -586,7 +601,7 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
             ) : (
               <CheckCircle2 className="w-4 h-4 mr-1.5" />
             )}
-            Valider le profil
+            {isAlreadyValidated ? 'Mettre à jour l\'évaluation' : 'Valider le profil'}
           </Button>
         </div>
       </form>

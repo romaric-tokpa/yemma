@@ -236,6 +236,7 @@ class JobStatus(str, Enum):
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
     CLOSED = "CLOSED"
+    ARCHIVED = "ARCHIVED"  # Offre expirée, dépublier automatiquement
 
 
 class ApplicationStatus(str, Enum):
@@ -271,6 +272,10 @@ class JobOffer(SQLModel, table=True):
     status: JobStatus = Field(default=JobStatus.DRAFT, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: Optional[datetime] = Field(default=None)
+
+    # Métriques d'acquisition (page publique /offres/{id})
+    view_count: int = Field(default=0, description="Nombre de vues de la page détail")
+    register_click_count: int = Field(default=0, description="Clics sur Créer mon compte depuis la modal Postuler")
 
     # Relations
     applications: List["Application"] = Relationship(back_populates="job_offer")

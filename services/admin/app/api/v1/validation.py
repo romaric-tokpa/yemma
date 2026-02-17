@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 from app.infrastructure.auth import require_admin_role
-from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status, update_candidate_hrflow_key, delete_candidate_profile
+from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status, update_candidate_evaluation, update_candidate_hrflow_key, delete_candidate_profile
 from app.infrastructure.hrflow_parse_client import parse_cv_and_get_key
 from app.infrastructure.hrflow_asking_client import ask_profile, HrFlowAskingError
 from app.infrastructure.search_client import index_candidate_in_search, remove_candidate_from_search
@@ -285,6 +285,57 @@ async def reject_candidate(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reject candidate: {str(e)}"
+        )
+
+
+@router.post("/update-evaluation/{candidate_id}", status_code=status.HTTP_200_OK)
+async def update_evaluation(
+    candidate_id: int,
+    report: ValidationReport,
+    admin_user=Depends(require_admin_role),
+):
+    """
+    Met à jour l'évaluation d'un candidat (admin_report, admin_score) sans changer le statut.
+    Utile pour modifier l'évaluation d'un profil déjà validé avec ses nouvelles informations.
+    Réindexe le candidat dans la CVthèque avec les données mises à jour.
+    """
+    try:
+        report_data = {
+            "overall_score": report.overallScore,
+            "technical_skills_rating": report.technicalSkills,
+            "soft_skills_rating": report.softSkills,
+            "communication_rating": report.communication,
+            "motivation_rating": report.motivation,
+            "soft_skills_tags": report.softSkillsTags or [],
+            "interview_notes": report.interview_notes or "",
+            "recommendations": report.recommendations or "",
+            "summary": report.summary,
+        }
+
+        await update_candidate_evaluation(candidate_id=candidate_id, report_data=report_data)
+
+        # Réindexer avec les données à jour (profil inclut déjà admin_report mis à jour)
+        profile_data_updated = await get_candidate_profile(candidate_id)
+        try:
+            await index_candidate_in_search(candidate_id, profile_data_updated)
+        except Exception as index_err:
+            logger.warning("Indexation après mise à jour évaluation échouée pour %s: %s", candidate_id, index_err)
+
+        return {
+            "message": "Evaluation updated successfully",
+            "candidate_id": candidate_id,
+        }
+    except CandidateNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate with id {candidate_id} not found"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update evaluation: {str(e)}"
         )
 
 

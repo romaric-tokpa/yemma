@@ -40,7 +40,7 @@ export default function RegisterCandidatIllustration() {
               {/* CV qui sort de l'écran */}
               <div className="p-2 space-y-1">
                 <div className="flex gap-2 items-center">
-                  <div className="w-8 h-8 rounded-full bg-gray-300 shrink-0" />
+                  <img src="/logo-icon.svg" alt="Yemma" className="w-8 h-8 rounded-full object-contain shrink-0 bg-white p-1" />
                   <div className="flex-1 space-y-1">
                     <div className="h-2 bg-gray-200 rounded w-3/4" />
                     <div className="h-1.5 bg-gray-100 rounded w-1/2" />
