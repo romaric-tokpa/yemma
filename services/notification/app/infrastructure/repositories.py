@@ -75,6 +75,18 @@ class NotificationRepository:
         """Récupère les notifications d'un destinataire (alias)"""
         return await self.get_by_recipient(recipient_email, limit)
     
+    async def get_by_type(
+        self,
+        notification_type: str,
+        limit: int = 50
+    ) -> List[Notification]:
+        """Récupère les notifications par type"""
+        statement = select(Notification).where(
+            Notification.notification_type == notification_type
+        ).order_by(desc(Notification.created_at)).limit(limit)
+        result = await self.session.execute(statement)
+        return list(result.scalars().all())
+
     async def update(self, notification: Notification) -> Notification:
         """Met à jour une notification"""
         notification.updated_at = datetime.utcnow()

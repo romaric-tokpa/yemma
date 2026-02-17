@@ -90,3 +90,21 @@ async def require_admin_role_dep(
     """Dépendance FastAPI pour exiger le rôle admin."""
     return require_admin_role(current_user)
 
+
+def require_company_role(current_user: Optional[TokenData]) -> TokenData:
+    """
+    Vérifie que l'utilisateur a le rôle entreprise (ROLE_COMPANY_ADMIN ou ROLE_RECRUITER).
+    """
+    if not current_user or not hasattr(current_user, 'roles') or not current_user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    company_roles = {"ROLE_COMPANY_ADMIN", "ROLE_RECRUITER"}
+    if not company_roles.intersection(set(current_user.roles)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company role required"
+        )
+    return current_user
+

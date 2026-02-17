@@ -50,6 +50,9 @@ async def init_db():
         
         # Migration: Ajouter les champs de contact du référent à la table companies si elles n'existent pas
         await migrate_add_company_contact_fields(conn)
+        
+        # Migration: Ajouter deleted_at aux tables si elles n'existent pas
+        await migrate_add_deleted_at_columns(conn)
 
 
 async def migrate_add_invitation_names(conn):
@@ -118,6 +121,25 @@ async def migrate_add_company_contact_fields(conn):
             # Si la table n'existe pas encore, on ignore l'erreur (elle sera créée par create_all)
             if "does not exist" not in str(e).lower() and "duplicate column" not in str(e).lower():
                 print(f"⚠️  Migration: Erreur lors de l'ajout des colonnes: {e}")
+    
+    await conn.run_sync(check_and_add_columns)
+
+
+async def migrate_add_deleted_at_columns(conn):
+    """Migration: Ajoute deleted_at aux tables companies et team_members si elles n'existent pas"""
+    from sqlalchemy import text, inspect
+    
+    def check_and_add_columns(sync_conn):
+        inspector = inspect(sync_conn)
+        for table in ("companies", "team_members"):
+            try:
+                columns = [col['name'] for col in inspector.get_columns(table)]
+                if 'deleted_at' not in columns:
+                    sync_conn.execute(text(f"ALTER TABLE {table} ADD COLUMN deleted_at TIMESTAMP"))
+                    print(f"✅ Migration: Colonne deleted_at ajoutée à la table {table}")
+            except Exception as e:
+                if "does not exist" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                    print(f"⚠️  Migration: Erreur lors de l'ajout de deleted_at à {table}: {e}")
     
     await conn.run_sync(check_and_add_columns)
 

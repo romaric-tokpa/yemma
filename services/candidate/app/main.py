@@ -1,6 +1,7 @@
 """
 Candidate Service - Point d'entrée principal
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,11 +11,21 @@ import logging
 
 from app.core.config import settings
 from app.core.exceptions import CandidateError
-from app.api.v1 import profiles, stats, jobs
+from app.api.v1 import profiles, stats, jobs, company_jobs
+from app.infrastructure.database import init_db
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Démarrage : init_db (création des tables + migrations)."""
+    await init_db()
+    yield
+    # shutdown si besoin
+
 
 app = FastAPI(
     title="Candidate Service",
@@ -22,6 +33,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS - DOIT être ajouté AVANT les routes pour gérer les erreurs
@@ -38,6 +50,7 @@ app.add_middleware(
 app.include_router(stats.router, prefix="/api/v1", tags=["Stats"])
 app.include_router(profiles.router, prefix="/api/v1")
 app.include_router(jobs.router, prefix="/api/v1")
+app.include_router(company_jobs.router, prefix="/api/v1")
 
 
 def _debug_log(loc: str, msg: str, data: dict, hid: str):

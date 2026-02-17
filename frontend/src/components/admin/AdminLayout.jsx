@@ -2,15 +2,15 @@
  * Layout partagé pour les pages admin : header, sidebar, contenu principal.
  * Design aligné sur le dashboard candidat.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
   LogOut, Menu, X, HelpCircle, LayoutDashboard, FileCheck, Briefcase,
-  BarChart3, Search, Shield, Building
+  BarChart3, Search, Shield, Building, Bell, User, ExternalLink
 } from 'lucide-react'
 import { LogoutConfirmDialog } from '@/components/common/LogoutConfirmDialog'
-import { authApiService } from '@/services/api'
+import { authApiService, notificationApi } from '@/services/api'
 
 const NAV_GROUPS = [
   {
@@ -54,6 +54,35 @@ export default function AdminLayout({ children }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [notifCount, setNotifCount] = useState(0)
+  const notifRef = useRef(null)
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await notificationApi.getValidationRequests(10)
+      setNotifications(data || [])
+      setNotifCount((data || []).length)
+    } catch {
+      // silently fail
+    }
+  }, [])
+
+  useEffect(() => {
+    loadNotifications()
+    const interval = setInterval(loadNotifications, 60000)
+    return () => clearInterval(interval)
+  }, [loadNotifications])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false)
+    }
+    if (notifOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [notifOpen])
 
   const user = (() => {
     try {
@@ -122,6 +151,73 @@ export default function AdminLayout({ children }) {
 
           {/* User menu */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Notification bell */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={() => setNotifOpen(!notifOpen)}
+                className="relative p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors"
+                title="Demandes de validation"
+                aria-label="Notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {notifCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#e76f51] text-white text-[10px] font-bold leading-none shadow-sm">
+                    {notifCount > 9 ? '9+' : notifCount}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                  <div className="px-4 py-3 bg-[#E8F4F3]/50 border-b border-gray-100 flex items-center justify-between">
+                    <p className="font-semibold text-sm text-[#2C2C2C]">Demandes de validation</p>
+                    {notifCount > 0 && (
+                      <span className="text-xs text-[#226D68] font-medium bg-[#226D68]/10 px-2 py-0.5 rounded-full">{notifCount}</span>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-[#6b7280]">
+                        Aucune demande de validation en attente.
+                      </div>
+                    ) : (
+                      notifications.map((profile) => {
+                        const candidateName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Candidat'
+                        const requestedAt = profile.validation_requested_at ? new Date(profile.validation_requested_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
+                        return (
+                          <Link
+                            key={profile.id}
+                            to={`/admin/review/${profile.id}`}
+                            onClick={() => setNotifOpen(false)}
+                            className="flex items-start gap-3 px-4 py-3 hover:bg-[#F4F6F8] transition-colors border-b border-gray-50 last:border-b-0"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-[#e76f51]/15 flex items-center justify-center shrink-0 mt-0.5">
+                              <User className="h-4 w-4 text-[#e76f51]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-[#2C2C2C] font-medium truncate">{candidateName}</p>
+                              <p className="text-xs text-[#6b7280] truncate">{profile.email || ''}</p>
+                              <p className="text-[11px] text-[#9ca3af] mt-0.5">{requestedAt}</p>
+                            </div>
+                            <ExternalLink className="h-3.5 w-3.5 text-[#9ca3af] shrink-0 mt-1" />
+                          </Link>
+                        )
+                      })
+                    )}
+                  </div>
+                  {notifications.length > 0 && (
+                    <div className="px-4 py-2 border-t border-gray-100 bg-[#F4F6F8]/30">
+                      <Link
+                        to="/admin/validation"
+                        onClick={() => setNotifOpen(false)}
+                        className="text-xs text-[#226D68] hover:text-[#1a5a55] font-medium"
+                      >
+                        Voir tous les profils en attente
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <Link to="/contact" className="p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors" title="Aide">
               <HelpCircle className="h-5 w-5" />
             </Link>

@@ -22,6 +22,7 @@ class NotificationResponse(BaseModel):
     recipient_email: str
     recipient_name: Optional[str] = None
     subject: Optional[str] = None
+    template_data: Optional[str] = None
     status: str
     sent_at: Optional[str] = None
     created_at: str

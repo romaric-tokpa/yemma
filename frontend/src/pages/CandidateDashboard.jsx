@@ -10,7 +10,7 @@ import {
   Home, Settings, Menu, X, TrendingUp, FileCheck,
   Flag, Download, Image as ImageIcon, Loader2, Upload,
   Wrench, Sparkles, BarChart3, HelpCircle, Target, Search,   FileSearch,
-  Save, Building2, ArrowLeft, ArrowRight, Shield
+  Save, Building2, ArrowLeft, ArrowRight, Shield, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Send
 } from 'lucide-react'
 import { candidateApi, authApiService, documentApi } from '../services/api'
 import { Button } from '../components/ui/button'
@@ -106,6 +106,64 @@ const generateAvatarUrl = (firstName, lastName) => {
 
 const generateCompanyLogoUrl = (companyName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(companyName || 'Company')}&size=100&background=e8f4f3&color=226D68&bold=true`
+}
+
+/** Ligne compacte d'expérience avec expand pour description/réalisations */
+function ExperienceRow({ exp, displayCompanyLogo, defaultCompanyLogo, dateLabel, yearBadge, hasDetails, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className="group">
+      <div className="flex items-center justify-between gap-3 p-3 hover:bg-[#F8FAFC]/60 transition-colors">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="relative shrink-0">
+            <img
+              src={displayCompanyLogo}
+              alt={`Logo ${exp.company_name}`}
+              className="w-9 h-9 rounded-lg object-cover border border-[#E8F4F3]"
+              onError={(e) => { if (e.target.src !== defaultCompanyLogo) e.target.src = defaultCompanyLogo }}
+            />
+            {exp.is_current && <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-sm text-[#2C2C2C] truncate">{exp.position}</p>
+            <p className="text-xs text-[#226D68] truncate">{exp.company_name}</p>
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+              <span className="text-[10px] px-1.5 py-0 rounded bg-[#E8F4F3] text-[#1a5a55] font-medium">{yearBadge}</span>
+              <span className="text-[10px] text-[#6b7280]">{dateLabel}</span>
+              {exp.contract_type && <span className="text-[10px] text-[#6b7280]">• {exp.contract_type}</span>}
+              {exp.company_sector && <span className="text-[10px] text-[#6b7280]">• {exp.company_sector}</span>}
+              {exp.has_document && exp.document_id && <FileText className="h-3 w-3 text-[#226D68]" title="Pièce justificative" />}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {hasDetails && (
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[#E8F4F3] text-[#226D68]" onClick={() => setExpanded(!expanded)} title={expanded ? 'Réduire' : 'Voir détails'}>
+              {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[#E8F4F3] text-[#226D68]" onClick={onEdit}><Edit className="h-3 w-3" /></Button>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50 text-red-500" onClick={onDelete}><Trash2 className="h-3 w-3" /></Button>
+        </div>
+      </div>
+      {expanded && hasDetails && (
+        <div className="px-3 pb-3 pt-0 -mt-1 pl-12 border-t border-gray-50 bg-[#F8FAFC]/40">
+          {exp.description && (
+            <div className="mb-2">
+              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">Description</p>
+              <div className="text-xs text-gray-700 rich-text-content leading-relaxed" dangerouslySetInnerHTML={{ __html: exp.description }} />
+            </div>
+          )}
+          {exp.achievements && (
+            <div>
+              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">Réalisations</p>
+              <div className="text-xs text-gray-700 rich-text-content leading-relaxed" dangerouslySetInnerHTML={{ __html: exp.achievements }} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Composant page Paramètres (mot de passe + suppression compte)
@@ -306,6 +364,10 @@ export default function CandidateDashboard() {
   // Modale compléter profil (postuler à une offre)
   const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false)
   const [profileCompletionMessage, setProfileCompletionMessage] = useState('')
+  // Modale demande de validation admin
+  const [showValidationRequestModal, setShowValidationRequestModal] = useState(false)
+  const [sendingValidationRequest, setSendingValidationRequest] = useState(false)
+  const [validationRequestSent, setValidationRequestSent] = useState(false)
   
   // États pour les filtres et recherche des compétences
   const [skillSearchQuery, setSkillSearchQuery] = useState('')
@@ -332,6 +394,8 @@ export default function CandidateDashboard() {
   const [applicationStatusByJobId, setApplicationStatusByJobId] = useState({}) // { job_id: { status, rejection_reason } } — mis à jour quand l'admin change l'étape
   const [debouncedTitle, setDebouncedTitle] = useState('')
   const [debouncedLocation, setDebouncedLocation] = useState('')
+  const [offresPage, setOffresPage] = useState(1)
+  const [candidaturesPage, setCandidaturesPage] = useState(1)
   // Mode édition du profil (intégré dans l'onglet Profil)
   const [profileEditMode, setProfileEditMode] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -429,6 +493,12 @@ export default function CandidateDashboard() {
     if (activeTab === 'offres') loadJobsOffres()
   }, [activeTab, loadJobsOffres, offerId])
 
+  // Charger les offres au montage pour afficher le nombre dans la sidebar
+  useEffect(() => {
+    loadJobsOffres()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Charger les offres postulées pour l'onglet Mes candidatures (indépendant des filtres)
   const loadAppliedJobs = useCallback(async () => {
     try {
@@ -460,6 +530,16 @@ export default function CandidateDashboard() {
       setAppliedJobsLoading(false)
     }
   }, [])
+
+  // Réinitialiser la page offres quand les données changent
+  useEffect(() => {
+    setOffresPage(1)
+  }, [jobsOffres, appliedJobIds])
+
+  // Réinitialiser la page candidatures quand les données changent
+  useEffect(() => {
+    setCandidaturesPage(1)
+  }, [appliedJobs])
 
   // Synchroniser offresSubTab avec l'URL (/offres vs /offres/candidatures)
   useEffect(() => {
@@ -528,7 +608,9 @@ export default function CandidateDashboard() {
       const status = err.response?.status
       const detail = err.response?.data?.detail
       const msg = typeof detail === 'string' ? detail : ''
-      if (status === 403 && (msg.includes('%') || msg.includes('profil'))) {
+      if (status === 403 && msg.includes('validé')) {
+        setShowValidationRequestModal(true)
+      } else if (status === 403 && (msg.includes('%') || msg.includes('profil'))) {
         setProfileCompletionMessage(msg)
         setShowCompleteProfileModal(true)
       } else if (status === 404) {
@@ -543,6 +625,19 @@ export default function CandidateDashboard() {
       setApplyingToJob(false)
     }
   }, [jobDetail])
+
+  const handleRequestValidation = useCallback(async () => {
+    setSendingValidationRequest(true)
+    try {
+      await candidateApi.requestValidation()
+      setValidationRequestSent(true)
+      setToast({ message: 'Votre demande de validation a été envoyée à l\'administrateur.', type: 'success' })
+    } catch {
+      setToast({ message: 'Erreur lors de l\'envoi de la demande. Réessayez plus tard.', type: 'error' })
+    } finally {
+      setSendingValidationRequest(false)
+    }
+  }, [])
 
   // Mode édition profil : synchronisé avec ?edit=1 sur l'onglet profile
   useEffect(() => {
@@ -940,6 +1035,20 @@ export default function CandidateDashboard() {
     ? currentPhotoUrl 
     : defaultAvatar
 
+  const PER_PAGE_OFFRES = 25
+  const PER_PAGE_CANDIDATURES = 25
+  const jobsToExplore = jobsOffres.filter((j) => !appliedJobIds.has(j.id))
+  const totalPagesOffres = Math.max(1, Math.ceil(jobsToExplore.length / PER_PAGE_OFFRES))
+  const paginatedJobsToExplore = jobsToExplore.slice(
+    (offresPage - 1) * PER_PAGE_OFFRES,
+    offresPage * PER_PAGE_OFFRES
+  )
+  const totalPagesCandidatures = Math.max(1, Math.ceil(appliedJobs.length / PER_PAGE_CANDIDATURES))
+  const paginatedAppliedJobs = appliedJobs.slice(
+    (candidaturesPage - 1) * PER_PAGE_CANDIDATURES,
+    candidaturesPage * PER_PAGE_CANDIDATURES
+  )
+
   // Navigation principale - regroupée par sections
   const navGroups = [
     {
@@ -961,9 +1070,14 @@ export default function CandidateDashboard() {
     {
       label: 'Emploi',
       items: [
-        { id: 'offres', label: 'Offres d\'emploi', icon: FileSearch },
+        {
+          id: 'offres',
+          label: 'Offres d\'emploi',
+          icon: FileSearch,
+          count: jobsOffres.filter((j) => !appliedJobIds.has(j.id)).length,
+          countOrange: true,
+        },
         { id: 'situation', label: 'Ma situation', icon: Search },
-        { id: 'preferences', label: 'Préférences', icon: Target },
       ],
     },
     {
@@ -1134,10 +1248,13 @@ export default function CandidateDashboard() {
                           <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-[#226D68]'}`} />
                         </span>
                         <span className="flex-1 min-w-0 truncate">{item.label}</span>
-                        {item.count != null && item.count > 0 && (
+                        {item.count != null && (item.count > 0 || item.countOrange) && (
                           <span className={`
                             shrink-0 min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center rounded-md text-xs font-semibold
-                            ${isActive ? 'bg-white/25 text-white' : 'bg-[#E8F4F3] text-[#226D68]'}
+                            ${item.countOrange
+                              ? (isActive ? 'bg-orange-400/30 text-white' : 'bg-orange-100 text-orange-600')
+                              : (isActive ? 'bg-white/25 text-white' : 'bg-[#E8F4F3] text-[#226D68]')
+                            }
                           `}>
                             {item.count}
                           </span>
@@ -1547,64 +1664,106 @@ export default function CandidateDashboard() {
                   {/* Onglet Offres à explorer */}
                   {offresSubTab === 'explorer' && (
                     <>
-                      {jobsOffres.filter((j) => !appliedJobIds.has(j.id)).length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-4 lg:gap-5">
-                          {jobsOffres.filter((j) => !appliedJobIds.has(j.id)).map((job) => (
-                            <Link key={job.id} to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)} className="block min-w-0">
-                              <Card className="border border-gray-200 bg-white rounded-xl hover:border-[#226D68]/40 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col h-full group">
-                                <div className="p-4 pb-0">
+                      {jobsToExplore.length > 0 ? (
+                        <>
+                          <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[600px]">
+                                <thead>
+                                  <tr className="border-b border-gray-100 bg-[#F8FAFC]/60">
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider w-12" />
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Offre</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden md:table-cell">Localisation</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden lg:table-cell">Contrat</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden md:table-cell">Date</th>
+                                    <th className="text-right py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {paginatedJobsToExplore.map((job) => (
+                                    <tr key={job.id} className="hover:bg-[#F8FAFC]/60 transition-colors">
+                                      <td className="py-3 px-4">
                                   {job.company_logo_url ? (
-                                    <img src={job.company_logo_url} alt={job.company_name || ''} className="h-9 w-auto max-w-[100px] object-contain object-left" />
+                                          <div className="w-9 h-9 rounded-lg overflow-hidden bg-white flex items-center justify-center shrink-0">
+                                            <img src={job.company_logo_url} alt="" className="w-full h-full object-contain" />
+                                          </div>
                                   ) : (
-                                    <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">{job.company_name || 'Yemma'}</p>
-                                  )}
+                                          <div className="w-9 h-9 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                                            <Briefcase className="h-4 w-4 text-[#226D68]" />
                                 </div>
-                                <div className="px-4 pt-3">
-                                  <h3 className="font-semibold text-[#2C2C2C] text-sm leading-tight line-clamp-2 group-hover:text-[#226D68] transition-colors">{job.title}</h3>
-                                </div>
-                                <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-[#6b7280]">
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                    {job.location}
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                    {job.contract_type}
-                                  </span>
-                                  {job.salary_range && (
-                                    <span className="flex items-center gap-1 text-[#226D68] font-medium">
-                                      FCFA {job.salary_range}
+                                        )}
+                                      </td>
+                                      <td className="py-3 px-4">
+                                        <Link to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)} className="block min-w-0 group">
+                                          <p className="font-medium text-[#2C2C2C] group-hover:text-[#226D68] truncate">{job.title}</p>
+                                          {job.company_name && (
+                                            <p className="text-xs text-[#6b7280] truncate">{job.company_name}</p>
+                                          )}
+                                          {job.salary_range && (
+                                            <p className="text-xs text-[#226D68] font-medium mt-0.5">FCFA {job.salary_range}</p>
+                                          )}
+                                        </Link>
+                                      </td>
+                                      <td className="py-3 px-4 hidden md:table-cell">
+                                        <span className="text-sm text-[#6b7280] flex items-center gap-1">
+                                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                          {job.location}
                                     </span>
-                                  )}
-                                  {job.sector && (
-                                    <span className="flex items-center gap-1 truncate max-w-full">
-                                      <Briefcase className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                      <span className="truncate">{job.sector}</span>
-                                    </span>
-                                  )}
-                                  {job.created_at && (
-                                    <span className="flex items-center gap-1" title="Publié le">
-                                      <Calendar className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                      Publié {formatDate(job.created_at)}
-                                    </span>
-                                  )}
-                                  {job.expires_at && (
-                                    <span className="flex items-center gap-1 text-amber-700" title="Expire le">
-                                      <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                      Expire {formatDate(job.expires_at)}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="px-4 pb-4 pt-2 mt-auto">
-                                  <span className="inline-flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-[#226D68] group-hover:bg-[#1a5a55] text-white text-xs font-medium transition-colors">
+                                      </td>
+                                      <td className="py-3 px-4 hidden lg:table-cell">
+                                        <span className="text-sm text-[#6b7280]">{job.contract_type}</span>
+                                      </td>
+                                      <td className="py-3 px-4 hidden md:table-cell">
+                                        <span className="text-xs text-[#6b7280]">
+                                          {job.created_at ? formatDate(job.created_at) : '—'}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-4 text-right">
+                                        <Link
+                                          to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)}
+                                          className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-[#226D68] hover:bg-[#1a5a55] text-white text-xs font-medium transition-colors"
+                                        >
                                     <FileText className="h-3.5 w-3.5" />
                                     Postuler
-                                  </span>
-                                </div>
-                              </Card>
                             </Link>
+                                      </td>
+                                    </tr>
                           ))}
+                                </tbody>
+                              </table>
                         </div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
+                            <p className="text-sm text-[#6b7280] order-2 sm:order-1">
+                              Affichage {(offresPage - 1) * PER_PAGE_OFFRES + 1}–{Math.min(offresPage * PER_PAGE_OFFRES, jobsToExplore.length)} sur {jobsToExplore.length} offres
+                            </p>
+                            <div className="flex items-center gap-2 order-1 sm:order-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setOffresPage((p) => Math.max(1, p - 1))}
+                                disabled={offresPage <= 1}
+                                className="h-9 px-3 gap-1"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                <span className="hidden sm:inline">Précédent</span>
+                              </Button>
+                              <span className="text-sm font-medium text-[#2C2C2C] min-w-[4rem] text-center px-2">
+                                {offresPage} / {totalPagesOffres}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setOffresPage((p) => Math.min(totalPagesOffres, p + 1))}
+                                disabled={offresPage >= totalPagesOffres}
+                                className="h-9 px-3 gap-1"
+                              >
+                                <span className="hidden sm:inline">Suivant</span>
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </>
                       ) : (
                         <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 p-6 sm:p-8 text-center">
                           <FileSearch className="h-12 w-12 text-[#9ca3af] mx-auto mb-4" />
@@ -1633,82 +1792,122 @@ export default function CandidateDashboard() {
                           <Loader2 className="h-8 w-8 animate-spin text-[#226D68]" />
                         </div>
                       ) : appliedJobs.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-4 lg:gap-5">
-                          {appliedJobs.map((job) => (
-                            <Link key={job.id} to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)} className="block min-w-0">
-                              <Card className="border border-[#226D68]/30 bg-[#E8F4F3]/30 rounded-xl hover:border-[#226D68]/50 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col h-full group">
-                                <div className="p-4 pb-0 flex items-start justify-between gap-2">
+                        <>
+                          <div className="rounded-xl border border-[#226D68]/20 bg-white overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[600px]">
+                                <thead>
+                                  <tr className="border-b border-gray-100 bg-[#E8F4F3]/40">
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider w-12" />
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Offre</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden md:table-cell">Localisation</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden lg:table-cell">Contrat</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Statut</th>
+                                    <th className="text-right py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {paginatedAppliedJobs.map((job) => {
+                                    const status = applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]
+                                    return (
+                                      <tr key={job.id} className="hover:bg-[#F8FAFC]/60 transition-colors">
+                                        <td className="py-3 px-4">
                                   {job.company_logo_url ? (
-                                    <img src={job.company_logo_url} alt={job.company_name || ''} className="h-9 w-auto max-w-[100px] object-contain object-left" />
-                                  ) : (
-                                    <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wide truncate">{job.company_name || 'Yemma'}</p>
-                                  )}
-                                  <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-                                    (applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]) === 'HIRED'
+                                            <div className="w-9 h-9 rounded-lg overflow-hidden bg-white flex items-center justify-center shrink-0">
+                                              <img src={job.company_logo_url} alt="" className="w-full h-full object-contain" />
+                                            </div>
+                                          ) : (
+                                            <div className="w-9 h-9 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                                              <Briefcase className="h-4 w-4 text-[#226D68]" />
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                          <Link to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)} className="block min-w-0 group">
+                                            <p className="font-medium text-[#2C2C2C] group-hover:text-[#226D68] truncate">{job.title}</p>
+                                            {job.company_name && (
+                                              <p className="text-xs text-[#6b7280] truncate">{job.company_name}</p>
+                                            )}
+                                            {job.salary_range && (
+                                              <p className="text-xs text-[#226D68] font-medium mt-0.5">FCFA {job.salary_range}</p>
+                                            )}
+                                            {status === 'REJECTED' && applicationStatusByJobId[job.id]?.rejection_reason && (
+                                              <p className="text-xs text-red-600 mt-0.5 line-clamp-1" title={applicationStatusByJobId[job.id].rejection_reason}>
+                                                {applicationStatusByJobId[job.id].rejection_reason}
+                                              </p>
+                                            )}
+                                          </Link>
+                                        </td>
+                                        <td className="py-3 px-4 hidden md:table-cell">
+                                          <span className="text-sm text-[#6b7280] flex items-center gap-1">
+                                            <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                            {job.location}
+                                          </span>
+                                        </td>
+                                        <td className="py-3 px-4 hidden lg:table-cell">
+                                          <span className="text-sm text-[#6b7280]">{job.contract_type}</span>
+                                        </td>
+                                        <td className="py-3 px-4">
+                                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                                            status === 'HIRED'
                                       ? 'bg-[#226D68]/20 text-[#1a5a55]'
-                                      : (applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]) === 'REJECTED'
+                                              : status === 'REJECTED'
                                       ? 'bg-red-100 text-red-700'
-                                      : ['TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_DONE'].includes(applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id])
+                                              : ['TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_DONE'].includes(status)
                                       ? 'bg-amber-100 text-amber-800'
                                       : 'bg-[#226D68]/15 text-[#1a5a55]'
                                   }`}>
-                                    <CheckCircle2 className="h-3 w-3" />
-                                    {APPLICATION_STATUS_LABELS[applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]] || 'Postulé'}
+                                            <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                            {APPLICATION_STATUS_LABELS[status] || 'Postulé'}
                                   </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-right">
+                                          <Link
+                                            to={ROUTES.CANDIDATE_JOB_DETAIL(job.id)}
+                                            className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg bg-[#226D68] hover:bg-[#1a5a55] text-white text-xs font-medium transition-colors"
+                                          >
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                            Voir l&apos;offre
+                                          </Link>
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
                                 </div>
-                                {(applicationStatusByJobId[job.id]?.status ?? applicationStatusByJobId[job.id]) === 'REJECTED' && applicationStatusByJobId[job.id]?.rejection_reason && (
-                                  <div className="px-4 py-2 bg-red-50/80 border-t border-red-100">
-                                    <p className="text-xs text-red-700 leading-relaxed line-clamp-2" title={applicationStatusByJobId[job.id].rejection_reason}>
-                                      {applicationStatusByJobId[job.id].rejection_reason}
-                                    </p>
                                   </div>
-                                )}
-                                <div className="px-4 pt-3">
-                                  <h3 className="font-semibold text-[#2C2C2C] text-sm leading-tight line-clamp-2 group-hover:text-[#226D68] transition-colors">{job.title}</h3>
-                                </div>
-                                <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-[#6b7280]">
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                    {job.location}
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
+                            <p className="text-sm text-[#6b7280] order-2 sm:order-1">
+                              Affichage {(candidaturesPage - 1) * PER_PAGE_CANDIDATURES + 1}–{Math.min(candidaturesPage * PER_PAGE_CANDIDATURES, appliedJobs.length)} sur {appliedJobs.length} candidatures
+                            </p>
+                            <div className="flex items-center gap-2 order-1 sm:order-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCandidaturesPage((p) => Math.max(1, p - 1))}
+                                disabled={candidaturesPage <= 1}
+                                className="h-9 px-3 gap-1"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                <span className="hidden sm:inline">Précédent</span>
+                              </Button>
+                              <span className="text-sm font-medium text-[#2C2C2C] min-w-[4rem] text-center px-2">
+                                {candidaturesPage} / {totalPagesCandidatures}
                                   </span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                    {job.contract_type}
-                                  </span>
-                                  {job.salary_range && (
-                                    <span className="flex items-center gap-1 text-[#226D68] font-medium">
-                                      FCFA {job.salary_range}
-                                    </span>
-                                  )}
-                                  {job.sector && (
-                                    <span className="flex items-center gap-1 truncate max-w-full">
-                                      <Briefcase className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                      <span className="truncate">{job.sector}</span>
-                                    </span>
-                                  )}
-                                  {job.created_at && (
-                                    <span className="flex items-center gap-1" title="Publié le">
-                                      <Calendar className="h-3.5 w-3.5 text-[#226D68] shrink-0" />
-                                      Publié {formatDate(job.created_at)}
-                                    </span>
-                                  )}
-                                  {job.expires_at && (
-                                    <span className="flex items-center gap-1 text-amber-700" title="Expire le">
-                                      <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                      Expire {formatDate(job.expires_at)}
-                                    </span>
-                                  )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCandidaturesPage((p) => Math.min(totalPagesCandidatures, p + 1))}
+                                disabled={candidaturesPage >= totalPagesCandidatures}
+                                className="h-9 px-3 gap-1"
+                              >
+                                <span className="hidden sm:inline">Suivant</span>
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
                                 </div>
-                                <div className="px-4 pb-4 mt-auto">
-                                  <span className="inline-flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-[#226D68]/80 group-hover:bg-[#226D68] text-white text-xs font-medium transition-colors">
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                    Voir l&apos;offre
-                                  </span>
                                 </div>
-                              </Card>
-                            </Link>
-                          ))}
-                        </div>
+                        </>
                       ) : (
                         <div className="rounded-xl border border-dashed border-[#226D68]/30 bg-[#E8F4F3]/20 p-6 sm:p-8 text-center">
                           <CheckCircle2 className="h-12 w-12 text-[#226D68] mx-auto mb-4" />
@@ -1824,18 +2023,11 @@ export default function CandidateDashboard() {
           <Tabs value={activeTab} onValueChange={(v) => navigate(`/candidate/dashboard/${v}`)} className="w-full">
               {/* Contenu des onglets */}
               <TabsContent value="profile" className="mt-3">
-                <SectionHeader
-                  title="Mon profil"
-                  subtitle="Identité, contact et parcours. Un profil complet facilite votre validation par nos experts RH avant d'entrer dans la CVthèque."
-                  icon={User}
-                  action={
-                    profileEditMode ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setProfileEditMode(false); navigate('/candidate/dashboard/profile') }}
-                        className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]"
-                      >
+                {/* En-tête compact */}
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h1 className="text-lg font-bold text-[#2C2C2C]">Mon profil</h1>
+                  {profileEditMode ? (
+                    <Button size="sm" variant="outline" onClick={() => { setProfileEditMode(false); navigate('/candidate/dashboard/profile') }} className="border-neutral-200 text-gray-600 hover:bg-[#E8F4F3] shrink-0">
                         Annuler
                       </Button>
                     ) : (
@@ -1849,35 +2041,54 @@ export default function CandidateDashboard() {
                             navigate('/candidate/dashboard/profile?edit=1')
                           }
                         }}
-                        className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] hover:text-[#1a5a55]"
+                      className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] hover:text-[#1a5a55] shrink-0"
                       >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Modifier
+                      <Edit className="h-4 w-4 mr-1.5" /> Modifier
                       </Button>
-                    )
-                  }
-                />
+                  )}
+                </div>
                 {profileEditMode ? (
-                <form onSubmit={handleProfileSubmit(onProfileFormSubmit)} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  <div className="p-4 sm:p-6 space-y-5">
-                    {/* Photo */}
-                    <div className="flex items-center gap-4">
-                      <div className="relative shrink-0">
-                        <img src={displayPhoto} alt="Photo de profil" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-[#226D68]/20" onError={(e) => { setPhotoError(true); e.target.src = defaultAvatar }} />
-                        {uploadingPhoto && <span className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center"><Loader2 className="w-6 h-6 text-white animate-spin" aria-hidden /></span>}
+                <form onSubmit={handleProfileSubmit(onProfileFormSubmit)} className="space-y-4">
+                  {/* Barre complétion + actions sticky */}
+                  <div className="flex items-center justify-between gap-4 px-3 py-2.5 rounded-lg bg-[#E8F4F3]/50 border border-[#E8F4F3] sticky top-0 z-10 backdrop-blur-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-md bg-[#226D68]/10 flex items-center justify-center">
+                        <span className="text-xs font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <Label htmlFor="photo-edit-profile" className="text-xs font-medium text-[#6b7280] block mb-1">Photo de profil</Label>
+                      <span className="text-sm font-medium text-[#2C2C2C]">Édition du profil</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => { setProfileEditMode(false); navigate('/candidate/dashboard/profile') }} className="text-[#6b7280] hover:bg-white/80 h-8">
+                        Annuler
+                      </Button>
+                      <Button type="submit" disabled={savingProfile} size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white h-8">
+                        {savingProfile ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Enregistrement...</> : <><Save className="w-3.5 h-3.5 mr-1.5" /> Enregistrer</>}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Colonne gauche : Identité + Adresse */}
+                    <div className="lg:col-span-1 space-y-4">
+                    {/* Photo */}
+                      <div className="rounded-xl border border-gray-200 bg-white p-4">
+                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                      <div className="relative shrink-0">
+                            <img src={displayPhoto} alt="Photo" className="w-20 h-20 rounded-full object-cover border-2 border-[#E8F4F3] shadow-sm" onError={(e) => { setPhotoError(true); e.target.src = defaultAvatar }} />
+                            {uploadingPhoto && <span className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center"><Loader2 className="w-5 h-5 text-white animate-spin" /></span>}
+                      </div>
+                          <div className="flex-1 min-w-0 text-center sm:text-left">
+                            <Label htmlFor="photo-edit-profile" className="text-xs font-medium text-[#6b7280] block mb-2">Photo de profil</Label>
                         <label htmlFor="photo-edit-profile">
-                          <span className="inline-flex items-center justify-center rounded-md border border-neutral-200 h-9 px-3 text-xs font-medium cursor-pointer hover:bg-[#E8F4F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#226D68]/30">
+                              <span className="inline-flex items-center justify-center rounded-lg border-2 border-dashed border-[#226D68]/30 h-9 px-4 text-sm font-medium text-[#226D68] cursor-pointer hover:bg-[#E8F4F3] hover:border-[#226D68]/50 transition-colors">
                             {uploadingPhoto ? 'Chargement...' : 'Changer la photo'}
                           </span>
                         </label>
                         <input id="photo-edit-profile" type="file" accept="image/*" className="sr-only" disabled={uploadingPhoto} onChange={async (e) => {
                           const file = e.target.files?.[0]
                           if (!file || !profile?.id) return
-                          if (!file.type.startsWith('image/')) { setToast({ message: 'Sélectionnez une image (JPG, PNG).', type: 'error' }); return }
-                          if (file.size > 5 * 1024 * 1024) { setToast({ message: 'La photo ne doit pas dépasser 5 Mo.', type: 'error' }); return }
+                              if (!file.type.startsWith('image/')) { setToast({ message: 'Image JPG/PNG.', type: 'error' }); return }
+                              if (file.size > 5 * 1024 * 1024) { setToast({ message: 'Max 5 Mo.', type: 'error' }); return }
                           try {
                             setUploadingPhoto(true)
                             const uploadResult = await documentApi.uploadProfilePhoto(file, profile.id)
@@ -1889,901 +2100,448 @@ export default function CandidateDashboard() {
                             setPhotoError(false)
                             await loadProfile()
                             setToast({ message: 'Photo mise à jour.', type: 'success' })
-                          } catch { setToast({ message: 'Erreur lors de l\'upload.', type: 'error' }) }
+                              } catch { setToast({ message: 'Erreur upload.', type: 'error' }) }
                           finally { setUploadingPhoto(false); e.target.value = '' }
                         }} />
-                        <p className="text-xs text-[#6b7280] mt-1">JPG, PNG · max 5 Mo</p>
+                            <p className="text-[11px] text-[#6b7280] mt-1.5">JPG, PNG · max 5 Mo</p>
                       </div>
                     </div>
+                      </div>
+
                     {/* Identité */}
+                      <div className="rounded-xl border border-gray-200 bg-white p-4">
+                        <h3 className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2 mb-4"><User className="h-4 w-4 text-[#226D68]" /> Identité</h3>
                     <div className="space-y-3">
-                      <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-[#226D68]" /> Identité</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="firstName" className="text-xs">Prénom <span className="text-red-500">*</span></Label>
-                          <Input id="firstName" {...regProfile('firstName')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Prénom" />
-                          {profileErrors.firstName && <p className="text-xs text-red-600">{profileErrors.firstName.message}</p>}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1"><Label htmlFor="firstName" className="text-xs">Prénom <span className="text-red-500">*</span></Label><Input id="firstName" {...regProfile('firstName')} className="h-9 text-sm rounded-lg border-gray-200" placeholder="Prénom" />{profileErrors.firstName && <p className="text-xs text-red-600">{profileErrors.firstName.message}</p>}</div>
+                            <div className="space-y-1"><Label htmlFor="lastName" className="text-xs">Nom <span className="text-red-500">*</span></Label><Input id="lastName" {...regProfile('lastName')} className="h-9 text-sm rounded-lg border-gray-200" placeholder="Nom" />{profileErrors.lastName && <p className="text-xs text-red-600">{profileErrors.lastName.message}</p>}</div>
                         </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="lastName" className="text-xs">Nom <span className="text-red-500">*</span></Label>
-                          <Input id="lastName" {...regProfile('lastName')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Nom" />
-                          {profileErrors.lastName && <p className="text-xs text-red-600">{profileErrors.lastName.message}</p>}
+                          <div className="space-y-1"><Label htmlFor="dateOfBirth" className="text-xs">Date de naissance</Label><Input id="dateOfBirth" type="date" {...regProfile('dateOfBirth')} className="h-9 text-sm rounded-lg border-gray-200 w-full" /></div>
+                          <div className="space-y-1"><Label htmlFor="nationality" className="text-xs">Nationalité</Label><Controller name="nationality" control={profileControl} render={({ field }) => <SearchableSelect id="nationality" options={COUNTRIES_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir une nationalité" className="h-9 text-sm" />} /></div>
+                          <div className="space-y-1"><Label htmlFor="phone" className="text-xs">Téléphone</Label><Input id="phone" {...regProfile('phone')} className="h-9 text-sm rounded-lg border-gray-200 w-full" placeholder="+33 6 00 00 00 00" /></div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="dateOfBirth" className="text-xs">Date de naissance</Label>
-                          <Input id="dateOfBirth" type="date" {...regProfile('dateOfBirth')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="nationality" className="text-xs">Nationalité</Label>
-                          <Controller name="nationality" control={profileControl} render={({ field }) => (
-                            <SearchableSelect id="nationality" options={COUNTRIES_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir une nationalité" className="h-9 text-sm" />
-                          )} />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="phone" className="text-xs">Téléphone</Label>
-                        <Input id="phone" {...regProfile('phone')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="+33 6 00 00 00 00" />
-                      </div>
-                    </div>
+
                     {/* Adresse */}
-                    <div className="space-y-3 pt-4 border-t border-gray-100">
-                      <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[#226D68]" /> Adresse</p>
+                      <div className="rounded-xl border border-gray-200 bg-white p-4">
+                        <h3 className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2 mb-4"><MapPin className="h-4 w-4 text-[#226D68]" /> Adresse</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="city" className="text-xs">Ville</Label>
-                          <Input id="city" {...regProfile('city')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Ville" />
+                          <div className="space-y-1"><Label htmlFor="city" className="text-xs">Ville</Label><Input id="city" {...regProfile('city')} className="h-9 text-sm rounded-lg border-gray-200 w-full" placeholder="Ville" /></div>
+                          <div className="space-y-1"><Label htmlFor="country" className="text-xs">Pays</Label><Controller name="country" control={profileControl} render={({ field }) => <SearchableSelect id="country" options={COUNTRIES_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir un pays" className="h-9 text-sm" />} /></div>
                         </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="country" className="text-xs">Pays</Label>
-                          <Controller name="country" control={profileControl} render={({ field }) => (
-                            <SearchableSelect id="country" options={COUNTRIES_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir un pays" className="h-9 text-sm" />
+                        </div>
+                      </div>
+
+                    {/* Colonne droite : Profil professionnel */}
+                    <div className="lg:col-span-2">
+                      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                        <h3 className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2 mb-4"><Briefcase className="h-4 w-4 text-[#226D68]" /> Profil professionnel</h3>
+                        <div className="space-y-4">
+                          <div className="space-y-1"><Label htmlFor="profileTitle" className="text-xs">Titre du profil</Label><Input id="profileTitle" {...regProfile('profileTitle')} className="h-9 text-sm rounded-lg border-gray-200 w-full" placeholder="Ex. Ingénieur Génie Civil" /></div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1"><Label htmlFor="sector" className="text-xs">Secteur d&apos;activité</Label><Controller name="sector" control={profileControl} render={({ field }) => <SearchableSelect id="sector" options={SECTORS_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir un secteur" className="h-9 text-sm" />} /></div>
+                            <div className="space-y-1"><Label htmlFor="mainJob" className="text-xs">Poste principal</Label><Input id="mainJob" {...regProfile('mainJob')} className="h-9 text-sm rounded-lg border-gray-200 w-full" placeholder="Ex. Chef de chantier" /></div>
+                    </div>
+                          <div className="space-y-1"><Label htmlFor="totalExperience" className="text-xs">Années d&apos;expérience</Label><Input id="totalExperience" type="number" min={0} {...regProfile('totalExperience', { valueAsNumber: true })} className="h-9 text-sm rounded-lg border-gray-200 w-24" /></div>
+                          <div className="space-y-1">
+                            <Label htmlFor="professionalSummary" className="text-xs">Résumé professionnel</Label>
+                            <Controller name="professionalSummary" control={profileControl} render={({ field }) => (
+                              <div className="mt-1 [&_.ql-container]:min-h-[140px] [&_.ql-editor]:min-h-[140px]">
+                                <RichTextEditor value={field.value || ''} onChange={field.onChange} placeholder="Décrivez votre parcours, vos compétences clés et vos objectifs professionnels..." />
+                      </div>
                           )} />
                         </div>
-                      </div>
-                    </div>
-                    {/* Profil professionnel */}
-                    <div className="space-y-3 pt-4 border-t border-gray-100">
-                      <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide flex items-center gap-1.5"><Briefcase className="h-3.5 w-3.5 text-[#226D68]" /> Profil professionnel</p>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="profileTitle" className="text-xs">Titre du profil</Label>
-                        <Input id="profileTitle" {...regProfile('profileTitle')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Ex. Ingénieur Génie Civil" />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="sector" className="text-xs">Secteur d&apos;activité</Label>
-                          <Controller name="sector" control={profileControl} render={({ field }) => (
-                            <SearchableSelect id="sector" options={SECTORS_FR} value={field.value || ''} onChange={field.onChange} placeholder="Choisir un secteur" className="h-9 text-sm" />
-                          )} />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="mainJob" className="text-xs">Poste principal</Label>
-                          <Input id="mainJob" {...regProfile('mainJob')} className="h-9 text-sm w-full min-w-0 rounded-xl border-neutral-200" placeholder="Ex. Chef de chantier" />
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="totalExperience" className="text-xs">Années d&apos;expérience</Label>
-                        <Input id="totalExperience" type="number" min={0} {...regProfile('totalExperience', { valueAsNumber: true })} className="h-9 text-sm w-24 rounded-xl border-neutral-200" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="professionalSummary" className="text-xs">Résumé professionnel</Label>
-                        <Textarea id="professionalSummary" {...regProfile('professionalSummary')} rows={4} className="resize-none text-sm min-h-[80px] w-full min-w-0 rounded-xl border-neutral-200" placeholder="Décrivez votre parcours et vos compétences..." />
-                      </div>
-                    </div>
-                    {/* Actions */}
-                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t border-gray-100">
-                      <Button type="button" variant="outline" size="sm" onClick={() => { setProfileEditMode(false); navigate('/candidate/dashboard/profile') }} className="border-neutral-200 text-gray-anthracite hover:bg-[#E8F4F3]">Annuler</Button>
-                      <Button type="submit" disabled={savingProfile} size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
-                        {savingProfile ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden /> Enregistrement...</> : <><Save className="w-4 h-4 mr-2" aria-hidden /> Enregistrer</>}
-                      </Button>
                     </div>
                   </div>
                 </form>
                 ) : (
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  <div className="p-4 sm:p-6">
-                    <div className="space-y-6">
-                      {/* Hero identité */}
-                      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center sm:items-start pb-6 border-b border-gray-100">
-                        <div className="relative group self-center sm:self-start">
-                          <span className="sr-only">Photo de profil</span>
+                <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                  <div className="p-4">
+                    {/* Hero compact */}
+                    <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
+                      <div className="relative group shrink-0">
                           <img
                             src={displayPhoto}
-                            alt={`Photo de profil de ${fullName}`}
-                            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 flex-shrink-0 shadow-md"
-                            style={{ borderColor: 'rgba(34, 109, 104, 0.25)' }}
+                          alt={`Photo de ${fullName}`}
+                          className="w-14 h-14 rounded-full object-cover border-2 border-[#E8F4F3]"
                             onError={(e) => {
-                              if (!photoError && e.target.src !== defaultAvatar) {
-                                setPhotoError(true)
-                                e.target.src = defaultAvatar
-                              } else if (e.target.src !== defaultAvatar) {
-                                e.target.src = defaultAvatar
-                              }
-                            }}
-                            onLoad={() => {
-                              if (photoError && currentPhotoUrl) setPhotoError(false)
-                            }}
-                          />
-                          <label
-                            htmlFor="photo-upload"
-                            className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center justify-center sm:pointer-events-none"
-                            aria-label="Changer la photo de profil"
-                          >
-                            {uploadingPhoto ? (
-                              <Loader2 className="h-5 w-5 text-white animate-spin" aria-hidden />
-                            ) : (
-                              <ImageIcon className="h-5 w-5 text-white" aria-hidden />
-                            )}
+                            if (!photoError && e.target.src !== defaultAvatar) { setPhotoError(true); e.target.src = defaultAvatar }
+                            else if (e.target.src !== defaultAvatar) e.target.src = defaultAvatar
+                          }}
+                          onLoad={() => { if (photoError && currentPhotoUrl) setPhotoError(false) }}
+                        />
+                        <label htmlFor="photo-upload" className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex items-center justify-center sm:pointer-events-none" aria-label="Changer la photo">
+                          {uploadingPhoto ? <Loader2 className="h-4 w-4 text-white animate-spin" /> : <ImageIcon className="h-4 w-4 text-white" />}
                           </label>
-                          <input
-                            id="photo-upload"
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            disabled={uploadingPhoto || !profile?.id}
-                            onChange={async (e) => {
+                        <input id="photo-upload" type="file" accept="image/*" className="hidden" disabled={uploadingPhoto || !profile?.id} onChange={async (e) => {
                               const file = e.target.files?.[0]
                               if (!file || !profile?.id) return
-
-                              if (!file.type.startsWith('image/')) {
-                                setToast({ message: 'Veuillez sélectionner une image pour la photo de profil (JPG, PNG).', type: 'error' })
-                                return
-                              }
-                              if (file.size > 5 * 1024 * 1024) {
-                                setToast({ message: 'La photo de profil ne doit pas dépasser 5 Mo.', type: 'error' })
-                                return
-                              }
-
+                          if (!file.type.startsWith('image/')) { setToast({ message: 'Sélectionnez une image (JPG, PNG).', type: 'error' }); return }
+                          if (file.size > 5 * 1024 * 1024) { setToast({ message: 'Photo max 5 Mo.', type: 'error' }); return }
                               try {
                                 setUploadingPhoto(true)
-                                
-                                // Utiliser l'endpoint dédié pour les photos de profil
                                 const uploadResult = await documentApi.uploadProfilePhoto(file, profile.id)
                                 let serveUrl = uploadResult.serve_url
-                                if (serveUrl && serveUrl.startsWith('/')) {
-                                  serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
-                                } else if (uploadResult.id) {
-                                  serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
-                                }
+                            if (serveUrl?.startsWith('/')) serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
+                            else if (uploadResult.id) serveUrl = documentApi.getDocumentServeUrl(uploadResult.id)
                                 await candidateApi.updateProfile(profile.id, { photo_url: serveUrl })
-                                
-                                // Mettre à jour l'état local immédiatement
                                 setCurrentPhotoUrl(serveUrl)
                                 setPhotoError(false)
-                                
-                                // Recharger le profil pour mettre à jour l'affichage
                                 await loadProfile()
-                                setToast({ message: 'Photo de profil mise à jour.', type: 'success' })
-                              } catch (err) {
-                                console.error('Error uploading photo:', err)
-                                setToast({ message: 'Erreur : ' + (err.response?.data?.detail || err.message), type: 'error' })
-                              } finally {
-                                setUploadingPhoto(false)
-                                // Réinitialiser l'input
-                                e.target.value = ''
-                              }
-                            }}
-                          />
-                          <label htmlFor="photo-upload" className={`sm:hidden mt-1.5 block ${uploadingPhoto ? 'pointer-events-none opacity-70' : ''}`}>
-                            <span className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2.5 py-1 text-[10px] font-medium h-7 cursor-pointer hover:bg-muted">
-                              {uploadingPhoto ? 'Chargement...' : 'Modifier'}
-                            </span>
+                            setToast({ message: 'Photo mise à jour.', type: 'success' })
+                          } catch (err) { setToast({ message: 'Erreur : ' + (err.response?.data?.detail || err.message), type: 'error' }) }
+                          finally { setUploadingPhoto(false); e.target.value = '' }
+                        }} />
+                        <label htmlFor="photo-upload" className={`sm:hidden mt-1 block ${uploadingPhoto ? 'pointer-events-none opacity-70' : ''}`}>
+                          <span className="inline-flex items-center justify-center rounded border border-input px-2 py-0.5 text-[10px] font-medium h-6 cursor-pointer hover:bg-muted">Modifier</span>
                           </label>
                         </div>
-                        <div className="flex-1 min-w-0 w-full sm:w-auto text-center sm:text-left">
-                          <h3 className="text-lg sm:text-xl font-bold text-[#2C2C2C] mb-1 truncate">{fullName}</h3>
-                          {profile.profile_title && (
-                            <p className="text-sm font-semibold text-[#226D68] mb-3 truncate">{profile.profile_title}</p>
-                          )}
-                          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 justify-center sm:justify-start">
-                            {profile.email && (
-                              <div className="flex items-center gap-2 text-sm text-[#6b7280] justify-center sm:justify-start">
-                                <Mail className="h-4 w-4 text-[#226D68] flex-shrink-0" />
-                                <span className="truncate">{profile.email}</span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-[#2C2C2C] truncate">{fullName}</h3>
+                        {profile.profile_title && <p className="text-sm text-[#226D68] truncate">{profile.profile_title}</p>}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-xs text-[#6b7280]">
+                          {profile.email && <span className="flex items-center gap-1 truncate"><Mail className="h-3 w-3 shrink-0 text-[#226D68]" />{profile.email}</span>}
+                          {profile.phone && <span className="flex items-center gap-1 truncate"><Phone className="h-3 w-3 shrink-0 text-[#226D68]" />{profile.phone}</span>}
+                          {(profile.city || profile.country) && <span className="flex items-center gap-1 truncate"><MapPin className="h-3 w-3 shrink-0 text-[#226D68]" />{[profile.city, profile.country].filter(Boolean).join(', ')}</span>}
                               </div>
-                            )}
-                            {profile.phone && (
-                              <div className="flex items-center gap-2 text-sm text-[#6b7280] justify-center sm:justify-start">
-                                <Phone className="h-4 w-4 text-[#226D68] flex-shrink-0" />
-                                <span className="truncate">{profile.phone}</span>
-                              </div>
-                            )}
-                            {(profile.city || profile.country) && (
-                              <div className="flex items-center gap-2 text-sm text-[#6b7280] justify-center sm:justify-start">
-                                <MapPin className="h-4 w-4 text-[#226D68] flex-shrink-0" />
-                                <span className="truncate">{[profile.city, profile.country].filter(Boolean).join(', ')}</span>
-                              </div>
-                            )}
-                          </div>
                         </div>
                       </div>
 
-                      {/* Informations détaillées - Bento grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {profile.date_of_birth && (
-                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
-                                <Calendar className="h-4 w-4 text-[#226D68]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-[#6b7280] font-medium">Date de naissance</p>
-                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{new Date(profile.date_of_birth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                              </div>
-                            </div>
+                    {/* Barre récap + infos en lignes compactes */}
+                    {(profile.date_of_birth || profile.nationality || profile.sector || profile.main_job || profile.total_experience !== undefined) && (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3 text-sm">
+                        {profile.date_of_birth && <span className="flex items-center gap-1.5 text-[#6b7280]"><Calendar className="h-3.5 w-3.5 text-[#226D68]" />{new Date(profile.date_of_birth).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                        {profile.nationality && <span className="flex items-center gap-1.5 text-[#6b7280]"><Flag className="h-3.5 w-3.5 text-[#226D68]" />{profile.nationality}</span>}
+                        {profile.sector && <span className="flex items-center gap-1.5 text-[#6b7280]"><Briefcase className="h-3.5 w-3.5 text-[#226D68]" />{profile.sector}</span>}
+                        {profile.main_job && <span className="text-[#2C2C2C] font-medium">{profile.main_job}</span>}
+                        {profile.total_experience !== undefined && <span className="text-[#226D68] font-medium">{profile.total_experience} an{profile.total_experience > 1 ? 's' : ''} d&apos;exp.</span>}
                           </div>
                         )}
-                        {profile.nationality && (
-                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
-                                <Flag className="h-4 w-4 text-[#226D68]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-[#6b7280] font-medium">Nationalité</p>
-                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{profile.nationality}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {profile.sector && (
-                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
-                                <Briefcase className="h-4 w-4 text-[#226D68]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-[#6b7280] font-medium">Secteur d&apos;activité</p>
-                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{profile.sector}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {profile.main_job && (
-                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
-                                <Briefcase className="h-4 w-4 text-[#226D68]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-[#6b7280] font-medium">Métier principal</p>
-                                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{profile.main_job}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {profile.total_experience !== undefined && (
-                          <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-[#E8F4F3] rounded-lg">
-                                <TrendingUp className="h-4 w-4 text-[#226D68]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-[#6b7280] font-medium">Expérience</p>
-                                <p className="text-sm font-semibold text-[#2C2C2C]">{profile.total_experience} an{profile.total_experience > 1 ? 's' : ''}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
 
-                      {/* Résumé professionnel */}
+                    {/* Résumé professionnel compact */}
                       {profile.professional_summary && (
-                        <div className="pt-6 border-t border-gray-100">
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="p-2 bg-[#E8F4F3] rounded-lg">
-                              <FileText className="h-4 w-4 text-[#226D68]" />
-                            </div>
-                            <h4 className="text-sm font-semibold text-[#2C2C2C]">
-                              Résumé professionnel
-                            </h4>
-                          </div>
-                          <div 
-                            className="text-sm text-[#6b7280] leading-relaxed rich-text-content"
-                            dangerouslySetInnerHTML={{ __html: profile.professional_summary }}
-                          />
+                      <div className="pt-3 border-t border-gray-100">
+                        <p className="text-xs font-semibold text-[#2C2C2C] uppercase tracking-wide mb-1.5 flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-[#226D68]" /> Résumé professionnel</p>
+                        <div className="text-sm text-[#6b7280] leading-relaxed rich-text-content" dangerouslySetInnerHTML={{ __html: profile.professional_summary }} />
                         </div>
                       )}
-                    </div>
                   </div>
                 </div>
                 )}
               </TabsContent>
 
               <TabsContent value="experiences" className="mt-3">
-                <SectionHeader
-                  title="Mes expériences"
-                  subtitle="Parlez de vos expériences professionnelles. Elles renforcent votre crédibilité auprès des recruteurs une fois votre profil validé."
-                  icon={Briefcase}
-                  action={
-                    <Button
-                      size="sm"
-                      onClick={() => { setEditingExperience(null); setShowExperienceDialog(true) }}
-                      className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Ajouter
+                {/* En-tête compact */}
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h1 className="text-lg font-bold text-[#2C2C2C]">Mes expériences</h1>
+                  <Button size="sm" onClick={() => { setEditingExperience(null); setShowExperienceDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white shrink-0">
+                    <Plus className="h-4 w-4 mr-1.5" /> Ajouter
                     </Button>
-                  }
-                />
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div className="p-4 sm:p-6 min-w-0">
+                </div>
+
                       {experiences.length > 0 ? (
-                        <div className="space-y-4 min-w-0">
+                  <div className="space-y-4">
+                    {/* Barre récap compacte */}
+                    <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-[#E8F4F3]/50 border border-[#E8F4F3] text-sm">
+                      <span className="font-medium text-[#226D68]">{experiences.length} expérience{experiences.length > 1 ? 's' : ''}</span>
+                      {(() => {
+                        const sorted = [...experiences].sort((a, b) => {
+                          const getSortDate = (e) => {
+                            if (e.is_current) return new Date()
+                            if (e.end_date) return new Date(e.end_date)
+                            if (e.start_date) return new Date(e.start_date)
+                            return new Date(0)
+                          }
+                          return getSortDate(b).getTime() - getSortDate(a).getTime()
+                        })
+                        const latest = sorted[0]
+                        return latest ? <span className="text-[#6b7280] truncate">• Dernière : {latest.position} chez {latest.company_name}</span> : null
+                      })()}
+                    </div>
+
+                    {/* Liste compacte */}
+                    <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                      <div className="divide-y divide-gray-100">
                           {[...experiences]
                             .sort((a, b) => {
-                              const getSortDate = (exp) => {
-                                if (exp.is_current) return new Date()
-                                if (exp.end_date) return new Date(exp.end_date)
-                                if (exp.start_date) return new Date(exp.start_date)
+                            const getSortDate = (e) => {
+                              if (e.is_current) return new Date()
+                              if (e.end_date) return new Date(e.end_date)
+                              if (e.start_date) return new Date(e.start_date)
                                 return new Date(0)
                               }
                               return getSortDate(b).getTime() - getSortDate(a).getTime()
                             })
-                            .map((exp, index) => {
+                          .map((exp) => {
                             const defaultCompanyLogo = generateCompanyLogoUrl(exp.company_name)
                             const displayCompanyLogo = exp.company_logo_url || defaultCompanyLogo
-                            
+                            const dateLabel = exp.start_date
+                              ? `${new Date(exp.start_date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })} – ${exp.is_current ? 'Actuellement' : exp.end_date ? new Date(exp.end_date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }) : '…'}`
+                              : '—'
+                            const yearBadge = exp.is_current ? 'Actuel' : exp.end_date ? new Date(exp.end_date).getFullYear().toString().slice(-2) : exp.start_date ? new Date(exp.start_date).getFullYear().toString().slice(-2) : '—'
+                            const hasDetails = !!(exp.description || exp.achievements)
                             return (
-                              <div key={exp.id} className="w-full min-w-0 rounded-xl border border-gray-100 bg-[#F4F6F8]/30 hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5">
-                                  <div className="flex gap-4 items-start">
-                                    <div className="relative shrink-0">
-                                      <img
-                                        src={displayCompanyLogo}
-                                        alt={`Logo de ${exp.company_name}`}
-                                        className="w-12 h-12 rounded-xl object-cover border-2 border-[#E8F4F3] shadow-sm"
-                                        onError={(e) => {
-                                          if (e.target.src !== defaultCompanyLogo) {
-                                            e.target.src = defaultCompanyLogo
-                                          }
-                                        }}
-                                      />
-                                      {exp.is_current && (
-                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Contenu principal */}
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-start justify-between gap-2 mb-2">
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="font-bold text-sm sm:text-base text-[#2C2C2C] truncate mb-0.5 leading-tight">{exp.position}</h4>
-                                          <p className="text-sm font-semibold text-[#226D68] truncate mb-2">{exp.company_name}</p>
-                                          
-                                          {/* Métadonnées compactes */}
-                                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                                            {/* Date */}
-                                            <div className="flex items-center gap-1 text-[10px] text-gray-600 bg-[#E8F4F3] px-1.5 py-0.5 rounded">
-                                              <Calendar className="w-2.5 h-2.5 text-[#226D68]" />
-                                              <span className="font-medium">
-                                                {new Date(exp.start_date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}
-                                                {exp.end_date 
-                                                  ? ` - ${new Date(exp.end_date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}`
-                                                  : exp.is_current ? ' - Actuellement' : ''}
-                                              </span>
-                                            </div>
-                                            
-                                            {/* Type de contrat */}
-                                            {exp.contract_type && (
-                                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
-                                                {exp.contract_type}
-                                              </Badge>
-                                            )}
-                                            
-                                            {/* Secteur */}
-                                            {exp.company_sector && (
-                                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-[#226D68]/30 text-gray-700">
-                                                {exp.company_sector}
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        </div>
-                                        
-                                        {/* Actions - toujours visible sur mobile, hover sur desktop */}
-                                        <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                              setEditingExperience(exp)
-                                              setShowExperienceDialog(true)
-                                            }}
-                                            className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
-                                            title="Modifier"
-                                          >
-                                            <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDeleteExperience(exp.id)}
-                                            className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
-                                            title="Supprimer"
-                                          >
-                                            <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
-                                          </Button>
-                                        </div>
-                                      </div>
-
-                                      {/* Description */}
-                                      {exp.description && (
-                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3] min-w-0">
-                                          <div className="flex items-center gap-1 mb-1">
-                                            <div className="w-1 h-1 rounded-full bg-[#226D68]"></div>
-                                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Description</p>
-                                          </div>
-                                          <div 
-                                            className="text-xs text-gray-700 rich-text-content leading-relaxed break-words"
-                                            dangerouslySetInnerHTML={{ __html: exp.description }}
-                                          />
-                                        </div>
-                                      )}
-
-                                      {/* Réalisations */}
-                                      {exp.achievements && (
-                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3] min-w-0">
-                                          <div className="flex items-center gap-1 mb-1">
-                                            <div className="w-1 h-1 rounded-full bg-[#226D68]"></div>
-                                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Réalisations</p>
-                                          </div>
-                                          <div 
-                                            className="text-xs text-gray-700 rich-text-content leading-relaxed break-words"
-                                            dangerouslySetInnerHTML={{ __html: exp.achievements }}
-                                          />
-                                        </div>
-                                      )}
-
-                                      {/* Document justificatif */}
-                                      {exp.has_document && exp.document_id && (
-                                        <div className="mt-2 pt-2 border-t border-[#E8F4F3]">
-                                          <div className="flex items-center gap-1.5 text-[#226D68]">
-                                            <FileText className="h-3 w-3" />
-                                            <span className="text-[10px] font-medium">Pièce justificative disponible</span>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                              </div>
+                              <ExperienceRow
+                                key={exp.id}
+                                exp={exp}
+                                displayCompanyLogo={displayCompanyLogo}
+                                defaultCompanyLogo={defaultCompanyLogo}
+                                dateLabel={dateLabel}
+                                yearBadge={yearBadge}
+                                hasDetails={hasDetails}
+                                onEdit={() => { setEditingExperience(exp); setShowExperienceDialog(true) }}
+                                onDelete={() => handleDeleteExperience(exp.id)}
+                              />
                             )
                           })}
                         </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
-                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
-                            <Briefcase className="h-10 w-10 text-[#226D68]" />
                           </div>
-                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune expérience</p>
-                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Au moins une expérience requise pour soumettre votre profil à la validation.</p>
-                          <Button 
-                            size="sm"
-                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
-                            onClick={() => setShowExperienceDialog(true)}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Ajouter une expérience
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20 p-8 text-center">
+                    <Briefcase className="h-10 w-10 text-[#226D68] mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-[#2C2C2C] mb-1">Aucune expérience</p>
+                    <p className="text-xs text-[#6b7280] mb-3">Au moins une expérience requise pour la validation.</p>
+                    <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white" onClick={() => { setEditingExperience(null); setShowExperienceDialog(true) }}>
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Ajouter
                           </Button>
                         </div>
                       )}
-                  </div>
-                </div>
               </TabsContent>
 
-              <TabsContent value="educations" className="mt-4">
-                <SectionHeader
-                  title="Mes formations"
-                  subtitle="Diplômes et parcours académique. Au moins une formation est requise pour soumettre votre profil à la validation."
-                  icon={GraduationCap}
-                  action={
-                    <Button size="sm" onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
-                      <Plus className="h-4 w-4 mr-2" /> Ajouter
+              <TabsContent value="educations" className="mt-3">
+                {/* En-tête compact */}
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h1 className="text-lg font-bold text-[#2C2C2C]">Mes formations</h1>
+                  <Button size="sm" onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white shrink-0">
+                    <Plus className="h-4 w-4 mr-1.5" /> Ajouter
                     </Button>
-                  }
-                />
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  <div className="p-4 sm:p-6">
+                </div>
+
                     {educations.length > 0 ? (
                       <div className="space-y-4">
+                    {/* Barre récap compacte */}
+                    <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-[#E8F4F3]/50 border border-[#E8F4F3] text-sm">
+                      <span className="font-medium text-[#226D68]">{educations.length} formation{educations.length > 1 ? 's' : ''}</span>
+                      {(() => {
+                        const sorted = [...educations].sort((a, b) => {
+                          const getYear = (e) => Number(e.graduation_year) || Number(e.start_year) || 0
+                          return getYear(b) - getYear(a)
+                        })
+                        const latest = sorted[0]
+                        return latest ? <span className="text-[#6b7280] truncate">• Dernière : {latest.diploma || 'Formation'} ({latest.graduation_year || latest.start_year || '—'})</span> : null
+                      })()}
+                    </div>
+
+                    {/* Liste compacte */}
+                    <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                      <div className="divide-y divide-gray-100">
                         {[...educations]
                           .sort((a, b) => {
                             const getYear = (edu) => Number(edu.graduation_year) || Number(edu.start_year) || 0
                             return getYear(b) - getYear(a)
                           })
                           .map((edu) => {
-                            const duration = edu.start_year && edu.graduation_year 
-                              ? edu.graduation_year - edu.start_year 
-                              : null
-                            
+                            const yearLabel = edu.start_year ? `${edu.start_year} – ${edu.graduation_year || '…'}` : edu.graduation_year || '—'
                             return (
-                              <div
-                                key={edu.id}
-                                className="rounded-xl border border-gray-100 bg-[#F4F6F8] hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5"
-                              >
-                                <div className="flex items-start justify-between gap-2.5">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start gap-3">
-                                      <div className="w-10 h-10 rounded-xl bg-[#E8F4F3] flex items-center justify-center shrink-0 shadow-sm">
-                                        <GraduationCap className="h-5 w-5 text-[#226D68]" />
+                              <div key={edu.id} className="flex items-center justify-between gap-3 p-3 hover:bg-[#F8FAFC]/60 transition-colors group">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <div className="shrink-0 w-8 h-8 rounded-lg bg-[#E8F4F3] flex items-center justify-center text-xs font-bold text-[#226D68]">
+                                    {edu.graduation_year?.toString().slice(-2) || edu.start_year?.toString().slice(-2) || '—'}
                                       </div>
-                                      <div className="flex-1 min-w-0">
-                                        <h4 className="font-semibold text-sm sm:text-base text-[#2C2C2C] mb-0.5 group-hover:text-[#226D68] transition-colors truncate">
-                                          {edu.diploma}
-                                        </h4>
-                                        <p className="text-sm font-medium text-[#6b7280] truncate mb-2">{edu.institution}</p>
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          {edu.level && (
-                                            <Badge variant="secondary" className="bg-[#E8F4F3] text-[#1a5a55] border-[#B8DDD9] text-[10px] font-medium px-1.5 py-0 h-4">
-                                              {edu.level}
-                                            </Badge>
-                                          )}
-                                          {edu.country && (
-                                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                              <MapPin className="h-2.5 w-2.5 text-[#226D68]" />
-                                              <span>{edu.country}</span>
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-sm text-[#2C2C2C] truncate">{edu.diploma}</p>
+                                    <p className="text-xs text-[#6b7280] truncate">{edu.institution}</p>
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                      {edu.level && <span className="text-[10px] px-1.5 py-0 rounded bg-[#E8F4F3] text-[#1a5a55] font-medium">{edu.level}</span>}
+                                      {edu.country && <span className="text-[10px] text-[#6b7280]">{edu.country}</span>}
+                                      <span className="text-[10px] text-[#6b7280]">{yearLabel}</span>
                                             </div>
-                                          )}
-                                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                            <Calendar className="h-2.5 w-2.5 text-[#226D68]" />
-                                            <span>
-                                              {edu.start_year ? `${edu.start_year} - ${edu.graduation_year}` : edu.graduation_year}
-                                            </span>
-                                            {duration && duration > 0 && (
-                                              <span className="text-muted-foreground"> • {duration} an{duration > 1 ? 's' : ''}</span>
-                                            )}
                                           </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="sm" onClick={() => { setEditingEducation(edu); setShowEducationDialog(true) }} className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]">
-                                      <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteEducation(edu.id)} className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50">
-                                      <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
-                                    </Button>
-                                  </div>
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[#E8F4F3] text-[#226D68]" onClick={() => { setEditingEducation(edu); setShowEducationDialog(true) }}><Edit className="h-3 w-3" /></Button>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50 text-red-500" onClick={() => handleDeleteEducation(edu.id)}><Trash2 className="h-3 w-3" /></Button>
                                 </div>
                               </div>
                             )
                           })}
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
-                        <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
-                          <GraduationCap className="h-10 w-10 text-[#226D68]" />
                         </div>
-                        <h3 className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune formation</h3>
-                        <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Au moins une formation requise pour soumettre votre profil à la validation.</p>
-                        <Button 
-                          size="sm"
-                          onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }}
-                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Ajouter une formation
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20 p-8 text-center">
+                    <GraduationCap className="h-10 w-10 text-[#226D68] mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-[#2C2C2C] mb-1">Aucune formation</p>
+                    <p className="text-xs text-[#6b7280] mb-3">Au moins une formation requise pour la validation.</p>
+                    <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white" onClick={() => { setEditingEducation(null); setShowEducationDialog(true) }}>
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Ajouter
                         </Button>
                       </div>
                     )}
-                  </div>
-                </div>
               </TabsContent>
 
               <TabsContent value="certifications" className="mt-3">
-                <SectionHeader
-                  title="Mes certifications"
-                  subtitle="Certifications et attestations. Optionnel mais valorisant pour votre profil dans la CVthèque."
-                  icon={Award}
-                  action={
-                    <Button size="sm" onClick={() => { setEditingCertification(null); setShowCertificationDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
-                      <Plus className="h-4 w-4 mr-2" /> Ajouter
-                    </Button>
-                  }
-                />
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  <div className="p-4 sm:p-6">
-                      {certifications.length > 0 ? (
-                        <div className="space-y-4">
-                          {certifications.map((cert) => (
-                            <div key={cert.id} className="rounded-xl border border-gray-100 bg-[#F4F6F8]/30 hover:border-[#E8F4F3] hover:shadow-md transition-all group p-4 sm:p-5">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start gap-3">
-                                      <div className="w-10 h-10 rounded-xl bg-[#E8F4F3] flex items-center justify-center shrink-0 shadow-sm">
-                                        <Award className="h-5 w-5 text-[#226D68]" />
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <h4 className="font-semibold text-sm sm:text-base text-[#2C2C2C] truncate mb-0.5 group-hover:text-[#226D68] transition-colors">{cert.title}</h4>
-                                        <p className="text-sm font-medium text-[#6b7280] truncate mb-2">{cert.issuer}</p>
-                                        
-                                        {/* Métadonnées compactes */}
-                                        <div className="flex flex-wrap items-center gap-1">
-                                          <div className="flex items-center gap-0.5 text-[9px] text-gray-600 bg-[#E8F4F3] px-1 py-0.5 rounded">
-                                            <Calendar className="w-2 h-2 text-[#226D68]" />
-                                            <span className="font-medium">{cert.year}</span>
-                                          </div>
-                                          {cert.expiration_date && (
-                                            <div className="flex items-center gap-0.5 text-[9px] text-[#226D68] bg-[#E8F4F3] px-1 py-0.5 rounded">
-                                              <Clock className="w-2 h-2" />
-                                              <span className="font-medium">Expire {new Date(cert.expiration_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                            </div>
-                                          )}
-                                          {cert.certification_id && (
-                                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-[#226D68]/30 text-gray-700">
-                                              ID: {cert.certification_id}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        
-                                        {/* Lien de vérification */}
-                                        {cert.verification_url && (
-                                          <div className="mt-1.5 pt-1.5 border-t border-[#E8F4F3]">
-                                            <a 
-                                              href={cert.verification_url} 
-                                              target="_blank" 
-                                              rel="noopener noreferrer" 
-                                              className="text-[9px] text-[#226D68] hover:underline inline-flex items-center gap-1 font-medium"
-                                            >
-                                              <Eye className="h-2.5 w-2.5" />
-                                              Lien de vérification
-                                            </a>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Actions - toujours visible sur mobile */}
-                                  <div className="flex items-center gap-1 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingCertification(cert)
-                                        setShowCertificationDialog(true)
-                                      }}
-                                      className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
-                                      title="Modifier"
-                                    >
-                                      <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteCertification(cert.id)}
-                                      className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
-                                      title="Supprimer"
-                                    >
-                                      <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
-                                    </Button>
+                {/* En-tête compact */}
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h1 className="text-lg font-bold text-[#2C2C2C]">Mes certifications</h1>
+                  <Button size="sm" onClick={() => { setEditingCertification(null); setShowCertificationDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white shrink-0">
+                    <Plus className="h-4 w-4 mr-1.5" /> Ajouter
+                  </Button>
+                </div>
+
+                {certifications.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Barre récap compacte */}
+                    <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-[#E8F4F3]/50 border border-[#E8F4F3] text-sm">
+                      <span className="font-medium text-[#226D68]">{certifications.length} certification{certifications.length > 1 ? 's' : ''}</span>
+                      {certifications.length > 0 && (() => {
+                        const latest = [...certifications].sort((a, b) => (b.year || 0) - (a.year || 0))[0]
+                        return latest ? <span className="text-[#6b7280] truncate">• Dernière : {latest.title} ({latest.year})</span> : null
+                      })()}
+                    </div>
+
+                    {/* Liste compacte */}
+                    <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                      <div className="divide-y divide-gray-100">
+                        {[...certifications]
+                          .sort((a, b) => (b.year || 0) - (a.year || 0))
+                          .map((cert) => (
+                            <div key={cert.id} className="flex items-center justify-between gap-3 p-3 hover:bg-[#F8FAFC]/60 transition-colors group">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-9 h-9 rounded-lg bg-[#E8F4F3] flex items-center justify-center shrink-0">
+                                  <Award className="h-4 w-4 text-[#226D68]" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-sm text-[#2C2C2C] truncate">{cert.title}</p>
+                                  <p className="text-xs text-[#6b7280] truncate">{cert.issuer}</p>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] px-1.5 py-0 rounded bg-[#E8F4F3] text-[#1a5a55] font-medium">{cert.year}</span>
+                                    {cert.expiration_date && <span className="text-[10px] text-[#6b7280]">Expire {new Date(cert.expiration_date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })}</span>}
+                                    {cert.certification_id && <span className="text-[10px] text-[#6b7280]">ID: {cert.certification_id}</span>}
+                                    {cert.verification_url && (
+                                      <a href={cert.verification_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#226D68] hover:underline inline-flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                        <Eye className="h-3 w-3" /> Vérifier
+                                      </a>
+                                    )}
                                   </div>
                                 </div>
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[#E8F4F3] text-[#226D68]" onClick={() => { setEditingCertification(cert); setShowCertificationDialog(true) }}><Edit className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50 text-red-500" onClick={() => handleDeleteCertification(cert.id)}><Trash2 className="h-3 w-3" /></Button>
+                              </div>
                             </div>
                           ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
-                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
-                            <Award className="h-10 w-10 text-[#226D68]" />
-                          </div>
-                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune certification</p>
-                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Optionnel mais valorisant pour votre profil dans la CVthèque.</p>
-                          <Button 
-                            size="sm"
-                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
-                            onClick={() => setShowCertificationDialog(true)}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Ajouter une certification
-                          </Button>
-                        </div>
-                      )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20 p-8 text-center">
+                    <Award className="h-10 w-10 text-[#226D68] mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-[#2C2C2C] mb-1">Aucune certification</p>
+                    <p className="text-xs text-[#6b7280] mb-3">Optionnel mais valorisant pour votre profil.</p>
+                    <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white" onClick={() => { setEditingCertification(null); setShowCertificationDialog(true) }}>
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Ajouter
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="skills" className="mt-3">
-                <SectionHeader
-                  title="Mes compétences"
-                  subtitle="Compétences techniques et transversales. Un profil complet augmente vos chances d'être contacté par les recruteurs."
-                  icon={Code}
-                  action={
-                    <Button size="sm" onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
-                      <Plus className="h-4 w-4 mr-2" /> Ajouter
+                {/* En-tête compact */}
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h1 className="text-lg font-bold text-[#2C2C2C]">Mes compétences</h1>
+                  <Button size="sm" onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }} className="bg-[#226D68] hover:bg-[#1a5a55] text-white shrink-0">
+                    <Plus className="h-4 w-4 mr-1.5" /> Ajouter
                     </Button>
-                  }
-                />
+                </div>
 
-                {/* Liste des compétences */}
-                {(() => {
-                  // Grouper par type
+                {skills.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20 p-8 text-center">
+                    <Code className="h-10 w-10 text-[#226D68] mx-auto mb-3" />
+                    <p className="text-sm font-semibold text-[#2C2C2C] mb-1">Aucune compétence</p>
+                    <p className="text-xs text-[#6b7280] mb-3">Au moins une compétence technique requise.</p>
+                    <Button size="sm" className="bg-[#226D68] hover:bg-[#1a5a55] text-white" onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }}>
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Ajouter
+                    </Button>
+                  </div>
+                ) : (
+                  (() => {
                   const technicalSkills = skills.filter(s => s.skill_type === 'TECHNICAL')
                   const softSkills = skills.filter(s => s.skill_type === 'SOFT')
                   const toolSkills = skills.filter(s => s.skill_type === 'TOOL')
-                  
-                  const getLevelColor = (level) => {
-                    switch(level) {
-                      case 'EXPERT': return { bg: 'bg-[#226D68]', text: 'text-[#1a5a55]', border: 'border-[#226D68]' }
-                      case 'ADVANCED': return { bg: 'bg-[#226D68]/80', text: 'text-[#1a5a55]', border: 'border-[#226D68]/80' }
-                      case 'INTERMEDIATE': return { bg: 'bg-[#226D68]/60', text: 'text-[#1a5a55]', border: 'border-[#226D68]/60' }
-                      case 'BEGINNER': return { bg: 'bg-[#226D68]/40', text: 'text-[#1a5a55]', border: 'border-[#226D68]/40' }
-                      default: return { bg: 'bg-gray-400', text: 'text-gray-700', border: 'border-gray-300' }
-                    }
-                  }
-                  
-                  const getLevelProgress = (level) => {
-                    switch(level) {
-                      case 'EXPERT': return 100
-                      case 'ADVANCED': return 75
-                      case 'INTERMEDIATE': return 50
-                      case 'BEGINNER': return 25
-                      default: return 0
-                    }
-                  }
-                  
-                  const getLevelLabel = (level) => {
-                    switch(level) {
-                      case 'EXPERT': return 'Expert'
-                      case 'ADVANCED': return 'Avancé'
-                      case 'INTERMEDIATE': return 'Intermédiaire'
-                      case 'BEGINNER': return 'Débutant'
-                      default: return ''
-                    }
-                  }
-                  
-                  if (skills.length === 0) {
-                    return (
-                      <div className="rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20 p-12 sm:p-16">
-                        <div className="flex flex-col items-center justify-center text-center">
-                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
-                            <Code className="h-10 w-10 text-[#226D68]" />
-                          </div>
-                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Aucune compétence</p>
-                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Au moins une compétence technique requise pour soumettre votre profil.</p>
-                          <Button 
-                            size="sm"
-                            onClick={() => { setEditingSkill(null); setShowSkillDialog(true) }}
-                            className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Ajouter ma première compétence
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  }
-                  
-                  return (
-                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                      <div className="space-y-6 p-4 sm:p-6">
-                      {/* Compétences Techniques */}
-                      {technicalSkills.length > 0 && (
-                        <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 overflow-hidden">
-                          <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-[#E8F4F3]/30">
-                            <div className="p-2 bg-[#226D68] rounded-lg">
-                              <Code className="h-4 w-4 text-white" />
-                            </div>
-                            <div>
-                              <h3 className="text-sm font-semibold text-[#2C2C2C]">Compétences techniques</h3>
-                              <p className="text-xs text-[#6b7280]">{technicalSkills.length} compétence{technicalSkills.length > 1 ? 's' : ''}</p>
-                            </div>
-                          </div>
-                          <div className="p-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {technicalSkills.map((skill) => {
-                                const levelColors = getLevelColor(skill.level || 'BEGINNER')
-                                return (
-                                  <div
-                                    key={skill.id}
-                                    className="group relative bg-white border border-gray-100 rounded-xl p-4 hover:border-[#E8F4F3] hover:shadow-md transition-all duration-200"
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
+                    const getLevelProgress = (level) => ({ EXPERT: 100, ADVANCED: 75, INTERMEDIATE: 50, BEGINNER: 25 }[level] || 0)
+                    const getLevelLabel = (level) => ({ EXPERT: 'Expert', ADVANCED: 'Avancé', INTERMEDIATE: 'Interm.', BEGINNER: 'Débutant' }[level] || '')
+
+                    const SkillCard = ({ skill, onEdit, onDelete }) => (
+                      <div className="rounded-lg border border-gray-100 bg-white p-3 hover:border-[#E8F4F3] transition-all group flex items-center justify-between gap-2">
                                       <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-sm text-[#2C2C2C] break-words mb-1">
-                                          {skill.name}
-                                        </h4>
+                          <p className="font-medium text-sm text-[#2C2C2C] truncate">{skill.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
                                         {skill.level && (
-                                          <div className="space-y-1">
-                                            <div className="flex items-center justify-between gap-2">
-                                              <span className={`text-[10px] font-medium ${levelColors.text}`}>
-                                                {getLevelLabel(skill.level)}
-                                              </span>
-                                              <span className="text-[10px] text-muted-foreground">
-                                                {getLevelProgress(skill.level)}%
-                                              </span>
+                              <>
+                                <span className="text-[10px] font-medium text-[#226D68]">{getLevelLabel(skill.level)}</span>
+                                <div className="flex-1 max-w-[60px] h-1 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-[#226D68] rounded-full" style={{ width: `${getLevelProgress(skill.level)}%` }} />
                                             </div>
-                                            <div className="h-1 bg-muted rounded-full overflow-hidden">
-                                              <div 
-                                                className={`h-full ${levelColors.bg} transition-all duration-300`}
-                                                style={{ width: `${getLevelProgress(skill.level)}%` }}
-                                              />
-                                            </div>
-                                          </div>
+                              </>
                                         )}
                                         {skill.years_of_practice > 0 && (
-                                          <div className="flex items-center gap-1 mt-1.5">
-                                            <Calendar className="h-2.5 w-2.5 text-muted-foreground" />
-                                            <span className="text-[10px] text-muted-foreground">
-                                              {skill.years_of_practice} an{skill.years_of_practice > 1 ? 's' : ''}
-                                            </span>
-                                          </div>
+                              <span className="text-[10px] text-[#6b7280]">{skill.years_of_practice} an{skill.years_of_practice > 1 ? 's' : ''}</span>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
-                                          onClick={() => {
-                                            setEditingSkill(skill)
-                                            setShowSkillDialog(true)
-                                          }}
-                                        >
-                                          <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
-                                          onClick={() => handleDeleteSkill(skill.id)}
-                                        >
-                                          <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
-                                        </Button>
                                       </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[#E8F4F3] text-[#226D68]" onClick={() => onEdit(skill)}><Edit className="h-3 w-3" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50 text-red-500" onClick={() => onDelete(skill.id)}><Trash2 className="h-3 w-3" /></Button>
                                     </div>
                                   </div>
                                 )
-                              })}
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Barre récap compacte */}
+                        <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-[#E8F4F3]/50 border border-[#E8F4F3] text-sm">
+                          <span className="font-medium text-[#226D68]">{skills.length} compétence{skills.length > 1 ? 's' : ''}</span>
+                          {technicalSkills.length > 0 && <span className="text-[#6b7280]">• {technicalSkills.length} technique{technicalSkills.length > 1 ? 's' : ''}</span>}
+                          {softSkills.length > 0 && <span className="text-[#6b7280]">• {softSkills.length} soft</span>}
+                          {toolSkills.length > 0 && <span className="text-[#6b7280]">• {toolSkills.length} outil{toolSkills.length > 1 ? 's' : ''}</span>}
                             </div>
+
+                        {/* Compétences techniques */}
+                        {technicalSkills.length > 0 && (
+                          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                            <div className="px-3 py-2 bg-[#F8FAFC] border-b border-gray-100 flex items-center gap-2">
+                              <Code className="h-3.5 w-3.5 text-[#226D68]" />
+                              <span className="text-xs font-semibold text-[#2C2C2C]">Techniques</span>
+                            </div>
+                            <div className="p-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                {technicalSkills.map((skill) => (
+                                  <SkillCard key={skill.id} skill={skill} onEdit={(s) => { setEditingSkill(s); setShowSkillDialog(true) }} onDelete={handleDeleteSkill} />
+                                ))}
+                              </div>
                           </div>
                         </div>
                       )}
 
-                      {/* Soft Skills */}
+                        {/* Soft skills */}
                       {softSkills.length > 0 && (
-                        <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 overflow-hidden">
-                          <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-[#E8F4F3]/30">
-                            <div className="p-2 bg-[#226D68] rounded-lg">
-                              <Sparkles className="h-4 w-4 text-white" />
+                          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                            <div className="px-3 py-2 bg-[#F8FAFC] border-b border-gray-100 flex items-center gap-2">
+                              <Sparkles className="h-3.5 w-3.5 text-[#226D68]" />
+                              <span className="text-xs font-semibold text-[#2C2C2C]">Soft skills</span>
                             </div>
-                            <div>
-                              <h3 className="text-sm font-semibold text-[#2C2C2C]">Soft Skills</h3>
-                              <p className="text-xs text-[#6b7280]">{softSkills.length} compétence{softSkills.length > 1 ? 's' : ''}</p>
-                            </div>
-                          </div>
-                          <div className="p-4">
+                            <div className="p-3">
                             <div className="flex flex-wrap gap-2">
                               {softSkills.map((skill) => (
-                                <div
-                                  key={skill.id}
-                                  className="group relative bg-[#E8F4F3]/50 border border-[#E8F4F3] rounded-xl px-4 py-2.5 hover:border-[#226D68]/50 hover:shadow-sm transition-all duration-200 flex items-center gap-2 min-w-0"
-                                >
-                                  <Sparkles className="h-4 w-4 text-[#226D68] shrink-0" />
-                                  <span className="font-medium text-sm text-[#2C2C2C] break-words min-w-0">
-                                    {skill.name}
-                                  </span>
-                                  <div className="flex items-center gap-0.5 ml-1 shrink-0">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 w-7 sm:h-5 sm:w-5 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
-                                      onClick={() => {
-                                        setEditingSkill(skill)
-                                        setShowSkillDialog(true)
-                                      }}
-                                    >
-                                      <Edit className="h-3.5 w-3.5 sm:h-2.5 sm:w-2.5 text-[#226D68]" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 w-7 sm:h-5 sm:w-5 p-0 hover:bg-red-50 active:bg-red-50"
-                                      onClick={() => handleDeleteSkill(skill.id)}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 sm:h-2.5 sm:w-2.5 text-red-500" />
-                                    </Button>
-                                  </div>
+                                  <div key={skill.id} className="flex items-center gap-1.5 rounded-md border border-gray-100 bg-white px-2.5 py-1.5 hover:border-[#E8F4F3] transition-all group">
+                                    <span className="text-xs font-medium text-[#2C2C2C]">{skill.name}</span>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-[#E8F4F3] text-[#226D68]" onClick={() => { setEditingSkill(skill); setShowSkillDialog(true) }}><Edit className="h-2.5 w-2.5" /></Button>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-red-50 text-red-500" onClick={() => handleDeleteSkill(skill.id)}><Trash2 className="h-2.5 w-2.5" /></Button>
                                 </div>
                               ))}
                             </div>
@@ -2791,207 +2549,203 @@ export default function CandidateDashboard() {
                         </div>
                       )}
 
-                      {/* Outils & Logiciels */}
+                        {/* Outils */}
                       {toolSkills.length > 0 && (
-                        <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 overflow-hidden">
-                          <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-[#E8F4F3]/30">
-                            <div className="p-2 bg-[#226D68] rounded-lg">
-                              <Wrench className="h-4 w-4 text-white" />
+                          <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                            <div className="px-3 py-2 bg-[#F8FAFC] border-b border-gray-100 flex items-center gap-2">
+                              <Wrench className="h-3.5 w-3.5 text-[#226D68]" />
+                              <span className="text-xs font-semibold text-[#2C2C2C]">Outils & Logiciels</span>
                             </div>
-                            <div>
-                              <h3 className="text-sm font-semibold text-[#2C2C2C]">Outils & Logiciels</h3>
-                              <p className="text-xs text-[#6b7280]">{toolSkills.length} outil{toolSkills.length > 1 ? 's' : ''}</p>
+                            <div className="p-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                {toolSkills.map((skill) => (
+                                  <SkillCard key={skill.id} skill={skill} onEdit={(s) => { setEditingSkill(s); setShowSkillDialog(true) }} onDelete={handleDeleteSkill} />
+                                ))}
                             </div>
-                          </div>
-                          <div className="p-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {toolSkills.map((skill) => {
-                                const levelColors = getLevelColor(skill.level || 'BEGINNER')
-                                return (
-                                  <div
-                                    key={skill.id}
-                                    className="group relative bg-white border border-gray-100 rounded-xl p-4 hover:border-[#E8F4F3] hover:shadow-md transition-all duration-200"
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="flex-1 min-w-0">
-                                        <h4 className="font-medium text-sm text-[#2C2C2C] break-words mb-1">
-                                          {skill.name}
-                                        </h4>
-                                        {skill.level && (
-                                          <div className="space-y-1">
-                                            <div className="flex items-center justify-between gap-2">
-                                              <span className={`text-[10px] font-medium ${levelColors.text}`}>
-                                                {getLevelLabel(skill.level)}
-                                              </span>
-                                              <span className="text-[10px] text-muted-foreground">
-                                                {getLevelProgress(skill.level)}%
-                                              </span>
-                                            </div>
-                                            <div className="h-1 bg-muted rounded-full overflow-hidden">
-                                              <div 
-                                                className={`h-full ${levelColors.bg} transition-all duration-300`}
-                                                style={{ width: `${getLevelProgress(skill.level)}%` }}
-                                              />
                                             </div>
                                           </div>
                                         )}
-                                        {skill.years_of_practice > 0 && (
-                                          <div className="flex items-center gap-1 mt-1.5">
-                                            <Calendar className="h-2.5 w-2.5 text-muted-foreground" />
-                                            <span className="text-[10px] text-muted-foreground">
-                                              {skill.years_of_practice} an{skill.years_of_practice > 1 ? 's' : ''}
-                                            </span>
                                           </div>
-                                        )}
+                    )
+                  })()
+                )}
+              </TabsContent>
+
+              <TabsContent value="preferences" className="mt-3">
+                {/* En-tête Ma situation - redesign */}
+                <div className="mb-6 sm:mb-8">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div>
+                      <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] font-heading tracking-tight">Ma situation</h1>
+                      <p className="mt-1 text-sm text-[#6b7280] max-w-2xl">
+                        Postes recherchés, types de contrat, localisation et disponibilité. Ces critères aident les recruteurs à vous trouver dans la CVthèque.
+                      </p>
                                       </div>
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-[#E8F4F3] active:bg-[#E8F4F3]"
-                                          onClick={() => {
-                                            setEditingSkill(skill)
-                                            setShowSkillDialog(true)
-                                          }}
-                                        >
-                                          <Edit className="h-4 w-4 sm:h-3 sm:w-3 text-[#226D68]" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 hover:bg-red-50 active:bg-red-50"
-                                          onClick={() => handleDeleteSkill(skill.id)}
-                                        >
-                                          <Trash2 className="h-4 w-4 sm:h-3 sm:w-3 text-red-500" />
+                    <Button size="sm" onClick={() => setShowPreferencesDialog(true)} className="bg-[#226D68] hover:bg-[#1a5a55] text-white shrink-0">
+                      <Edit className="h-4 w-4 mr-2" /> Modifier
                                         </Button>
                                       </div>
                                     </div>
+
+                {jobPreferences ? (
+                  <div className="space-y-6">
+                    {/* Bandeau récapitulatif (si disponibilité renseignée) */}
+                    {jobPreferences.availability && (
+                      <div className="rounded-2xl bg-gradient-to-r from-[#226D68] to-[#1a5a55] p-5 sm:p-6 text-white shadow-lg">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-3 bg-white/20 rounded-xl">
+                              <Calendar className="h-6 w-6" />
                                   </div>
-                                )
-                              })}
+                            <div>
+                              <p className="text-sm font-medium text-white/90">Disponibilité</p>
+                              <p className="text-lg font-bold">
+                                {jobPreferences.availability === 'immediate' ? 'Immédiate' :
+                                 jobPreferences.availability === '1_week' ? 'Sous 1 semaine' :
+                                 jobPreferences.availability === '2_weeks' ? 'Sous 2 semaines' :
+                                 jobPreferences.availability === '1_month' ? 'Sous 1 mois' :
+                                 jobPreferences.availability === '2_months' ? 'Sous 2 mois' :
+                                 jobPreferences.availability === '3_months' ? 'Sous 3 mois' :
+                                 jobPreferences.availability === 'negotiable' ? 'À négocier' :
+                                 jobPreferences.availability}
+                              </p>
                             </div>
                           </div>
+                          {(jobPreferences.salary_min || jobPreferences.salary_max) && (
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-white/90">Prétentions salariales</p>
+                              <p className="text-lg font-bold">
+                                {jobPreferences.salary_min && jobPreferences.salary_max
+                                  ? `${jobPreferences.salary_min.toLocaleString('fr-FR')} - ${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`
+                                  : jobPreferences.salary_min
+                                  ? `${jobPreferences.salary_min.toLocaleString('fr-FR')} CFA/mois`
+                                  : `${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`}
+                              </p>
                         </div>
                       )}
                       </div>
                     </div>
-                  )
-                })()}
-              </TabsContent>
+                    )}
 
-              <TabsContent value="preferences" className="mt-3">
-                <SectionHeader
-                  title="Ma situation"
-                  subtitle="Postes recherchés, types de contrat, localisation et disponibilité. Ces critères aident les recruteurs à vous trouver dans la CVthèque."
-                  icon={Search}
-                  action={
-                    <Button size="sm" onClick={() => setShowPreferencesDialog(true)} className="bg-[#226D68] hover:bg-[#1a5a55] text-white">
-                      <Edit className="h-4 w-4 mr-2" /> Modifier
-                    </Button>
-                  }
-                />
-                <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  <div className="p-4 sm:p-6">
-                      {jobPreferences ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Section Votre recherche */}
+                    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <div className="px-5 py-4 bg-[#F8FAFC] border-b border-gray-100">
+                        <h2 className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                          <Target className="h-4 w-4 text-[#226D68]" />
+                          Votre recherche
+                        </h2>
+                        <p className="text-xs text-[#6b7280] mt-0.5">Postes, secteurs et localisation souhaités</p>
+                      </div>
+                      <div className="p-5 sm:p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Postes recherchés */}
                           {jobPreferences.desired_positions?.length > 0 && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
                                     <Briefcase className="h-4 w-4 text-[#226D68]" />
-                                  </div>
-                                  <p className="text-xs font-semibold text-[#6b7280]">Postes recherchés</p>
-                                </div>
+                                Postes recherchés
+                              </p>
                                 <div className="flex flex-wrap gap-2">
                                   {jobPreferences.desired_positions.map((pos, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                  <Badge key={idx} className="text-sm px-3 py-1 bg-[#E8F4F3] text-[#1a5a55] border-0 font-medium">
                                       {pos}
                                     </Badge>
                                   ))}
                                 </div>
                             </div>
                           )}
-                          
                           {/* Types de contrat */}
                           {(jobPreferences.contract_types?.length > 0 || jobPreferences.contract_type) && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="p-2 bg-[#E8F4F3] rounded-lg">
+                            <div className="space-y-2">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
                                     <FileText className="h-4 w-4 text-[#226D68]" />
-                                  </div>
-                                  <p className="text-xs font-semibold text-[#6b7280]">Type(s) de contrat</p>
-                                </div>
+                                Type(s) de contrat
+                              </p>
                                 <div className="flex flex-wrap gap-2">
                                   {jobPreferences.contract_types?.length > 0
                                     ? jobPreferences.contract_types.map((type, idx) => (
-                                        <Badge key={idx} variant="secondary" className="text-xs px-2 py-0.5 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                      <Badge key={idx} className="text-sm px-3 py-1 bg-[#E8F4F3] text-[#1a5a55] border-0 font-medium">
                                           {type}
                                         </Badge>
                                       ))
-                                    : <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                  : <Badge className="text-sm px-3 py-1 bg-[#E8F4F3] text-[#1a5a55] border-0 font-medium">
                                           {jobPreferences.contract_type}
                                         </Badge>
                                   }
                                 </div>
                             </div>
                           )}
-                          
                           {/* Secteurs ciblés */}
                           {jobPreferences.target_sectors?.length > 0 && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-1 mb-1.5">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <TrendingUp className="h-2.5 w-2.5 text-white" />
-                                  </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Secteurs ciblés</p>
-                                </div>
-                                <div className="flex flex-wrap gap-0.5">
+                            <div className="space-y-2 md:col-span-2">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-[#226D68]" />
+                                Secteurs ciblés
+                              </p>
+                              <div className="flex flex-wrap gap-2">
                                   {jobPreferences.target_sectors.map((sector, idx) => (
-                                    <Badge key={idx} variant="secondary" className="text-[9px] px-1 py-0 h-4 bg-[#226D68]/10 text-[#226D68] border border-[#226D68]/20 font-medium">
+                                  <Badge key={idx} className="text-sm px-3 py-1 bg-[#E8F4F3] text-[#1a5a55] border-0 font-medium">
                                       {sector}
                                     </Badge>
                                   ))}
                                 </div>
                             </div>
                           )}
-                          
-                          {/* Localisation souhaitée */}
+                          {/* Localisation */}
                           {jobPreferences.desired_location && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <MapPin className="h-2.5 w-2.5 text-white" />
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-[#226D68]" />
+                                Localisation souhaitée
+                              </p>
+                              <p className="text-sm font-medium text-[#2C2C2C]">{jobPreferences.desired_location}</p>
                                   </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Localisation</p>
+                          )}
+                          {/* Zones préférées */}
+                          {jobPreferences.preferred_locations && (
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-[#226D68]" />
+                                Zones préférées
+                              </p>
+                              <p className="text-sm font-medium text-[#2C2C2C]">{jobPreferences.preferred_locations}</p>
                                 </div>
-                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.desired_location}</p>
+                          )}
+                          {/* Mobilité / Prêt à déménager */}
+                          {(jobPreferences.mobility || jobPreferences.willing_to_relocate) && (
+                            <div className="space-y-1 md:col-span-2">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-[#226D68]" />
+                                Mobilité
+                              </p>
+                              <p className="text-sm font-medium text-[#2C2C2C]">
+                                {jobPreferences.willing_to_relocate ? 'Prêt(e) à déménager' : jobPreferences.mobility}
+                              </p>
                             </div>
                           )}
-                          
-                          {/* Mobilité */}
-                          {jobPreferences.mobility && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <MapPin className="h-2.5 w-2.5 text-white" />
                                   </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Mobilité</p>
                                 </div>
-                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.mobility}</p>
                             </div>
-                          )}
-                          
-                          {/* Disponibilité */}
+
+                    {/* Section Vos conditions */}
+                    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <div className="px-5 py-4 bg-[#F8FAFC] border-b border-gray-100">
+                        <h2 className="text-sm font-semibold text-[#2C2C2C] flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-[#226D68]" />
+                          Vos conditions
+                        </h2>
+                        <p className="text-xs text-[#6b7280] mt-0.5">Disponibilité, télétravail et rémunération</p>
+                                  </div>
+                      <div className="p-5 sm:p-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {/* Disponibilité (détail, le bandeau en haut donne la vue d'ensemble) */}
                           {jobPreferences.availability && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <Calendar className="h-2.5 w-2.5 text-white" />
-                                  </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Disponibilité</p>
-                                </div>
-                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-[#226D68]" />
+                                Disponibilité
+                              </p>
+                              <p className="text-sm font-medium text-[#2C2C2C]">
                                   {jobPreferences.availability === 'immediate' ? 'Immédiate' :
                                    jobPreferences.availability === '1_week' ? 'Sous 1 semaine' :
                                    jobPreferences.availability === '2_weeks' ? 'Sous 2 semaines' :
@@ -3003,90 +2757,61 @@ export default function CandidateDashboard() {
                                 </p>
                             </div>
                           )}
-                          
                           {/* Télétravail */}
                           {jobPreferences.remote_preference && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <MapPin className="h-2.5 w-2.5 text-white" />
-                                  </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Télétravail</p>
-                                </div>
-                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
+                                <Building2 className="h-4 w-4 text-[#226D68]" />
+                                Télétravail
+                              </p>
+                              <p className="text-sm font-medium text-[#2C2C2C]">
                                   {jobPreferences.remote_preference === 'onsite' ? 'Sur site uniquement' :
-                                   jobPreferences.remote_preference === 'hybrid' ? 'Hybride' :
+                                 jobPreferences.remote_preference === 'hybrid' ? 'Hybride (présentiel + télétravail)' :
                                    jobPreferences.remote_preference === 'remote' ? 'Télétravail complet' :
-                                   jobPreferences.remote_preference === 'flexible' ? 'Flexible' :
+                                 jobPreferences.remote_preference === 'flexible' ? 'Flexible / Indifférent' :
                                    jobPreferences.remote_preference}
                                 </p>
                             </div>
                           )}
-                          
-                          {/* Zones préférées */}
-                          {jobPreferences.preferred_locations && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <MapPin className="h-2.5 w-2.5 text-white" />
-                                  </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Zones préférées</p>
-                                </div>
-                                <p className="font-semibold text-[10px] text-gray-900 leading-tight">{jobPreferences.preferred_locations}</p>
-                            </div>
-                          )}
-                          
-                          {/* Prêt à déménager */}
-                          {jobPreferences.willing_to_relocate && (
-                            <div className="rounded-xl border border-gray-100 bg-[#F4F6F8]/50 p-4 hover:border-[#E8F4F3] transition-colors">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <div className="p-0.5 bg-[#226D68] rounded">
-                                    <MapPin className="h-2.5 w-2.5 text-white" />
-                                  </div>
-                                  <p className="text-[9px] font-semibold text-gray-600 uppercase tracking-wider">Mobilité</p>
-                                </div>
-                                <p className="font-semibold text-[10px] text-[#226D68] leading-tight">Prêt(e) à déménager</p>
-                            </div>
-                          )}
-                          
-                          {/* Prétentions salariales */}
-                          {(jobPreferences.salary_min || jobPreferences.salary_max) && (
-                            <div className="rounded-xl border border-gray-100 bg-[#E8F4F3]/30 p-4 hover:border-[#E8F4F3] transition-colors sm:col-span-2 lg:col-span-3">
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="p-2 bg-[#226D68] rounded-lg">
-                                  <TrendingUp className="h-4 w-4 text-white" />
-                                </div>
-                                <p className="text-xs font-semibold text-[#6b7280]">Prétentions salariales</p>
-                              </div>
-                              <p className="font-bold text-base text-[#226D68]">
+                          {/* Prétentions salariales (dans le bandeau si disponibilité, sinon ici) */}
+                          {(jobPreferences.salary_min || jobPreferences.salary_max) && !jobPreferences.availability && (
+                            <div className="space-y-1 sm:col-span-2 lg:col-span-3">
+                              <p className="text-xs font-semibold text-[#6b7280] uppercase tracking-wider flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-[#226D68]" />
+                                Prétentions salariales
+                              </p>
+                              <p className="text-base font-bold text-[#226D68]">
                                   {jobPreferences.salary_min && jobPreferences.salary_max
                                     ? `${jobPreferences.salary_min.toLocaleString('fr-FR')} - ${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`
                                     : jobPreferences.salary_min
-                                    ? `${jobPreferences.salary_min.toLocaleString('fr-FR')} CFA/mois`
-                                    : `${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`}
+                                  ? `À partir de ${jobPreferences.salary_min.toLocaleString('fr-FR')} CFA/mois`
+                                  : `Jusqu'à ${jobPreferences.salary_max.toLocaleString('fr-FR')} CFA/mois`}
                               </p>
                             </div>
                           )}
                         </div>
+                      </div>
+                    </div>
+                        </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center rounded-xl border-2 border-dashed border-[#E8F4F3] bg-[#E8F4F3]/20">
-                          <div className="p-4 bg-[#E8F4F3] rounded-2xl mb-4">
-                            <MapPin className="h-10 w-10 text-[#226D68]" />
+                  <div className="rounded-2xl border-2 border-dashed border-[#E8F4F3] bg-gradient-to-b from-[#E8F4F3]/30 to-white p-12 sm:p-16 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-[#E8F4F3] flex items-center justify-center mx-auto mb-6">
+                      <Search className="h-8 w-8 text-[#226D68]" />
                           </div>
-                          <p className="text-base font-semibold text-[#2C2C2C] mb-2">Recherche non renseignée</p>
-                          <p className="text-sm text-[#6b7280] mb-4 max-w-sm">Ces critères aident les recruteurs à vous trouver dans la CVthèque.</p>
+                    <h2 className="text-lg font-bold text-[#2C2C2C] mb-2">Recherche non renseignée</h2>
+                    <p className="text-sm text-[#6b7280] mb-6 max-w-md mx-auto">
+                      Ces critères aident les recruteurs à vous trouver dans la CVthèque. Indiquez vos postes ciblés, votre disponibilité et vos préférences.
+                    </p>
                           <Button 
-                            size="sm"
+                      size="lg"
                             className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
                             onClick={() => setShowPreferencesDialog(true)}
                           >
-                            <MapPin className="h-4 w-4 mr-2" />
-                            Remplir la recherche
+                      <Search className="h-4 w-4 mr-2" />
+                      Remplir ma situation
                           </Button>
                         </div>
                       )}
-                  </div>
-                </div>
               </TabsContent>
 
               {/* Onglet Documents */}
@@ -3377,6 +3102,53 @@ export default function CandidateDashboard() {
               onClick={() => setShowCompleteProfileModal(false)}
             >
               Plus tard
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale : Demande de validation admin pour postuler */}
+      <Dialog open={showValidationRequestModal} onOpenChange={(open) => { if (!sendingValidationRequest) { setShowValidationRequestModal(open); if (!open) setValidationRequestSent(false); } }}>
+        <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl border-0 shadow-xl">
+          <div className="bg-gradient-to-b from-[#E8F4F3] to-white pt-8 pb-6 px-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#226D68]/20 flex items-center justify-center mx-auto mb-4">
+              <Shield className="h-7 w-7 text-[#226D68]" />
+            </div>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-[#2C2C2C]">
+                Validation requise
+              </DialogTitle>
+              <DialogDescription className="text-[#6b7280] mt-2 text-sm leading-relaxed">
+                Votre profil doit être validé par un administrateur avant de pouvoir postuler aux offres. Envoyez une demande pour accélérer le processus.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="px-6 pb-6 flex flex-col gap-3">
+            {validationRequestSent ? (
+              <div className="flex items-center justify-center gap-2 py-2 text-[#226D68] font-semibold">
+                <CheckCircle2 className="h-5 w-5" />
+                Demande envoyée avec succès
+              </div>
+            ) : (
+              <Button
+                className="w-full h-11 bg-[#e76f51] hover:bg-[#d45a3f] text-white font-semibold rounded-lg"
+                onClick={handleRequestValidation}
+                disabled={sendingValidationRequest}
+              >
+                {sendingValidationRequest ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                Demander la validation de mon profil
+              </Button>
+            )}
+            <button
+              type="button"
+              className="text-sm text-[#6b7280] hover:text-[#2C2C2C] pt-1"
+              onClick={() => { setShowValidationRequestModal(false); setValidationRequestSent(false); }}
+            >
+              {validationRequestSent ? 'Fermer' : 'Plus tard'}
             </button>
           </div>
         </DialogContent>

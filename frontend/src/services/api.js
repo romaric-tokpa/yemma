@@ -60,7 +60,16 @@ const AUTH_API_URL = getBaseUrl('VITE_AUTH_API_URL', 8001)
 const CANDIDATE_API_URL = getBaseUrl('VITE_CANDIDATE_API_URL', 8002)
 const DOCUMENT_API_URL = getBaseUrl('VITE_DOCUMENT_API_URL', 8003)
 const SEARCH_API_URL = getBaseUrl('VITE_SEARCH_API_URL', 8004)
-const COMPANY_API_URL = getBaseUrl('VITE_COMPANY_API_URL', 8005)
+// Company : en dev (port 3000 Vite), URL directe pour éviter les erreurs proxy (500 text/plain)
+const COMPANY_API_URL = (() => {
+  const envUrl = getBaseUrl('VITE_COMPANY_API_URL', 8005)
+  if (envUrl) return envUrl
+  if (typeof window !== 'undefined' && window.location.port === '3000') {
+    const protocol = window.location.protocol || 'http:'
+    return `${protocol}//${window.location.hostname}:8005`
+  }
+  return ''
+})()
 const PAYMENT_API_URL = getBaseUrl('VITE_PAYMENT_API_URL', 8006)
 const NOTIFICATION_API_URL = getBaseUrl('VITE_NOTIFICATION_API_URL', 8007)
 const AUDIT_API_URL = getBaseUrl('VITE_AUDIT_API_URL', 8008)
@@ -173,6 +182,7 @@ const searchApi = createApiClient(SEARCH_API_URL)
 const companyApiClient = createApiClient(COMPANY_API_URL)
 const paymentApiClient = createApiClient(PAYMENT_API_URL)
 const auditApi = createApiClient(AUDIT_API_URL)
+const notificationApiClient = createApiClient(NOTIFICATION_API_URL)
 const adminApiClient = createApiClient(ADMIN_API_URL)
 
 // Client pour le service Parsing (avec support multipart/form-data)
@@ -393,6 +403,10 @@ export const candidateApi = {
   },
   notifyProfileCreated: async () => {
     const response = await api.post('/api/v1/profiles/me/notify-profile-created')
+    return response.data
+  },
+  requestValidation: async () => {
+    const response = await api.post('/api/v1/profiles/me/request-validation')
     return response.data
   },
 
@@ -635,6 +649,83 @@ export const candidateApi = {
   adminRenewJob: async (jobId, expiresAt) => {
     const dateStr = expiresAt ? expiresAt.slice(0, 10) : ''
     const response = await api.post(`/api/v1/admin/jobs/${jobId}/renew`, { expires_at: dateStr }, { timeout: 60000 })
+    return response.data
+  },
+
+  // ===== COMPANY - OFFRES D'EMPLOI (même fonctionnalités que admin, filtré par entreprise) =====
+  companyJobsStats: async (companyId) => {
+    const response = await api.get('/api/v1/company/jobs/stats', {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
+    return response.data
+  },
+  companyListJobs: async (companyId) => {
+    const response = await api.get('/api/v1/company/jobs', {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
+    return response.data
+  },
+  companyCreateJob: async (companyId, data) => {
+    const response = await api.post('/api/v1/company/jobs', data, {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
+    return response.data
+  },
+  companyGetJob: async (companyId, jobId) => {
+    const response = await api.get(`/api/v1/company/jobs/${jobId}`, {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
+    return response.data
+  },
+  companyGetJobApplications: async (companyId, jobId) => {
+    const response = await api.get(`/api/v1/company/jobs/${jobId}/applications`, {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
+    return response.data
+  },
+  companyGetCandidateProfile: async (companyId, jobId, candidateId) => {
+    const response = await api.get(`/api/v1/company/jobs/${jobId}/candidates/${candidateId}/profile`, {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
+    return response.data
+  },
+  companyUpdateApplicationStatus: async (companyId, jobId, applicationId, statusValue, rejectionReason = null) => {
+    const body = { status: statusValue }
+    if (statusValue === 'REJECTED' && rejectionReason) body.rejection_reason = rejectionReason
+    const response = await api.patch(
+      `/api/v1/company/jobs/${jobId}/applications/${applicationId}/status`,
+      body,
+      { timeout: 10000, headers: { 'X-Company-Id': String(companyId) } }
+    )
+    return response.data
+  },
+  companyUpdateJob: async (companyId, jobId, data) => {
+    const response = await api.patch(`/api/v1/company/jobs/${jobId}`, data, {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
+    return response.data
+  },
+  companyUpdateJobStatus: async (companyId, jobId, status) => {
+    const response = await api.patch(
+      `/api/v1/company/jobs/${jobId}/status?status_value=${encodeURIComponent(status)}`,
+      null,
+      { timeout: 60000, headers: { 'X-Company-Id': String(companyId) } }
+    )
+    return response.data
+  },
+  companyRenewJob: async (companyId, jobId, expiresAt) => {
+    const dateStr = expiresAt ? expiresAt.slice(0, 10) : ''
+    const response = await api.post(`/api/v1/company/jobs/${jobId}/renew`, { expires_at: dateStr }, {
+      timeout: 60000,
+      headers: { 'X-Company-Id': String(companyId) },
+    })
     return response.data
   },
 
@@ -1168,6 +1259,13 @@ export const companyApi = {
   },
 }
 
+export const notificationApi = {
+  getValidationRequests: async (limit = 20) => {
+    const response = await api.get(`/api/v1/profiles/admin/validation-requests?limit=${limit}`)
+    return response.data
+  },
+}
+
 export const auditApiService = {
   // Enregistrer un accès
   logAccess: async (accessData) => {
@@ -1190,6 +1288,7 @@ export {
   companyApiClient,
   paymentApiClient,
   auditApi,
+  notificationApiClient,
   adminApiClient,
   parsingApiClient,
 }

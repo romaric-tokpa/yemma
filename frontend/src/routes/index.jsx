@@ -204,9 +204,17 @@ export default function AppRoutes() {
       />
 
       {/* Routes protégées - Entreprise / Recruteur */}
-      {/* Onboarding entreprise */}
+      {/* Onboarding entreprise - routes par étape */}
       <Route 
         path="/company/onboarding" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
+            <Navigate to="/company/onboarding/etape-1" replace />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/onboarding/etape-:step" 
         element={
           <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
             <CompanyOnboarding />
@@ -241,6 +249,54 @@ export default function AppRoutes() {
       />
       <Route 
         path="/company/dashboard/management" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/settings" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/jobs/new" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/jobs/:jobId/candidatures" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/jobs/:jobId/edit" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/jobs" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
+            <CompanyDashboard />
+          </AuthGuard>
+        } 
+      />
+      <Route 
+        path="/company/dashboard/statistics" 
         element={
           <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN', 'ROLE_RECRUITER']}>
             <CompanyDashboard />

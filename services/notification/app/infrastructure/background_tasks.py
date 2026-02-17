@@ -52,6 +52,7 @@ async def send_notification_task(
             "company_account_created",
             "company_onboarding_completed",
             "company_welcome",
+            "admin_validation_request",
         ]:
             subject, html_body, text_body = get_email_template_simple(notification_type, template_data_with_name)
         else:

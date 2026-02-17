@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.infrastructure.database import get_session
-from app.infrastructure.auth import get_current_user, require_current_user, TokenData
+from app.infrastructure.auth import get_current_user, require_current_user, require_admin_role_dep, TokenData
 from app.infrastructure.internal_auth import verify_internal_token
 from app.infrastructure.repositories import (
     ProfileRepository, ExperienceRepository, EducationRepository,
@@ -400,6 +400,85 @@ async def notify_profile_created(
     except Exception as e:
         logger.warning(f"Failed to send profile created email: {str(e)}")
         return {"message": "Profil créé – notification en attente"}
+
+
+@router.post("/me/request-validation", status_code=http_status.HTTP_202_ACCEPTED)
+async def request_validation(
+    session: AsyncSession = Depends(get_session),
+    current_user: Optional[TokenData] = Depends(get_current_user)
+):
+    """
+    Le candidat demande à l'administrateur de valider son profil.
+    Enregistre la demande sur le profil et tente d'envoyer un email à l'admin.
+    """
+    current_user = require_current_user(current_user)
+    profile = await ProfileRepository.get_by_user_id_with_relations(session, current_user.user_id)
+    if not profile:
+        raise ProfileNotFoundError(str(current_user.user_id))
+    if profile.status == ProfileStatus.VALIDATED:
+        return {"message": "Votre profil est déjà validé."}
+
+    # Enregistrer la demande directement sur le profil (source fiable)
+    from datetime import datetime
+    profile.validation_requested_at = datetime.utcnow()
+    session.add(profile)
+    await session.commit()
+
+    # Tenter l'envoi d'email à l'admin (best effort)
+    try:
+        from app.infrastructure.notification_client import send_admin_validation_request_notification
+        from app.core.config import settings
+        candidate_name = f"{profile.first_name or ''} {profile.last_name or ''}".strip()
+        if not candidate_name:
+            candidate_name = (profile.email or current_user.email or "").split("@")[0] or "Candidat"
+        await send_admin_validation_request_notification(
+            candidate_email=profile.email or current_user.email,
+            candidate_name=candidate_name,
+            profile_id=profile.id,
+            profile_url=f"{settings.FRONTEND_URL}/admin/review/{profile.id}"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send validation request email: {str(e)}")
+
+    return {"message": "Votre demande de validation a été envoyée à l'administrateur."}
+
+
+@router.get("/admin/validation-requests")
+async def admin_get_validation_requests(
+    limit: int = 20,
+    session: AsyncSession = Depends(get_session),
+    _: TokenData = Depends(require_admin_role_dep),
+):
+    """
+    Liste les profils candidats ayant demandé une validation (validation_requested_at non null),
+    dont le statut n'est pas encore VALIDATED, triés par date de demande (plus récent en premier).
+    """
+    from sqlalchemy import select, desc
+    from app.domain.models import Profile
+    stmt = (
+        select(Profile)
+        .where(Profile.validation_requested_at.isnot(None))
+        .where(Profile.status != ProfileStatus.VALIDATED)
+        .where(Profile.deleted_at.is_(None))
+        .order_by(desc(Profile.validation_requested_at))
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    profiles = result.scalars().all()
+    return [
+        {
+            "id": p.id,
+            "first_name": p.first_name,
+            "last_name": p.last_name,
+            "email": p.email,
+            "profile_title": p.profile_title,
+            "status": p.status.value if p.status else None,
+            "photo_url": p.photo_url,
+            "admin_score": p.admin_score,
+            "validation_requested_at": p.validation_requested_at.isoformat() if p.validation_requested_at else None,
+        }
+        for p in profiles
+    ]
 
 
 @router.get("", response_model=PaginatedProfilesResponse)

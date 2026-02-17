@@ -2,6 +2,7 @@
 Endpoints de gestion des entreprises
 """
 import logging
+import traceback
 from typing import List
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -119,6 +120,56 @@ async def list_companies(
     return [CompanyResponse.model_validate(company) for company in companies]
 
 
+@router.get("/me/company", response_model=CompanyResponse)
+async def get_my_company(
+    current_user: TokenData = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Récupère l'entreprise de l'utilisateur connecté.
+    Retourne 404 si l'utilisateur n'a pas d'entreprise (cas onboarding).
+    """
+    company = None
+    try:
+        logger.info(f"get_my_company called for user_id={current_user.user_id}, email={current_user.email}")
+        repo = CompanyRepository(session)
+        company = await repo.get_by_admin_id(current_user.user_id)
+        
+        if not company:
+            team_member_repo = TeamMemberRepository(session)
+            team_member = await team_member_repo.get_by_user_id(current_user.user_id)
+            if team_member and team_member.company_id:
+                company = await repo.get_by_id(team_member.company_id)
+    except Exception as e:
+        # Erreur DB ou schéma (table manquante, colonne absente) → considérer comme "pas d'entreprise"
+        tb = traceback.format_exc()
+        logger.warning(f"get_my_company DB lookup failed for user_id={current_user.user_id}: {e}\n{tb}")
+        company = None
+    
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You don't have a company"
+        )
+    
+    try:
+        return CompanyResponse.model_validate(company)
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(f"CompanyResponse validation failed for user_id={current_user.user_id}: {e}\n{tb}")
+        print(f"[COMPANY] get_my_company validation 500: {e}\n{tb}", flush=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.get("/ping")
+async def companies_ping():
+    """Test de connectivité (sans auth) pour vérifier le proxy."""
+    return {"ok": True, "service": "company"}
+
+
 @router.get("/{company_id}", response_model=CompanyDetailResponse)
 async def get_company(
     company_id: int,
@@ -184,6 +235,8 @@ async def update_company(
     # Mettre à jour les champs
     if company_data.name is not None:
         company.name = company_data.name
+    if company_data.legal_id is not None:
+        company.legal_id = company_data.legal_id
     if company_data.adresse is not None:
         company.adresse = company_data.adresse
     if company_data.logo_url is not None:
@@ -248,60 +301,6 @@ async def list_companies(
     companies = result.scalars().all()
     
     return [CompanyResponse.model_validate(company) for company in companies]
-
-
-@router.get("/me/company", response_model=CompanyResponse)
-async def get_my_company(
-    current_user: TokenData = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
-):
-    """
-    Récupère l'entreprise de l'utilisateur connecté
-    Fonctionne pour les admins d'entreprise et les recruteurs
-    """
-    try:
-        logger.info(f"get_my_company called for user_id={current_user.user_id}, email={current_user.email}, roles={current_user.roles}")
-        repo = CompanyRepository(session)
-        
-        # D'abord, essayer de trouver l'entreprise où l'utilisateur est admin
-        company = await repo.get_by_admin_id(current_user.user_id)
-        logger.info(f"Company found as admin: {company.id if company else None}")
-        
-        # Si pas trouvé, chercher via TeamMember (pour les recruteurs ou autres membres)
-        if not company:
-            logger.info(f"No company found as admin, checking TeamMember for user_id={current_user.user_id}")
-            team_member_repo = TeamMemberRepository(session)
-            team_member = await team_member_repo.get_by_user_id(current_user.user_id)
-            
-            if team_member:
-                logger.info(f"TeamMember found: id={team_member.id}, company_id={team_member.company_id}, status={team_member.status}")
-                if team_member.company_id:
-                    company = await repo.get_by_id(team_member.company_id)
-                    logger.info(f"Company found via TeamMember: id={company.id if company else None}, name={company.name if company else None}")
-                else:
-                    logger.warning(f"TeamMember found but company_id is None for user_id={current_user.user_id}")
-            else:
-                logger.info(f"No TeamMember found for user_id={current_user.user_id}")
-        
-        if not company:
-            logger.info(f"No company found for user_id={current_user.user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="You don't have a company"
-            )
-        
-        logger.info(f"Company found: id={company.id}, name={company.name}")
-        return CompanyResponse.model_validate(company)
-    except HTTPException:
-        # Re-raise HTTP exceptions (comme 404)
-        raise
-    except Exception as e:
-        # Logger l'erreur pour le débogage
-        logger.error(f"Error in get_my_company for user_id={current_user.user_id}: {str(e)}", exc_info=True, stack_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
 
 
 @router.get("/{company_id}/team-members", response_model=List[TeamMemberOrInvitationResponse])

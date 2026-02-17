@@ -82,7 +82,8 @@ class Profile(SQLModel, table=True):
     validated_at: Optional[datetime] = Field(default=None, description="Date de validation")
     rejected_at: Optional[datetime] = Field(default=None, description="Date de rejet")
     rejection_reason: Optional[str] = Field(default=None, description="Motif de rejet")
-    
+    validation_requested_at: Optional[datetime] = Field(default=None, description="Date de la dernière demande de validation par le candidat")
+
     # Consentements (étape 0)
     accept_cgu: bool = Field(default=False, description="Acceptation CGU")
     accept_rgpd: bool = Field(default=False, description="Acceptation RGPD")
@@ -265,6 +266,9 @@ class JobOffer(SQLModel, table=True):
 
     # Secteur d'activité
     sector: Optional[str] = Field(default=None, max_length=255, description="Secteur d'activité")
+
+    # Entreprise propriétaire (company service, nullable pour offres admin)
+    company_id: Optional[int] = Field(default=None, index=True, description="ID entreprise (company service)")
 
     # Entreprise partenaire (offres externes)
     company_name: Optional[str] = Field(default=None, max_length=255, description="Nom de l'entreprise")

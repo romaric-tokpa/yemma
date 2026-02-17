@@ -53,6 +53,11 @@ export default defineConfig({
         target: process.env.VITE_CANDIDATE_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8002',
         changeOrigin: true,
       },
+      // /api/v1/company/jobs est sur le service Candidate (offres entreprise)
+      '/api/v1/company': {
+        target: process.env.VITE_CANDIDATE_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8002',
+        changeOrigin: true,
+      },
       // /api/v1/admin/jobs est sur le service Candidate (pas Admin) - règle AVANT /api/v1/admin
       '/api/v1/admin/jobs': {
         target: process.env.VITE_CANDIDATE_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8002',
@@ -96,6 +101,18 @@ export default defineConfig({
       },
       '/api/v1/quotas': {
         target: process.env.VITE_PAYMENT_PROXY_TARGET || 'http://localhost:8006',
+        changeOrigin: true,
+      },
+      '/api/v1/notifications': {
+        target: process.env.VITE_NOTIFICATION_PROXY_TARGET || 'http://localhost:8007',
+        changeOrigin: true,
+      },
+      '/api/v1/companies': {
+        target: process.env.VITE_COMPANY_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8005',
+        changeOrigin: true,
+      },
+      '/api/v1/invitations': {
+        target: process.env.VITE_COMPANY_PROXY_TARGET || process.env.VITE_PROXY_TARGET || 'http://localhost:8005',
         changeOrigin: true,
       },
       '/api': {

@@ -33,6 +33,7 @@ export const ROUTES = {
   
   // Routes entreprise
   COMPANY_ONBOARDING: '/company/onboarding',
+  COMPANY_ONBOARDING_ETAPE: (step) => `/company/onboarding/etape-${step}`,
   COMPANY_DASHBOARD: '/company/dashboard',
   COMPANY_MANAGEMENT: '/company/management',
   COMPANY_SEARCH: '/company/search',
@@ -77,6 +78,7 @@ export const ROUTES = {
   COMPANY_DASHBOARD_MANAGEMENT_TEAM: '/company/dashboard/management/team',
   COMPANY_DASHBOARD_MANAGEMENT_SUBSCRIPTION: '/company/dashboard/management/subscription',
   COMPANY_DASHBOARD_MANAGEMENT_HISTORY: '/company/dashboard/management/history',
+  COMPANY_DASHBOARD_SETTINGS: '/company/dashboard/settings',
 
   // Routes candidat - sous-onglets offres
   CANDIDATE_OFFRES_LISTE: '/candidate/dashboard/offres',

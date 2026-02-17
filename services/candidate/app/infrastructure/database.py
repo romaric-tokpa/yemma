@@ -41,11 +41,49 @@ async def get_session() -> AsyncSession:
             await session.close()
 
 
+async def migrate_add_job_offer_company_id(conn):
+    """Migration: Ajoute company_id à job_offers si elle n'existe pas"""
+    from sqlalchemy import inspect
+
+    def check_and_add(sync_conn):
+        inspector = inspect(sync_conn)
+        try:
+            columns = [col['name'] for col in inspector.get_columns('job_offers')]
+            if 'company_id' not in columns:
+                sync_conn.execute(text("ALTER TABLE job_offers ADD COLUMN company_id INTEGER"))
+                print("✅ Migration: Colonne company_id ajoutée à job_offers")
+        except Exception as e:
+            if "does not exist" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                print(f"⚠️  Migration job_offers company_id: {e}")
+
+    await conn.run_sync(check_and_add)
+
+
+async def migrate_add_validation_requested_at(conn):
+    """Migration: Ajoute validation_requested_at à profiles si elle n'existe pas"""
+    from sqlalchemy import inspect
+
+    def check_and_add(sync_conn):
+        inspector = inspect(sync_conn)
+        try:
+            columns = [col['name'] for col in inspector.get_columns('profiles')]
+            if 'validation_requested_at' not in columns:
+                sync_conn.execute(text("ALTER TABLE profiles ADD COLUMN validation_requested_at TIMESTAMP"))
+                print("✅ Migration: Colonne validation_requested_at ajoutée à profiles")
+        except Exception as e:
+            if "does not exist" not in str(e).lower() and "duplicate column" not in str(e).lower():
+                print(f"⚠️  Migration profiles validation_requested_at: {e}")
+
+    await conn.run_sync(check_and_add)
+
+
 async def init_db():
     """Initialise la base de données (création des tables)"""
     async with engine.begin() as conn:
         # Import des modèles pour que SQLModel les enregistre
         from app.domain.models import Profile, Experience, Education, Certification, Skill, JobPreference, JobOffer, Application
-        
+
         # Création des tables
         await conn.run_sync(SQLModel.metadata.create_all)
+        await migrate_add_job_offer_company_id(conn)
+        await migrate_add_validation_requested_at(conn)

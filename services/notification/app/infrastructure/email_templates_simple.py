@@ -1084,6 +1084,78 @@ def get_company_welcome_template(data: Dict[str, Any]) -> tuple[str, str, str]:
     return subject, html, text
 
 
+def get_admin_validation_request_template(data: Dict[str, Any]) -> tuple[str, str, str]:
+    """
+    Email envoyé à l'administrateur quand un candidat demande la validation de son profil.
+    """
+    candidate_name = data.get("candidate_name", "Un candidat")
+    candidate_email = data.get("candidate_email", "")
+    profile_url = data.get("profile_url", f"{settings.FRONTEND_URL}/admin/dashboard")
+    primary_color = "#226D68"
+
+    subject = f"Demande de validation de profil – {candidate_name}"
+
+    content = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #212529; font-size: 15px; line-height: 1.5;">
+                    Bonjour <strong style="color: {primary_color};">Administrateur</strong>,
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <p style="margin: 0; color: #495057; font-size: 14px; line-height: 1.55;">
+                    Le candidat <strong style="color: {primary_color};">{candidate_name}</strong> ({candidate_email}) souhaite postuler à une offre et demande la validation de son profil.
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 0 0 16px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0f9f8; border-radius: 8px; border-left: 4px solid {primary_color};">
+                    <tr>
+                        <td style="padding: 14px 16px;">
+                            <p style="margin: 0; color: #374151; font-size: 13px; line-height: 1.6;">
+                                Veuillez examiner et valider le profil de ce candidat afin qu'il puisse postuler aux offres d'emploi sur la plateforme.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 12px 0 0 0;">
+                <p style="margin: 0; color: #6b7280; font-size: 12px; line-height: 1.5;">
+                    L'équipe Yemma Solutions
+                </p>
+            </td>
+        </tr>
+    </table>
+    """
+
+    html = get_base_template(
+        title=subject,
+        content=content,
+        button_text="Voir le profil du candidat",
+        button_url=profile_url,
+        header_color=primary_color,
+    )
+
+    text = f"""Demande de validation de profil
+
+Bonjour Administrateur,
+
+Le candidat {candidate_name} ({candidate_email}) souhaite postuler à une offre et demande la validation de son profil.
+
+Veuillez examiner et valider le profil de ce candidat : {profile_url}
+
+L'équipe Yemma Solutions
+"""
+
+    return subject, html, text
+
+
 def get_email_template_simple(notification_type: str, data: Dict[str, Any]) -> tuple[str, str, str]:
     """
     Récupère le template d'email selon le type (utilise les templates simples)
@@ -1099,6 +1171,7 @@ def get_email_template_simple(notification_type: str, data: Dict[str, Any]) -> t
         "company_account_created": get_company_account_created_template,
         "company_onboarding_completed": get_company_onboarding_completed_template,
         "company_welcome": get_company_welcome_template,
+        "admin_validation_request": get_admin_validation_request_template,
     }
     
     template_func = templates.get(notification_type)

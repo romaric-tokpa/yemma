@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     
     # Frontend URL (pour les liens dans les emails)
     FRONTEND_URL: str = Field(default="http://localhost:3000", description="Frontend URL")
+
+    # Admin email (destinataire des demandes de validation)
+    ADMIN_EMAIL: str = Field(default="admin@yemma.com", description="Admin email for validation requests")
     
     # CORS (défini comme string pour éviter les problèmes de parsing)
     CORS_ORIGINS: str = Field(

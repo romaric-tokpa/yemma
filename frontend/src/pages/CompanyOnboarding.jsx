@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,9 +20,9 @@ import {
   Mail,
   Phone,
   Briefcase,
-  ChevronRight,
+  Upload,
+  Sparkles,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { companyApi, documentApi, authApiService, paymentApi } from '@/services/api'
 import { Check, Crown, Zap, CreditCard } from 'lucide-react'
 
@@ -57,14 +57,16 @@ const companyOnboardingSchema = z.object({
 })
 
 const STEPS = [
-  { id: 1, title: 'Entreprise', short: 'Entreprise', icon: Building2 },
-  { id: 2, title: 'Logo & récapitulatif', short: 'Logo', icon: ImageIcon },
-  { id: 3, title: 'Choix du plan', short: 'Abonnement', icon: CreditCard },
+  { id: 1, title: 'Votre entreprise', subtitle: 'Informations légales', icon: Building2 },
+  { id: 2, title: 'Identité visuelle', subtitle: 'Logo & récapitulatif', icon: ImageIcon },
+  { id: 3, title: 'Votre plan', subtitle: 'Choisissez votre abonnement', icon: CreditCard },
 ]
 
 export default function CompanyOnboarding() {
   const navigate = useNavigate()
-  const [currentStep, setCurrentStep] = useState(1)
+  const { step } = useParams()
+  const stepNum = Math.min(3, Math.max(1, parseInt(step || '1', 10) || 1))
+  const currentStep = stepNum
   const [company, setCompany] = useState(null)
   const [logoUrl, setLogoUrl] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -73,6 +75,7 @@ export default function CompanyOnboarding() {
   const [lastSaved, setLastSaved] = useState(null)
   const [plans, setPlans] = useState([])
   const [plansLoading, setPlansLoading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   const form = useForm({
     resolver: zodResolver(companyOnboardingSchema),
@@ -93,6 +96,12 @@ export default function CompanyOnboarding() {
   useEffect(() => {
     loadCompany()
   }, [])
+
+  useEffect(() => {
+    if (step && step !== String(stepNum)) {
+      navigate(`/company/onboarding/etape-${stepNum}`, { replace: true })
+    }
+  }, [step, stepNum, navigate])
 
   const loadCompany = async () => {
     try {
@@ -136,17 +145,15 @@ export default function CompanyOnboarding() {
       } else if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
         setError('Connexion impossible. Vérifiez votre réseau.')
       } else {
-        setError(err.response?.data?.detail || err.message || 'Erreur de chargement')
+        setError(err.response?.data?.detail || err.response?.data?.message || err.message || 'Erreur de chargement')
       }
     } finally {
       setLoading(false)
     }
   }
 
-  const handleLogoUpload = async (files) => {
-    if (!files?.length) return
-    const file = files[0]
-    if (!file.type.startsWith('image/')) {
+  const processLogoFile = useCallback(async (file) => {
+    if (!file?.type?.startsWith('image/')) {
       setError('Fichier image requis (JPG, PNG)')
       return
     }
@@ -195,7 +202,29 @@ export default function CompanyOnboarding() {
     } finally {
       setUploading(false)
     }
+  }, [company?.id, getValues])
+
+  const handleLogoUpload = async (files) => {
+    if (!files?.length) return
+    await processLogoFile(files[0])
   }
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer?.files?.[0]
+    if (file) processLogoFile(file)
+  }, [processLogoFile])
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }, [])
 
   const loadPlans = async () => {
     try {
@@ -219,12 +248,12 @@ export default function CompanyOnboarding() {
           setError('Nom et RCCM obligatoires')
           return
         }
-        setCurrentStep(2)
+        navigate('/company/onboarding/etape-2')
         setLastSaved(new Date())
       } else if (currentStep === 2) {
         await saveCompanyData(data)
         setLastSaved(new Date())
-        setCurrentStep(3)
+        navigate('/company/onboarding/etape-3')
         loadPlans()
       } else if (currentStep === 3) {
         await finalizeOnboarding(data)
@@ -298,82 +327,89 @@ export default function CompanyOnboarding() {
     }
   }
 
-  const progress = ((currentStep - 1) / Math.max(1, STEPS.length - 1)) * 100
+  const progress = (currentStep / STEPS.length) * 100
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center overflow-x-hidden w-full max-w-[100vw]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-[#226D68]" />
-          <p className="text-sm text-[#2C2C2C]/70">Chargement...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-neutral-50 via-white to-green-emerald/5">
+        <div className="text-center animate-fade-in">
+          <div className="w-14 h-14 rounded-2xl bg-green-emerald/10 flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="h-7 w-7 animate-spin text-green-emerald" />
+          </div>
+          <p className="text-sm font-medium text-gray-anthracite/70">Chargement de votre espace...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden w-full max-w-[100vw]">
-      {/* Header compact */}
-      <header className="bg-white border-b border-[#e5e7eb] sticky top-0 z-40">
-        <div className="max-w-2xl mx-auto px-4 xs:px-5 py-3 min-w-0">
+    <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-green-emerald/[0.03]">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-neutral-200/80">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link to="/company/dashboard" className="text-sm font-bold hover:opacity-80 transition-opacity">
-                <span className="text-[#226D68]">Yemma</span>
-                <span className="text-[#e76f51]">-Solutions</span>
-              </Link>
-              <span className="text-[#d1d5db]">|</span>
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-md bg-[#226D68] flex items-center justify-center">
-                  <Building2 className="w-3.5 h-3.5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-sm font-semibold text-[#2C2C2C] font-[Poppins]">
-                    Configuration entreprise
-                  </h1>
-                  <p className="text-[10px] text-[#2C2C2C]/60">
-                    Étape {currentStep}/{STEPS.length}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <Link
+              to="/company/dashboard"
+              className="flex items-center gap-2 text-gray-anthracite hover:text-green-emerald transition-colors group"
+            >
+              <span className="font-heading font-bold text-lg">
+                <span className="text-green-emerald">Yemma</span>
+                <span className="text-orange-secondary">-Solutions</span>
+              </span>
+            </Link>
             {lastSaved && (
-              <span className="text-xs text-[#2C2C2C]/50">
+              <span className="text-xs text-neutral-500 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-emerald" />
                 Sauvegardé {lastSaved.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
           </div>
-          <Progress value={progress} className="h-1 mt-2 bg-[#e5e7eb]" />
+          <div className="mt-3">
+            <Progress value={progress} className="h-1.5 bg-neutral-100" />
+          </div>
         </div>
       </header>
 
-      {/* Stepper minimal */}
-      <div className="border-b border-[#e5e7eb] bg-white/80">
-        <div className="max-w-2xl mx-auto px-4 xs:px-5 py-2 min-w-0">
-          <div className="flex gap-2">
-            {STEPS.map((step, i) => {
-              const isDone = currentStep > step.id
-              const isCurrent = currentStep === step.id
-              const Icon = step.icon
-              return (
-                <div
-                  key={step.id}
-                  className={`flex items-center gap-2 flex-1 ${i < STEPS.length - 1 ? 'flex-1' : ''}`}
-                >
+      {/* Stepper */}
+      <div className="border-b border-neutral-200/60 bg-white/60">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            {STEPS.map((stepItem, i) => {
+              const isDone = currentStep > stepItem.id
+              const isCurrent = currentStep === stepItem.id
+              const isClickable = isDone
+              const Icon = stepItem.icon
+              const stepContent = (
+                <div className="flex flex-col items-center flex-1">
                   <div
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${
-                      isCurrent ? 'bg-[#E8F4F3] text-[#226D68]' : isDone ? 'text-[#226D68]' : 'text-[#9ca3af]'
-                    }`}
+                    className={`flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300 ${
+                      isCurrent
+                        ? 'bg-green-emerald text-white shadow-lg shadow-green-emerald/25'
+                        : isDone
+                          ? 'bg-green-emerald/10 text-green-emerald'
+                          : 'bg-neutral-100 text-neutral-400'
+                    } ${isClickable ? 'cursor-pointer hover:opacity-90' : ''}`}
                   >
-                    {isDone ? (
-                      <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                    ) : (
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                    )}
-                    <span className="text-xs font-medium truncate">{step.short}</span>
+                    {isDone ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                   </div>
+                  <span className={`mt-2 text-xs font-medium hidden sm:block ${
+                    isCurrent ? 'text-green-emerald' : isDone ? 'text-neutral-600' : 'text-neutral-400'
+                  }`}>
+                    {stepItem.title}
+                  </span>
+                </div>
+              )
+              return (
+                <div key={stepItem.id} className="flex items-center flex-1">
+                  {isClickable ? (
+                    <Link to={`/company/onboarding/etape-${stepItem.id}`} className="flex flex-col items-center flex-1 no-underline">
+                      {stepContent}
+                    </Link>
+                  ) : (
+                    stepContent
+                  )}
                   {i < STEPS.length - 1 && (
-                    <ChevronRight className="w-4 h-4 text-[#d1d5db] flex-shrink-0" />
+                    <div className="flex-1 h-px bg-neutral-200 mx-2 max-w-[40px] sm:max-w-none" />
                   )}
                 </div>
               )
@@ -382,351 +418,354 @@ export default function CompanyOnboarding() {
         </div>
       </div>
 
-      {/* Contenu */}
-      <main className="max-w-2xl mx-auto px-4 xs:px-5 py-5 sm:py-6 min-w-0">
-        <Card className="border-0 shadow-sm overflow-hidden">
-          <CardHeader className="py-4 px-4 sm:px-5 bg-white border-b border-[#e5e7eb]">
-            <CardTitle className="text-base font-semibold text-[#2C2C2C] font-[Poppins]">
-              {STEPS[currentStep - 1].title}
-            </CardTitle>
-            <CardDescription className="text-xs text-[#2C2C2C]/60 mt-0.5">
-              {currentStep === 1
-                ? 'Informations légales et contact référent'
-                : currentStep === 2
-                  ? 'Logo optionnel puis vérification'
-                  : 'Choisissez votre plan d\'abonnement'}
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="p-4 sm:p-5">
-            <form onSubmit={handleSubmit(onStepSubmit)} className="space-y-4">
-              {error && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{error}</span>
+      {/* Main content */}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        <div className="animate-fade-in">
+          <Card className="border-0 shadow-xl shadow-neutral-200/50 overflow-hidden rounded-2xl">
+            <CardHeader className="px-6 sm:px-8 pt-8 pb-6 bg-gradient-to-b from-white to-neutral-50/50 border-b border-neutral-100">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-green-emerald/10 flex items-center justify-center flex-shrink-0">
+                  {(() => {
+                    const Icon = STEPS[currentStep - 1].icon
+                    return <Icon className="w-6 h-6 text-green-emerald" />
+                  })()}
                 </div>
-              )}
-
-              {/* Étape 1 : Entreprise + Contact */}
-              {currentStep === 1 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="name" className="text-xs font-medium text-[#2C2C2C]">
-                        Nom entreprise *
-                      </Label>
-                      <Input
-                        id="name"
-                        {...register('name')}
-                        placeholder="Ex: Acme SAS"
-                        className="h-9 text-sm w-full min-w-0"
-                      />
-                      {errors.name && (
-                        <p className="text-xs text-red-600">{errors.name.message}</p>
-                      )}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="legal_id" className="text-xs font-medium text-[#2C2C2C]">
-                        RCCM *
-                      </Label>
-                      <Input
-                        id="legal_id"
-                        {...register('legal_id')}
-                        placeholder="CI-ABJ-2024-A-12345"
-                        className="h-9 text-sm w-full min-w-0"
-                      />
-                      {errors.legal_id && (
-                        <p className="text-xs text-red-600">{errors.legal_id.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="adresse" className="text-xs font-medium text-[#2C2C2C]">
-                      Adresse
-                    </Label>
-                    <Input
-                      id="adresse"
-                      {...register('adresse')}
-                      placeholder="123 Rue Example, 75001 Paris"
-                      className="h-9 text-sm w-full min-w-0"
-                    />
-                    {errors.adresse && (
-                      <p className="text-xs text-red-600">{errors.adresse.message}</p>
-                    )}
-                  </div>
-
-                  <div className="pt-3 border-t border-[#e5e7eb]">
-                    <p className="text-xs font-medium text-[#2C2C2C]/80 mb-3 flex items-center gap-2">
-                      <User className="w-3.5 h-3.5" />
-                      Contact référent
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="contact_first_name" className="text-xs text-[#2C2C2C]/70">
-                          Prénom
-                        </Label>
-                        <Input
-                          id="contact_first_name"
-                          {...register('contact_first_name')}
-                          placeholder="Jean"
-                          className="h-9 text-sm w-full min-w-0"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="contact_last_name" className="text-xs text-[#2C2C2C]/70">
-                          Nom
-                        </Label>
-                        <Input
-                          id="contact_last_name"
-                          {...register('contact_last_name')}
-                          placeholder="Dupont"
-                          className="h-9 text-sm w-full min-w-0"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="contact_email" className="text-xs text-[#2C2C2C]/70 flex items-center gap-1">
-                          <Mail className="w-3 h-3" /> Email
-                        </Label>
-                        <Input
-                          id="contact_email"
-                          type="email"
-                          {...register('contact_email')}
-                          placeholder="jean@entreprise.com"
-                          className="h-9 text-sm w-full min-w-0"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="contact_phone" className="text-xs text-[#2C2C2C]/70 flex items-center gap-1">
-                          <Phone className="w-3 h-3" /> Téléphone
-                        </Label>
-                        <Input
-                          id="contact_phone"
-                          type="tel"
-                          {...register('contact_phone')}
-                          placeholder="+225 07 12 34 56 78"
-                          className="h-9 text-sm w-full min-w-0"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-1.5">
-                      <Label htmlFor="contact_function" className="text-xs text-[#2C2C2C]/70 flex items-center gap-1">
-                        <Briefcase className="w-3 h-3" /> Fonction
-                      </Label>
-                      <Input
-                        id="contact_function"
-                        {...register('contact_function')}
-                        placeholder="DRH, Responsable Recrutement"
-                        className="h-9 text-sm w-full min-w-0"
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <CardTitle className="text-xl font-heading font-semibold text-gray-anthracite">
+                    {STEPS[currentStep - 1].title}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-neutral-500 mt-0.5">
+                    {STEPS[currentStep - 1].subtitle}
+                  </CardDescription>
                 </div>
-              )}
+              </div>
+            </CardHeader>
 
-              {/* Étape 3 : Choix du plan */}
-              {currentStep === 3 && (
-                <div className="space-y-4">
-                  <p className="text-sm text-[#2C2C2C]/80">Sélectionnez un plan pour accéder à la CVthèque.</p>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    {/* Plan gratuit */}
-                    <Card className="flex-1 border-[#e5e7eb] shadow-none hover:border-[#226D68]/40 transition-colors">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <CreditCard className="w-4 h-4 text-[#9ca3af]" />
-                          <span className="text-sm font-semibold text-[#2C2C2C]">Gratuit</span>
+            <CardContent className="p-6 sm:p-8">
+              <form onSubmit={handleSubmit(onStepSubmit)} className="space-y-6">
+                {error && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                {/* Step 1 */}
+                {currentStep === 1 && (
+                  <div className="space-y-8">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-anthracite mb-4 flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-green-emerald" />
+                        Informations légales
+                      </h3>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name" className="text-sm font-medium text-gray-anthracite">
+                            Nom de l'entreprise *
+                          </Label>
+                          <Input
+                            id="name"
+                            {...register('name')}
+                            placeholder="Ex: Acme SAS"
+                            className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20"
+                          />
+                          {errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}
                         </div>
-                        <p className="text-xs text-[#9ca3af] mb-3">Accès limité pour découvrir</p>
-                        <ul className="space-y-1.5 mb-4 text-xs text-[#2C2C2C]">
-                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#226D68]" /> 10 consultations/mois</li>
-                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#226D68]" /> Recherche limitée</li>
-                        </ul>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-8 text-xs"
-                          onClick={handleChooseFree}
-                          disabled={uploading}
-                        >
-                          {uploading ? 'Enregistrement...' : 'Commencer gratuitement'}
-                        </Button>
-                      </CardContent>
-                    </Card>
+                        <div className="space-y-2">
+                          <Label htmlFor="legal_id" className="text-sm font-medium text-gray-anthracite">
+                            RCCM / SIRET *
+                          </Label>
+                          <Input
+                            id="legal_id"
+                            {...register('legal_id')}
+                            placeholder="CI-ABJ-2024-A-12345"
+                            className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20"
+                          />
+                          {errors.legal_id && <p className="text-xs text-red-600">{errors.legal_id.message}</p>}
+                        </div>
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        <Label htmlFor="adresse" className="text-sm font-medium text-gray-anthracite">
+                          Adresse
+                        </Label>
+                        <Input
+                          id="adresse"
+                          {...register('adresse')}
+                          placeholder="Ex: Plateau, 01 BP 123 Abidjan 01"
+                          className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20"
+                        />
+                        {errors.adresse && <p className="text-xs text-red-600">{errors.adresse.message}</p>}
+                      </div>
+                    </div>
 
-                    {/* Plans payants */}
-                    {plansLoading ? (
-                      <div className="flex-1 flex items-center justify-center py-8 text-xs text-[#9ca3af]">Chargement des plans...</div>
-                    ) : (
-                      [...plans].sort((a, b) => a.name === 'Essentiel' ? -1 : b.name === 'Essentiel' ? 1 : 0).map((plan) => (
-                        <Card
-                          key={plan.id}
-                          className={`flex-1 border shadow-none overflow-hidden transition-colors hover:border-[#226D68]/40 ${
-                            plan.name === 'Essentiel' ? 'border-[#226D68] ring-1 ring-[#226D68]/20' : 'border-[#e5e7eb]'
+                    <div className="pt-6 border-t border-neutral-100">
+                      <h3 className="text-sm font-semibold text-gray-anthracite mb-4 flex items-center gap-2">
+                        <User className="w-4 h-4 text-green-emerald" />
+                        Contact référent
+                      </h3>
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="contact_first_name" className="text-sm text-neutral-600">Prénom</Label>
+                          <Input
+                            id="contact_first_name"
+                            {...register('contact_first_name')}
+                            placeholder="Jean"
+                            className="h-11 border-neutral-200"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="contact_last_name" className="text-sm text-neutral-600">Nom</Label>
+                          <Input
+                            id="contact_last_name"
+                            {...register('contact_last_name')}
+                            placeholder="Dupont"
+                            className="h-11 border-neutral-200"
+                          />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label htmlFor="contact_email" className="text-sm text-neutral-600 flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5" /> Email
+                          </Label>
+                          <Input
+                            id="contact_email"
+                            type="email"
+                            {...register('contact_email')}
+                            placeholder="jean@entreprise.com"
+                            className="h-11 border-neutral-200"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="contact_phone" className="text-sm text-neutral-600 flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5" /> Téléphone
+                          </Label>
+                          <Input
+                            id="contact_phone"
+                            type="tel"
+                            {...register('contact_phone')}
+                            placeholder="+225 07 12 34 56 78"
+                            className="h-11 border-neutral-200"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="contact_function" className="text-sm text-neutral-600 flex items-center gap-1.5">
+                            <Briefcase className="w-3.5 h-3.5" /> Fonction
+                          </Label>
+                          <Input
+                            id="contact_function"
+                            {...register('contact_function')}
+                            placeholder="DRH, Responsable Recrutement"
+                            className="h-11 border-neutral-200"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2 */}
+                {currentStep === 2 && (
+                  <div className="space-y-8">
+                    <div className="flex flex-col sm:flex-row gap-8">
+                      <div className="flex-shrink-0">
+                        <Label className="text-sm font-medium text-gray-anthracite mb-3 block">Logo de l'entreprise</Label>
+                        <div
+                          onDrop={handleDrop}
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          className={`w-32 h-32 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center overflow-hidden transition-all duration-200 cursor-pointer ${
+                            isDragging
+                              ? 'border-green-emerald bg-green-emerald/5'
+                              : logoUrl
+                                ? 'border-neutral-200 bg-neutral-50 hover:border-green-emerald/50'
+                                : 'border-neutral-200 bg-neutral-50/80 hover:border-green-emerald/50 hover:bg-green-emerald/5'
                           }`}
                         >
-                          <CardContent className="p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              {plan.plan_type === 'ENTERPRISE' && plan.name !== 'Essentiel' ? (
-                                <Crown className="w-4 h-4 text-amber-500" />
-                              ) : plan.plan_type === 'PRO' && plan.name !== 'Essentiel' ? (
-                                <Zap className="w-4 h-4 text-blue-500" />
-                              ) : null}
-                              <span className="text-sm font-semibold text-[#2C2C2C]">{plan.name}</span>
-                            </div>
-                            <p className="text-[10px] text-[#226D68] font-medium mb-1">3 jours d'essai gratuit</p>
-                            <p className="text-[10px] text-[#9ca3af] mb-2">Puis facturation automatique</p>
-                            {plan.name === 'Essentiel' ? (
-                              <p className="text-lg font-bold text-[#2C2C2C] mb-2">
-                                {Math.round(plan.price_monthly * 655).toLocaleString('fr-FR')} FCFA<span className="text-xs font-normal text-[#9ca3af]">/mois</span>
-                              </p>
-                            ) : (
-                              <p className="text-lg font-bold text-[#2C2C2C] mb-2">
-                                {plan.price_monthly.toFixed(2)}€<span className="text-xs font-normal text-[#9ca3af]">/mois</span>
-                              </p>
-                            )}
-                            <ul className="space-y-1 mb-4 text-xs text-[#2C2C2C]">
-                              {plan.unlimited_search && <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#226D68]" /> Recherche illimitée</li>}
-                              {plan.max_profile_views === null ? (
-                                <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#226D68]" /> Consultations illimitées</li>
-                              ) : (
-                                <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#226D68]" /> {plan.max_profile_views} consultations/mois</li>
-                              )}
-                              {plan.document_access && <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#226D68]" /> Accès aux documents</li>}
-                            </ul>
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="w-full h-8 text-xs"
-                              variant={plan.name === 'Essentiel' ? 'default' : 'outline'}
-                              onClick={() => handlePlanChoice(plan.id, 'monthly')}
+                          <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
                               disabled={uploading}
-                            >
-                              {uploading ? 'Redirection...' : 'Choisir ce plan'}
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ))
-                    )}
-                  </div>
-                  <p className="text-[10px] text-[#9ca3af]">Coordonnées bancaires requises pour la facturation automatique après l'essai.</p>
-                </div>
-              )}
-
-              {/* Étape 2 : Logo + Récap */}
-              {currentStep === 2 && (
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-shrink-0">
-                      <Label className="text-xs font-medium text-[#2C2C2C] mb-2 block">Logo</Label>
-                      <div className="w-24 h-24 rounded-lg border-2 border-dashed border-[#e5e7eb] bg-[#F4F6F8] flex items-center justify-center overflow-hidden hover:border-[#226D68]/40 transition-colors">
-                        {logoUrl ? (
-                          <img
-                            src={logoUrl}
-                            alt="Logo"
-                            className="w-full h-full object-contain"
-                            onError={(e) => (e.target.style.display = 'none')}
-                          />
-                        ) : (
-                          <ImageIcon className="w-8 h-8 text-[#9ca3af]" />
-                        )}
-                      </div>
-                      <div className="mt-2">
-                        <label className="cursor-pointer">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            disabled={uploading}
-                            onChange={(e) => handleLogoUpload(e.target.files)}
-                            className="hidden"
-                          />
-                          <span className="text-xs text-[#226D68] hover:underline font-medium">
-                            {uploading ? 'Upload...' : 'Changer / Ajouter'}
-                          </span>
-                        </label>
-                      </div>
-                      <p className="text-[10px] text-[#9ca3af] mt-1">JPG, PNG, max 5 Mo</p>
-                    </div>
-
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <p className="text-xs font-medium text-[#2C2C2C]/80">Récapitulatif</p>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex gap-2">
-                          <span className="text-[#9ca3af] min-w-[70px]">Entreprise</span>
-                          <span className="font-medium text-[#2C2C2C] truncate">{watch('name')}</span>
+                              onChange={(e) => handleLogoUpload(e.target.files)}
+                              className="hidden"
+                            />
+                            {logoUrl ? (
+                              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-2" onError={(e) => (e.target.style.display = 'none')} />
+                            ) : (
+                              <>
+                                <Upload className={`w-8 h-8 mb-2 ${isDragging ? 'text-green-emerald' : 'text-neutral-400'}`} />
+                                <span className="text-xs text-neutral-500 text-center px-2">
+                                  {uploading ? 'Upload...' : 'Glissez ou cliquez'}
+                                </span>
+                              </>
+                            )}
+                          </label>
                         </div>
-                        <div className="flex gap-2">
-                          <span className="text-[#9ca3af] min-w-[70px]">RCCM</span>
-                          <span className="font-medium text-[#2C2C2C] truncate">{watch('legal_id')}</span>
+                        <p className="text-xs text-neutral-400 mt-2">JPG, PNG • max 5 Mo</p>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-gray-anthracite mb-4 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-orange-secondary" />
+                          Récapitulatif
+                        </h3>
+                        <div className="space-y-3 p-4 rounded-xl bg-neutral-50/80">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-sm text-neutral-500">Entreprise</span>
+                            <span className="text-sm font-medium text-gray-anthracite truncate text-right">{watch('name') || '—'}</span>
+                          </div>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-sm text-neutral-500">RCCM</span>
+                            <span className="text-sm font-medium text-gray-anthracite truncate text-right">{watch('legal_id') || '—'}</span>
+                          </div>
+                          {watch('adresse') && (
+                            <div className="flex justify-between gap-4 pt-2 border-t border-neutral-200">
+                              <span className="text-sm text-neutral-500">Adresse</span>
+                              <span className="text-sm text-gray-anthracite truncate text-right">{watch('adresse')}</span>
+                            </div>
+                          )}
+                          {(watch('contact_first_name') || watch('contact_last_name') || watch('contact_email')) && (
+                            <div className="flex justify-between gap-4 pt-2 border-t border-neutral-200">
+                              <span className="text-sm text-neutral-500">Contact</span>
+                              <span className="text-sm text-gray-anthracite text-right">
+                                {[watch('contact_first_name'), watch('contact_last_name')].filter(Boolean).join(' ')}
+                                {watch('contact_email') && <span className="text-neutral-500 block text-xs">{watch('contact_email')}</span>}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        {watch('adresse') && (
-                          <div className="flex gap-2">
-                            <span className="text-[#9ca3af] min-w-[70px]">Adresse</span>
-                            <span className="text-[#2C2C2C] truncate">{watch('adresse')}</span>
-                          </div>
-                        )}
-                        {(watch('contact_first_name') || watch('contact_last_name') || watch('contact_email')) && (
-                          <div className="flex gap-2 pt-1 border-t border-[#e5e7eb]">
-                            <span className="text-[#9ca3af] min-w-[70px]">Contact</span>
-                            <span className="text-[#2C2C2C] truncate">
-                              {[watch('contact_first_name'), watch('contact_last_name')].filter(Boolean).join(' ')}
-                              {watch('contact_email') && (
-                                <span className="text-[#9ca3af]"> • {watch('contact_email')}</span>
-                              )}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Boutons */}
-              <div className="flex justify-between pt-4 border-t border-[#e5e7eb]">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    currentStep > 1 ? setCurrentStep(currentStep - 1) : navigate('/company/dashboard')
-                  }
-                  className="h-9 text-xs border-[#d1d5db] text-[#2C2C2C] hover:bg-[#F4F6F8]"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-                  {currentStep === 1 ? 'Annuler' : 'Précédent'}
-                </Button>
-                {currentStep < 3 && (
-                  <Button
-                    type="submit"
-                    disabled={uploading}
-                    size="sm"
-                    className="h-9 text-xs bg-[#226D68] hover:bg-[#1a5a55] text-white px-4"
-                  >
-                    {uploading ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                        Enregistrement...
-                      </>
-                    ) : currentStep === 2 ? (
-                      <>
-                        Suivant
-                        <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                      </>
-                    ) : (
-                      <>
-                        Suivant
-                        <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                      </>
-                    )}
-                  </Button>
                 )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+
+                {/* Step 3 */}
+                {currentStep === 3 && (
+                  <div className="space-y-6">
+                    <p className="text-sm text-neutral-600">Sélectionnez un plan pour accéder à la CVthèque et recruter les meilleurs talents.</p>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Plan gratuit */}
+                      <Card className="border-2 border-neutral-200 hover:border-green-emerald/30 transition-colors rounded-xl overflow-hidden">
+                        <CardContent className="p-5">
+                          <div className="flex items-center gap-2 mb-3">
+                            <CreditCard className="w-5 h-5 text-neutral-400" />
+                            <span className="font-semibold text-gray-anthracite">Gratuit</span>
+                          </div>
+                          <p className="text-xs text-neutral-500 mb-4">Découvrez la plateforme</p>
+                          <ul className="space-y-2 mb-6 text-sm text-gray-anthracite">
+                            <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-emerald flex-shrink-0" /> 10 consultations/mois</li>
+                            <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-emerald flex-shrink-0" /> Recherche limitée</li>
+                          </ul>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-10"
+                            onClick={handleChooseFree}
+                            disabled={uploading}
+                          >
+                            {uploading ? 'Enregistrement...' : 'Commencer gratuitement'}
+                          </Button>
+                        </CardContent>
+                      </Card>
+
+                      {/* Plans payants */}
+                      {plansLoading ? (
+                        <div className="col-span-1 sm:col-span-2 flex items-center justify-center py-12">
+                          <Loader2 className="w-6 h-6 animate-spin text-green-emerald" />
+                        </div>
+                      ) : (
+                        [...plans].sort((a, b) => a.name === 'Essentiel' ? -1 : b.name === 'Essentiel' ? 1 : 0).map((plan) => (
+                          <Card
+                            key={plan.id}
+                            className={`border-2 overflow-hidden rounded-xl transition-all hover:shadow-lg ${
+                              plan.name === 'Essentiel'
+                                ? 'border-green-emerald shadow-lg shadow-green-emerald/10 ring-2 ring-green-emerald/20'
+                                : 'border-neutral-200 hover:border-green-emerald/30'
+                            }`}
+                          >
+                            <CardContent className="p-5">
+                              <div className="flex items-center gap-2 mb-2">
+                                {plan.plan_type === 'ENTERPRISE' && plan.name !== 'Essentiel' ? (
+                                  <Crown className="w-5 h-5 text-amber-500" />
+                                ) : plan.plan_type === 'PRO' && plan.name !== 'Essentiel' ? (
+                                  <Zap className="w-5 h-5 text-blue-500" />
+                                ) : null}
+                                <span className="font-semibold text-gray-anthracite">{plan.name}</span>
+                              </div>
+                              <p className="text-xs font-medium text-green-emerald mb-1">3 jours d'essai gratuit</p>
+                              <p className="text-xs text-neutral-500 mb-3">Puis facturation automatique</p>
+                              {plan.name === 'Essentiel' ? (
+                                <p className="text-2xl font-bold text-gray-anthracite mb-3">
+                                  {Math.round(plan.price_monthly * 655).toLocaleString('fr-FR')} <span className="text-sm font-normal text-neutral-500">FCFA/mois</span>
+                                </p>
+                              ) : (
+                                <p className="text-2xl font-bold text-gray-anthracite mb-3">
+                                  {plan.price_monthly?.toFixed(2) || '0'}€ <span className="text-sm font-normal text-neutral-500">/mois</span>
+                                </p>
+                              )}
+                              <ul className="space-y-2 mb-6 text-sm text-gray-anthracite">
+                                {plan.unlimited_search && <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-emerald flex-shrink-0" /> Recherche illimitée</li>}
+                                {plan.max_profile_views === null ? (
+                                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-emerald flex-shrink-0" /> Consultations illimitées</li>
+                                ) : (
+                                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-emerald flex-shrink-0" /> {plan.max_profile_views} consultations/mois</li>
+                                )}
+                                {plan.document_access && <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-emerald flex-shrink-0" /> Accès aux documents</li>}
+                              </ul>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className={`w-full h-10 ${plan.name === 'Essentiel' ? 'bg-green-emerald hover:bg-green-emerald/90' : ''}`}
+                                variant={plan.name === 'Essentiel' ? 'default' : 'outline'}
+                                onClick={() => handlePlanChoice(plan.id, 'monthly')}
+                                disabled={uploading}
+                              >
+                                {uploading ? 'Redirection...' : 'Choisir ce plan'}
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </div>
+                    <p className="text-xs text-neutral-500">Coordonnées bancaires requises pour la facturation automatique après l'essai gratuit.</p>
+                  </div>
+                )}
+
+                {/* Navigation */}
+                <div className="flex justify-between pt-8 border-t border-neutral-100">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => currentStep > 1 ? navigate(`/company/onboarding/etape-${currentStep - 1}`) : navigate('/company/dashboard')}
+                    className="text-neutral-600 hover:text-gray-anthracite"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    {currentStep === 1 ? 'Annuler' : 'Précédent'}
+                  </Button>
+                  {currentStep < 3 && (
+                    <Button
+                      type="submit"
+                      disabled={uploading}
+                      className="bg-green-emerald hover:bg-green-emerald/90 text-white px-6"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Enregistrement...
+                        </>
+                      ) : (
+                        <>
+                          Suivant
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   )

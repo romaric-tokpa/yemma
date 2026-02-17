@@ -4,6 +4,7 @@ import {
   Briefcase, Plus, Loader2, MapPin, Pencil,
   ExternalLink, ChevronLeft, ChevronRight,
   Calendar, RotateCcw, Eye, UserPlus, FileText,
+  Building2, Shield,
 } from 'lucide-react'
 import {
   Dialog,
@@ -35,6 +36,11 @@ const FILTERS = [
   { id: 'archived', label: 'Expirées' },
   { id: 'closed', label: 'Fermées' },
 ]
+const SOURCE_FILTERS = [
+  { id: 'all', label: 'Toutes les sources' },
+  { id: 'admin', label: 'Créées par admin' },
+  { id: 'company', label: 'Créées par entreprises' },
+]
 
 export default function AdminJobManager() {
   const [jobs, setJobs] = useState([])
@@ -42,6 +48,7 @@ export default function AdminJobManager() {
   const [toast, setToast] = useState(null)
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState('all')
+  const [sourceFilter, setSourceFilter] = useState('all')
   const [renewJob, setRenewJob] = useState(null)
   const [renewDate, setRenewDate] = useState('')
   const [renewing, setRenewing] = useState(false)
@@ -76,19 +83,24 @@ export default function AdminJobManager() {
 
   const filteredJobs = useMemo(() => {
     const isExpired = (j) => j.expires_at && new Date(j.expires_at) < new Date()
+    let result = jobs
+    // Filtre par source (admin vs entreprise)
+    if (sourceFilter === 'admin') result = result.filter((j) => !j.company_id)
+    else if (sourceFilter === 'company') result = result.filter((j) => j.company_id != null)
+    // Filtre par statut
     switch (filter) {
       case 'active':
-        return jobs.filter((j) => j.status === 'PUBLISHED' && !isExpired(j))
+        return result.filter((j) => j.status === 'PUBLISHED' && !isExpired(j))
       case 'draft':
-        return jobs.filter((j) => j.status === 'DRAFT')
+        return result.filter((j) => j.status === 'DRAFT')
       case 'archived':
-        return jobs.filter((j) => j.status === 'ARCHIVED' || (j.status === 'PUBLISHED' && isExpired(j)))
+        return result.filter((j) => j.status === 'ARCHIVED' || (j.status === 'PUBLISHED' && isExpired(j)))
       case 'closed':
-        return jobs.filter((j) => j.status === 'CLOSED')
+        return result.filter((j) => j.status === 'CLOSED')
       default:
-        return jobs
+        return result
     }
-  }, [jobs, filter])
+  }, [jobs, filter, sourceFilter])
 
   const handleRenew = async () => {
     if (!renewJob || !renewDate) return
@@ -140,7 +152,7 @@ export default function AdminJobManager() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-[#2C2C2C] font-heading">Gestion des offres</h1>
-              <p className="text-[#6b7280] mt-1">Créez et publiez des offres. Les offres arrivées à leur date d&apos;expiration sont automatiquement dépublier et archivées. Consultez l&apos;historique (expirées, fermées) et reconduisez les offres si besoin.</p>
+              <p className="text-[#6b7280] mt-1">Toutes les offres (créées par l&apos;admin ou par les entreprises inscrites). Créez et publiez des offres. Les offres arrivées à leur date d&apos;expiration sont automatiquement dépublier et archivées. Consultez l&apos;historique (expirées, fermées) et reconduisez les offres si besoin.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link to="/offres" target="_blank" rel="noopener noreferrer" className="text-sm text-[#6b7280] hover:text-[#226D68] flex items-center gap-1.5">
@@ -192,20 +204,31 @@ export default function AdminJobManager() {
                 </p>
               </div>
             )}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => { setFilter(f.id); setPage(1) }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    filter === f.id
-                      ? 'bg-[#226D68] text-white'
-                      : 'bg-white border border-gray-200 text-[#6b7280] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div className="flex flex-wrap gap-2">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => { setFilter(f.id); setPage(1) }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filter === f.id
+                        ? 'bg-[#226D68] text-white'
+                        : 'bg-white border border-gray-200 text-[#6b7280] hover:bg-[#F8FAFC]'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={sourceFilter}
+                onChange={(e) => { setSourceFilter(e.target.value); setPage(1) }}
+                className="h-9 px-3 rounded-lg text-sm border border-gray-200 bg-white text-[#6b7280] focus:outline-none focus:ring-2 focus:ring-[#226D68]/30"
+              >
+                {SOURCE_FILTERS.map((f) => (
+                  <option key={f.id} value={f.id}>{f.label}</option>
+                ))}
+              </select>
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
@@ -215,6 +238,7 @@ export default function AdminJobManager() {
                     <tr className="border-b border-gray-100 bg-[#F8FAFC]/60">
                       <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider w-12" />
                       <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Offre</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden lg:table-cell">Source</th>
                       <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden md:table-cell">Localisation</th>
                       <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider hidden lg:table-cell">Contrat</th>
                       <th className="text-left py-3 px-4 text-xs font-semibold text-[#6b7280] uppercase tracking-wider">Dates</th>
@@ -263,6 +287,19 @@ export default function AdminJobManager() {
                               </p>
                             )}
                           </div>
+                        </td>
+                        <td className="py-3 px-4 hidden lg:table-cell">
+                          {job.company_id != null ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-[#E8F4F3] text-[#1a5a55]">
+                              <Building2 className="h-3.5 w-3.5" />
+                              Entreprise
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-[#6b7280]">
+                              <Shield className="h-3.5 w-3.5" />
+                              Admin
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 hidden md:table-cell">
                           <span className="text-sm text-[#6b7280] flex items-center gap-1">

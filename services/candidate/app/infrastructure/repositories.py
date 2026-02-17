@@ -536,6 +536,16 @@ class JobOfferRepository:
         return list(result.scalars().all())
 
     @staticmethod
+    async def list_by_company(session: AsyncSession, company_id: int) -> List[JobOffer]:
+        """Liste les offres d'une entreprise"""
+        result = await session.execute(
+            select(JobOffer)
+            .where(JobOffer.company_id == company_id)
+            .order_by(JobOffer.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
     async def get_stats(session: AsyncSession) -> dict:
         """Statistiques des offres par statut + total candidatures + métriques acquisition + pipeline."""
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -588,6 +598,77 @@ class JobOfferRepository:
             for r in top_result.all()[:10]
         ]
         # Moyenne candidatures par offre publiée
+        published_count = by_status.get("PUBLISHED", 0)
+        avg_applications = round(applications_count / published_count, 1) if published_count > 0 else 0
+        return {
+            "total": sum(by_status.values()),
+            "by_status": by_status,
+            "expired_published": expired_count,
+            "applications": applications_count,
+            "total_view_count": total_view_count,
+            "total_register_click_count": total_register_click_count,
+            "applications_by_status": applications_by_status,
+            "top_jobs_by_applications": top_jobs,
+            "avg_applications_per_job": avg_applications,
+        }
+
+    @staticmethod
+    async def get_stats_by_company(session: AsyncSession, company_id: int) -> dict:
+        """Statistiques des offres d'une entreprise."""
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        # Comptage par statut
+        stmt = select(JobOffer.status, func.count(JobOffer.id).label("count")).where(
+            JobOffer.company_id == company_id
+        ).group_by(JobOffer.status)
+        result = await session.execute(stmt)
+        rows = result.all()
+        by_status = {"DRAFT": 0, "PUBLISHED": 0, "CLOSED": 0, "ARCHIVED": 0}
+        for row in rows:
+            status_val = row.status.value if hasattr(row.status, "value") else str(row.status)
+            if status_val in by_status:
+                by_status[status_val] = row.count
+        stmt_expired = select(func.count(JobOffer.id)).where(
+            JobOffer.company_id == company_id,
+            JobOffer.status == JobStatus.PUBLISHED,
+            JobOffer.expires_at.isnot(None),
+            JobOffer.expires_at <= now,
+        )
+        expired_result = await session.execute(stmt_expired)
+        expired_count = expired_result.scalar() or 0
+        job_ids_stmt = select(JobOffer.id).where(JobOffer.company_id == company_id)
+        job_ids_result = await session.execute(job_ids_stmt)
+        job_ids = [r[0] for r in job_ids_result.all()]
+        applications_count = 0
+        applications_by_status = {}
+        top_jobs = []
+        if job_ids:
+            stmt_apps = select(func.count(Application.id)).where(Application.job_offer_id.in_(job_ids))
+            apps_result = await session.execute(stmt_apps)
+            applications_count = apps_result.scalar() or 0
+            stmt_pipeline = select(Application.status, func.count(Application.id).label("count")).where(
+                Application.job_offer_id.in_(job_ids)
+            ).group_by(Application.status)
+            pipeline_result = await session.execute(stmt_pipeline)
+            for row in pipeline_result.all():
+                applications_by_status[str(row.status) if row.status else "PENDING"] = row.count
+            stmt_top = (
+                select(JobOffer.id, JobOffer.title, JobOffer.company_name, func.count(Application.id).label("app_count"))
+                .where(JobOffer.company_id == company_id)
+                .outerjoin(Application, JobOffer.id == Application.job_offer_id)
+                .group_by(JobOffer.id, JobOffer.title, JobOffer.company_name)
+                .order_by(func.count(Application.id).desc())
+            )
+            top_result = await session.execute(stmt_top)
+            top_jobs = [
+                {"job_id": r.id, "title": r.title, "company_name": r.company_name or "", "applications": r.app_count}
+                for r in top_result.all()[:10]
+            ]
+        stmt_views = select(func.coalesce(func.sum(JobOffer.view_count), 0)).where(JobOffer.company_id == company_id)
+        stmt_clicks = select(func.coalesce(func.sum(JobOffer.register_click_count), 0)).where(JobOffer.company_id == company_id)
+        views_result = await session.execute(stmt_views)
+        clicks_result = await session.execute(stmt_clicks)
+        total_view_count = int(views_result.scalar() or 0)
+        total_register_click_count = int(clicks_result.scalar() or 0)
         published_count = by_status.get("PUBLISHED", 0)
         avg_applications = round(applications_count / published_count, 1) if published_count > 0 else 0
         return {
@@ -693,6 +774,19 @@ class ApplicationRepository:
                 seen.add(job_id)
                 out.append((job_id, status or "PENDING", rejection_reason))
         return out
+
+    @staticmethod
+    async def count_by_job_ids(session: AsyncSession, job_ids: List[int]) -> dict:
+        """Retourne {job_id: count} pour chaque offre."""
+        if not job_ids:
+            return {}
+        stmt = (
+            select(Application.job_offer_id, func.count(Application.id).label("count"))
+            .where(Application.job_offer_id.in_(job_ids))
+            .group_by(Application.job_offer_id)
+        )
+        result = await session.execute(stmt)
+        return {row[0]: row[1] for row in result.all()}
 
     @staticmethod
     async def list_by_job(session: AsyncSession, job_offer_id: int) -> List[tuple]:

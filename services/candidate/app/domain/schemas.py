@@ -277,6 +277,7 @@ class JobOfferCreate(BaseModel):
     requirements: Optional[str] = Field(default=None)
     expires_at: Optional[datetime] = Field(default=None)
     sector: Optional[str] = Field(default=None, max_length=255, description="Secteur d'activité")
+    company_id: Optional[int] = Field(default=None, description="ID entreprise (company service)")
     # Entreprise partenaire (offres externes)
     company_name: Optional[str] = Field(default=None, max_length=255)
     company_logo_url: Optional[str] = Field(default=None, max_length=500)
@@ -295,6 +296,7 @@ class JobOfferUpdate(BaseModel):
     status: Optional[str] = Field(default=None, max_length=50)
     expires_at: Optional[datetime] = None
     sector: Optional[str] = Field(default=None, max_length=255)
+    company_id: Optional[int] = Field(default=None, description="ID entreprise")
     company_name: Optional[str] = Field(default=None, max_length=255)
     company_logo_url: Optional[str] = Field(default=None, max_length=500)
     external_application_url: Optional[str] = Field(default=None, max_length=500)
@@ -314,12 +316,14 @@ class JobOfferResponse(BaseModel):
     created_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
     sector: Optional[str] = None
+    company_id: Optional[int] = None
     company_name: Optional[str] = None
     company_logo_url: Optional[str] = None
     external_application_url: Optional[str] = None
     application_email: Optional[str] = None
     view_count: Optional[int] = 0
     register_click_count: Optional[int] = 0
+    applications_count: Optional[int] = 0
 
     class Config:
         from_attributes = True
@@ -331,7 +335,7 @@ class ApplicationCreate(BaseModel):
 
 
 class JobApplicationResponse(BaseModel):
-    """Candidature avec infos profil pour l'admin"""
+    """Candidature avec infos profil pour l'admin / entreprise"""
     id: int
     candidate_id: int
     job_offer_id: int
@@ -344,6 +348,8 @@ class JobApplicationResponse(BaseModel):
     profile_title: Optional[str] = None
     profile_status: Optional[str] = None
     photo_url: Optional[str] = None
+    admin_score: Optional[float] = None
+    admin_report: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True

@@ -82,6 +82,40 @@ async def send_candidate_profile_created_notification(
         logger.error(f"⚠️ Erreur lors de l'envoi de l'email profil créé: {str(e)}", exc_info=True)
 
 
+async def send_admin_validation_request_notification(
+    candidate_email: str,
+    candidate_name: str,
+    profile_id: int,
+    profile_url: Optional[str] = None
+) -> None:
+    """
+    Envoie un email à l'administrateur pour lui demander de valider le profil d'un candidat.
+    """
+    try:
+        headers = get_service_token_header("candidate-service")
+        if not profile_url:
+            profile_url = f"{settings.FRONTEND_URL}/admin/review/{profile_id}"
+        payload = {
+            "candidate_email": candidate_email,
+            "candidate_name": candidate_name,
+            "profile_id": profile_id,
+            "profile_url": profile_url
+        }
+        logger.info(f"Sending admin validation request notification for candidate {candidate_email}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{settings.NOTIFICATION_SERVICE_URL}/api/v1/triggers/notify_admin_validation_request",
+                json=payload,
+                headers=headers
+            )
+            if response.status_code != 202:
+                logger.error(f"Notification service returned {response.status_code}: {response.text}")
+            response.raise_for_status()
+            logger.info(f"Admin validation request notification sent for {candidate_email}")
+    except Exception as e:
+        logger.error(f"⚠️ Erreur lors de l'envoi de la demande de validation admin: {str(e)}", exc_info=True)
+
+
 async def send_candidate_welcome_notification(
     candidate_email: str,
     candidate_name: str,

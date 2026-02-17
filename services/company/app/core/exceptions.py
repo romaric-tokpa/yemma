@@ -76,11 +76,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         headers["Access-Control-Allow-Methods"] = "*"
         headers["Access-Control-Allow-Headers"] = "*"
     
+    detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "error": True,
-            "message": exc.detail,
+            "message": detail,
+            "detail": detail,  # Compatibilité avec le format FastAPI standard
             "path": str(request.url),
         },
         headers=headers
@@ -119,9 +121,29 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Handler pour les exceptions non gérées - log et retourne 500"""
+    import traceback
+    import logging
+    tb = traceback.format_exc()
+    logging.getLogger(__name__).error(f"Unhandled exception: {exc}\n{tb}")
+    print(f"[COMPANY] Unhandled 500: {exc}\n{tb}", flush=True)
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin and origin in settings.cors_origins_list:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "message": str(exc), "error": True},
+        headers=headers,
+    )
+
+
 def setup_exception_handlers(app: FastAPI):
     """Configure tous les handlers d'exceptions"""
     app.add_exception_handler(CompanyError, company_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, generic_exception_handler)
 

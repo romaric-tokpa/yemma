@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.infrastructure.database import get_session
 from app.infrastructure.auth import get_current_user, require_current_user, require_admin_role_dep, TokenData
 from app.infrastructure.repositories import ProfileRepository, JobOfferRepository, ApplicationRepository
-from app.domain.models import Profile, JobOffer, JobStatus
+from app.domain.models import Profile, JobOffer, JobStatus, ProfileStatus
 from app.domain.schemas import JobOfferCreate, JobOfferUpdate, JobOfferResponse, ApplicationCreate, JobApplicationResponse
 from app.core.completion import check_cv_exists, calculate_completion_percentage
 
@@ -164,6 +164,13 @@ async def apply_to_job(
                     detail=f"Votre profil est à {pct}%. Les recruteurs ont besoin de savoir qui vous êtes. Complétez-le à {threshold}% pour débloquer votre candidature.",
                 )
 
+    # Vérifier que le profil est validé par l'admin
+    if profile.status != ProfileStatus.VALIDATED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Votre profil doit être validé par un administrateur avant de pouvoir postuler. Veuillez patienter ou contacter le support.",
+        )
+
     if await ApplicationRepository.exists(session, profile.id, job_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -276,6 +283,8 @@ async def admin_list_job_applications(
                 profile_title=profile.profile_title if profile else None,
                 profile_status=profile_status_val,
                 photo_url=profile.photo_url if profile else None,
+                admin_score=profile.admin_score if profile else None,
+                admin_report=profile.admin_report if profile else None,
             ))
         return result
     except HTTPException:

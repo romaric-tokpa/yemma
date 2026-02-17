@@ -2,8 +2,8 @@
 Schémas Pydantic pour la validation des données
 """
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List, Any
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.domain.models import CompanyStatus, TeamMemberRole, TeamMemberStatus, InvitationStatus
 
@@ -34,6 +34,7 @@ class CompanyCreate(CompanyBase):
 class CompanyUpdate(BaseModel):
     """Schéma pour la mise à jour d'une entreprise"""
     name: Optional[str] = None
+    legal_id: Optional[str] = Field(None, max_length=50, description="RCCM/SIRET")
     adresse: Optional[str] = Field(None, max_length=500, description="Adresse de l'entreprise")
     logo_url: Optional[str] = None
     status: Optional[CompanyStatus] = None
@@ -53,6 +54,14 @@ class CompanyResponse(CompanyBase):
     subscription_id: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def status_to_str(cls, v: Any) -> str:
+        """Convertit CompanyStatus enum en str pour la sérialisation"""
+        if isinstance(v, CompanyStatus):
+            return v.value
+        return str(v) if v is not None else "active"
 
     class Config:
         from_attributes = True

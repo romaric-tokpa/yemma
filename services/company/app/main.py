@@ -1,6 +1,7 @@
 """
 Company Service - Point d'entrée principal
 """
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +9,8 @@ from app.api.v1 import companies, recruiters, invitations, invoices
 from app.core.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.infrastructure.database import init_db
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Company Service",
@@ -40,6 +43,8 @@ app.include_router(invoices.router, prefix="/api/v1", tags=["Invoices"])
 async def startup_event():
     """Initialisation au démarrage"""
     await init_db()
+    if not settings.JWT_SECRET_KEY or len(settings.JWT_SECRET_KEY) < 16:
+        logger.warning("JWT_SECRET_KEY is empty or too short - auth validation may fail")
 
 
 @app.get("/health", tags=["Health"])

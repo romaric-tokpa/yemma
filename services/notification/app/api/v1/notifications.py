@@ -197,6 +197,20 @@ async def send_quota_alert(
     )
 
 
+@router.get("/validation-requests", response_model=list[NotificationResponse])
+async def get_validation_requests(
+    limit: int = 20,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Récupère les demandes de validation de profil envoyées par les candidats.
+    Utilisé par le dashboard admin pour afficher les notifications.
+    """
+    notification_repo = NotificationRepository(session)
+    notifications = await notification_repo.get_by_type("admin_validation_request", limit)
+    return [NotificationResponse.model_validate(n) for n in notifications]
+
+
 @router.get("/{notification_id}", response_model=NotificationResponse)
 async def get_notification(
     notification_id: int,

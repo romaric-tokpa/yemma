@@ -77,6 +77,14 @@ class CandidateRegistrationRequest(BaseModel):
     onboarding_url: str = Field(default="", description="URL de la page d'onboarding")
 
 
+class AdminValidationRequestNotification(BaseModel):
+    """Requête pour notifier l'admin qu'un candidat demande la validation de son profil"""
+    candidate_email: str = Field(..., description="Email du candidat")
+    candidate_name: str = Field(..., description="Nom du candidat")
+    profile_id: int = Field(..., description="ID du profil candidat")
+    profile_url: str = Field(default="", description="URL du profil candidat (espace admin)")
+
+
 class CompanyWelcomeRequest(BaseModel):
     """Requête pour envoyer un email de bienvenue à une entreprise après création du compte"""
     recipient_email: str = Field(..., description="Email du recruteur/admin")
@@ -436,6 +444,55 @@ async def notify_candidate_registration(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue candidate registration notification: {str(e)}",
+        )
+
+
+@router.post("/notify_admin_validation_request", status_code=status.HTTP_202_ACCEPTED)
+async def notify_admin_validation_request(
+    request: AdminValidationRequestNotification,
+    background_tasks: BackgroundTasks,
+    service_info: dict = Depends(verify_internal_token),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Trigger interne : Envoie un email à l'administrateur quand un candidat demande la validation de son profil.
+    Appelé par le Candidate Service.
+    """
+    try:
+        notification_repo = NotificationRepository(session)
+        profile_url = request.profile_url or f"{settings.FRONTEND_URL}/admin/review/{request.profile_id}"
+        template_data = {
+            "candidate_name": request.candidate_name,
+            "candidate_email": request.candidate_email,
+            "profile_id": request.profile_id,
+            "profile_url": profile_url,
+        }
+        admin_email = settings.ADMIN_EMAIL
+        notification = Notification(
+            notification_type="admin_validation_request",
+            recipient_email=admin_email,
+            recipient_name="Administrateur",
+            template_data=json.dumps(template_data),
+            status=NotificationStatus.PENDING,
+        )
+        notification = await notification_repo.create(notification)
+        background_tasks.add_task(
+            send_notification_task,
+            notification_type="admin_validation_request",
+            recipient_email=admin_email,
+            recipient_name="Administrateur",
+            template_data=template_data,
+            notification_id=notification.id,
+        )
+        return {
+            "message": "Admin validation request notification queued",
+            "notification_id": notification.id,
+            "status": "pending"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue admin validation request notification: {str(e)}"
         )
 
 
