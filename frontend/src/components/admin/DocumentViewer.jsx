@@ -112,16 +112,16 @@ export default function DocumentViewer({ documents, selectedDocument, onSelectDo
     return (
       <div className="h-full flex flex-col min-w-0">
         {/* Barre d'outils */}
-        <div className="shrink-0 border-b border-border bg-white px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="shrink-0 border-b border-border bg-white px-2 sm:px-3 py-2 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
             {getDocumentIcon(mimeType)}
-            <span className="text-sm font-medium text-gray-anthracite truncate" title={selectedDocument.originalFilename || selectedDocument.original_filename}>
+            <span className="text-xs sm:text-sm font-medium text-gray-anthracite truncate max-w-[120px] sm:max-w-none" title={selectedDocument.originalFilename || selectedDocument.original_filename}>
               {selectedDocument.originalFilename || selectedDocument.original_filename}
             </span>
-            <Badge variant="outline" className={`text-xs shrink-0 ${badgeClass}`}>
+            <Badge variant="outline" className={`text-[10px] sm:text-xs shrink-0 ${badgeClass}`}>
               {typeLabel}
             </Badge>
-            <span className="text-xs text-muted-foreground shrink-0">
+            <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0 hidden sm:inline">
               {formatFileSize(selectedDocument.fileSize ?? selectedDocument.file_size)}
             </span>
           </div>
@@ -203,9 +203,9 @@ export default function DocumentViewer({ documents, selectedDocument, onSelectDo
   }
 
   return (
-    <div className="h-full flex min-h-0">
+    <div className="h-full flex flex-col sm:flex-row min-h-0">
       {/* Panneau latéral : liste par type */}
-      <div className="w-72 shrink-0 border-r border-border bg-muted/20 flex flex-col">
+      <div className="w-full sm:w-72 shrink-0 border-b sm:border-b-0 sm:border-r border-border bg-muted/20 flex flex-col max-h-48 sm:max-h-none overflow-y-auto sm:overflow-y-visible">
         <div className="p-3 border-b border-border bg-white">
           <h3 className="text-sm font-semibold text-gray-anthracite">Documents à évaluer</h3>
           <p className="text-xs text-muted-foreground mt-0.5">

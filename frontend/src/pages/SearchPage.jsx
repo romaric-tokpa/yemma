@@ -29,7 +29,12 @@ export default function SearchPage() {
     locations: [],
   })
   
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024
+    }
+    return false
+  })
   const [subscription, setSubscription] = useState(null)
 
   useEffect(() => {

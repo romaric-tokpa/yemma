@@ -233,11 +233,11 @@ export default function AdminReview({ defaultTab }) {
     <AdminLayout>
       <div className="min-w-0 w-full">
         {/* Fil d'Ariane */}
-        <nav className="flex items-center gap-2 text-sm text-[#6b7280] mb-6">
-          <Link to="/admin/dashboard" className="hover:text-[#226D68]">Dashboard</Link>
-          <ChevronRight className="h-4 w-4" />
-          <Link to="/admin/validation" className="hover:text-[#226D68]">Validation</Link>
-          <ChevronRight className="h-4 w-4" />
+        <nav className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[#6b7280] mb-4 sm:mb-6 overflow-x-auto">
+          <Link to="/admin/dashboard" className="hover:text-[#226D68] shrink-0">Dashboard</Link>
+          <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <Link to="/admin/validation" className="hover:text-[#226D68] shrink-0">Validation</Link>
+          <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
           <span className="text-[#2C2C2C] font-medium truncate">{fullName || `#${candidateId}`}</span>
         </nav>
 
@@ -249,7 +249,7 @@ export default function AdminReview({ defaultTab }) {
                 <img
                   src={displayPhoto}
                   alt={fullName}
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-white/30 shadow-xl"
+                  className="w-20 h-20 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-white/30 shadow-xl"
                   onError={(e) => {
                     if (!photoError && e.target.src !== defaultAvatar) {
                       setPhotoError(true)
@@ -273,57 +273,57 @@ export default function AdminReview({ defaultTab }) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{fullName}</h1>
+                  <h1 className="text-lg sm:text-2xl font-bold text-white truncate max-w-full">{fullName}</h1>
                   <Badge className={`text-xs font-medium ${STATUS_COLORS[candidateData?.status] || STATUS_COLORS.DRAFT}`}>
                     {STATUS_LABELS[candidateData?.status] || candidateData?.status}
                   </Badge>
-                  <div className="flex items-center gap-2 ml-auto">
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchCandidateData}
+                    disabled={loading}
+                    className="h-8 text-white/90 hover:text-white hover:bg-white/10 text-xs sm:text-sm"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                    Actualiser
+                  </Button>
+                  {candidateData?.status === 'ARCHIVED' ? (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={fetchCandidateData}
-                      disabled={loading}
-                      className="h-8 text-white/90 hover:text-white hover:bg-white/10"
+                      onClick={() => setUnarchiveDialogOpen(true)}
+                      disabled={unarchiveLoading}
+                      className="h-8 text-white/90 hover:text-white hover:bg-white/10 text-xs sm:text-sm"
+                      title="Déarchiver le profil"
                     >
-                      <RefreshCw className="h-4 w-4 mr-1.5" />
-                      Actualiser
+                      {unarchiveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArchiveRestore className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
+                      Déarchiver
                     </Button>
-                    {candidateData?.status === 'ARCHIVED' ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setUnarchiveDialogOpen(true)}
-                        disabled={unarchiveLoading}
-                        className="h-8 text-white/90 hover:text-white hover:bg-white/10"
-                        title="Déarchiver le profil (restaure dans la liste de validation et la CVthèque)"
-                      >
-                        {unarchiveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArchiveRestore className="h-4 w-4 mr-1.5" />}
-                        Déarchiver
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setArchiveDialogOpen(true)}
-                        disabled={archiveLoading}
-                        className="h-8 text-white/90 hover:text-white hover:bg-white/10"
-                        title="Archiver le profil"
-                      >
-                        {archiveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4 mr-1.5" />}
-                        Archiver
-                      </Button>
-                    )}
-                  </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setArchiveDialogOpen(true)}
+                      disabled={archiveLoading}
+                      className="h-8 text-white/90 hover:text-white hover:bg-white/10 text-xs sm:text-sm"
+                      title="Archiver le profil"
+                    >
+                      {archiveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
+                      Archiver
+                    </Button>
+                  )}
                 </div>
                 {candidateData?.profile_title && (
                   <p className="text-white/95 text-sm sm:text-base mb-3">{candidateData.profile_title}</p>
                 )}
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-white/90">
-                  {candidateLocation && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{candidateLocation}</span>}
-                  {candidateData?.email && <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{candidateData.email}</span>}
-                  {candidateData?.phone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{candidateData.phone}</span>}
+                <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1.5 text-xs sm:text-sm text-white/90">
+                  {candidateLocation && <span className="flex items-center gap-1"><MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /><span className="truncate max-w-[150px] sm:max-w-none">{candidateLocation}</span></span>}
+                  {candidateData?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /><span className="truncate max-w-[180px] sm:max-w-none">{candidateData.email}</span></span>}
+                  {candidateData?.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />{candidateData.phone}</span>}
                   {candidateData?.total_experience != null && (
-                    <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" />{candidateData.total_experience} an{candidateData.total_experience > 1 ? 's' : ''}</span>
+                    <span className="flex items-center gap-1"><Briefcase className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />{candidateData.total_experience} an{candidateData.total_experience > 1 ? 's' : ''}</span>
                   )}
                   {candidateData?.completion_percentage != null && (
                     <span>{candidateData.completion_percentage.toFixed(0)}% complété</span>
@@ -428,20 +428,22 @@ export default function AdminReview({ defaultTab }) {
 
         {/* Tabs — routes dédiées */}
         <Tabs value={activeTab} onValueChange={goToTab} className="w-full">
-          <TabsList className="bg-white border border-gray-200 p-1 rounded-xl mb-4 h-11">
-            <TabsTrigger value="profile" className="rounded-lg px-4 data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
-              <User className="w-4 h-4 mr-2" />
-              Profil
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="rounded-lg px-4 data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
-              <FileText className="w-4 h-4 mr-2" />
-              Documents ({documents.length})
-            </TabsTrigger>
-            <TabsTrigger value="evaluation" className="rounded-lg px-4 data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Évaluation
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
+            <TabsList className="bg-white border border-gray-200 p-1 rounded-xl mb-4 h-10 sm:h-11 w-max sm:w-full">
+              <TabsTrigger value="profile" className="rounded-lg px-2.5 sm:px-4 text-xs sm:text-sm data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                Profil
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="rounded-lg px-2.5 sm:px-4 text-xs sm:text-sm data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                Docs ({documents.length})
+              </TabsTrigger>
+              <TabsTrigger value="evaluation" className="rounded-lg px-2.5 sm:px-4 text-xs sm:text-sm data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
+                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                Évaluation
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="profile" className="mt-0">
             <CandidateDataView data={candidateData} />
@@ -500,10 +502,10 @@ export default function AdminReview({ defaultTab }) {
 
         {/* Modale confirmation archivage */}
         <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
-          <DialogContent className="max-w-sm p-0 gap-0 overflow-hidden border-[#e5e7eb] shadow-xl rounded-2xl">
-            <div className="p-5 pr-12">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#226D68]/10 flex items-center justify-center flex-shrink-0">
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm p-0 gap-0 overflow-hidden border-[#e5e7eb] shadow-xl rounded-2xl">
+            <div className="p-4 sm:p-5 pr-10 sm:pr-12">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#226D68]/10 flex items-center justify-center flex-shrink-0">
                   <Archive className="w-6 h-6 text-[#226D68]" />
                 </div>
                 <DialogHeader className="flex-1 p-0 space-y-2">
@@ -541,10 +543,10 @@ export default function AdminReview({ defaultTab }) {
 
         {/* Modale confirmation déarchivage */}
         <Dialog open={unarchiveDialogOpen} onOpenChange={setUnarchiveDialogOpen}>
-          <DialogContent className="max-w-sm p-0 gap-0 overflow-hidden border-[#e5e7eb] shadow-xl rounded-2xl">
-            <div className="p-5 pr-12">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[#226D68]/10 flex items-center justify-center flex-shrink-0">
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm p-0 gap-0 overflow-hidden border-[#e5e7eb] shadow-xl rounded-2xl">
+            <div className="p-4 sm:p-5 pr-10 sm:pr-12">
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#226D68]/10 flex items-center justify-center flex-shrink-0">
                   <ArchiveRestore className="w-6 h-6 text-[#226D68]" />
                 </div>
                 <DialogHeader className="flex-1 p-0 space-y-2">

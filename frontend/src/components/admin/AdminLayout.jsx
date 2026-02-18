@@ -50,7 +50,12 @@ const NAV_GROUPS = [
 export default function AdminLayout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024
+    }
+    return false
+  })
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -92,6 +97,19 @@ export default function AdminLayout({ children }) {
     }
   })()
 
+  // Auto-close sidebar on mobile resize, auto-open on desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(true)
+      } else {
+        setSidebarOpen(false)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   useEffect(() => {
     try {
       const u = JSON.parse(localStorage.getItem('user') || '{}')
@@ -125,56 +143,62 @@ export default function AdminLayout({ children }) {
 
       {/* Top bar - Logo, badge, user (aligné dashboard candidat) */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 safe-top">
-        <div className="flex items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
-          <div className="flex items-center gap-2 shrink-0">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-[#E8F4F3] text-[#2C2C2C]"
-                aria-label="Ouvrir le menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            )}
+        <div className="flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3 max-w-7xl mx-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-[#E8F4F3] text-[#2C2C2C]"
+              aria-label={sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+            >
+              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
             <Link to="/" className="flex items-center gap-2">
-              <img src="/favicon.ico" alt="Yemma Solutions" className="h-8 w-8 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/logo-icon.svg' }} />
+              <img src="/favicon.ico" alt="Yemma Solutions" className="h-7 w-7 sm:h-8 sm:w-8 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/logo-icon.svg' }} />
             </Link>
           </div>
 
           {/* Badge Administration - centre */}
-          <div className="flex-1 min-w-0 max-w-xs sm:max-w-sm mx-2 sm:mx-4 flex items-center justify-center">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#E8F4F3]/80 border border-[#226D68]/20">
-              <Shield className="h-4 w-4 text-[#226D68]" />
-              <span className="font-semibold text-sm text-[#2C2C2C]">Administration</span>
+          <div className="flex-1 min-w-0 mx-1 sm:mx-4 flex items-center justify-center">
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-[#E8F4F3]/80 border border-[#226D68]/20">
+              <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#226D68] shrink-0" />
+              <span className="font-semibold text-xs sm:text-sm text-[#2C2C2C] hidden sm:inline">Administration</span>
+              <span className="font-semibold text-xs text-[#2C2C2C] sm:hidden">Admin</span>
             </div>
           </div>
 
           {/* User menu */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             {/* Notification bell */}
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="relative p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors"
+                className="relative p-1.5 sm:p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors"
                 title="Demandes de validation"
                 aria-label="Notifications"
               >
                 <Bell className="h-5 w-5" />
                 {notifCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#e76f51] text-white text-[10px] font-bold leading-none shadow-sm">
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[16px] sm:min-w-[18px] h-[16px] sm:h-[18px] px-0.5 sm:px-1 rounded-full bg-[#e76f51] text-white text-[9px] sm:text-[10px] font-bold leading-none shadow-sm">
                     {notifCount > 9 ? '9+' : notifCount}
                   </span>
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                <>
+                  {/* Overlay mobile */}
+                  <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setNotifOpen(false)} aria-hidden />
+                  <div className="
+                    fixed left-3 right-3 top-14 z-50
+                    sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80
+                    bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden
+                  ">
                   <div className="px-4 py-3 bg-[#E8F4F3]/50 border-b border-gray-100 flex items-center justify-between">
                     <p className="font-semibold text-sm text-[#2C2C2C]">Demandes de validation</p>
                     {notifCount > 0 && (
                       <span className="text-xs text-[#226D68] font-medium bg-[#226D68]/10 px-2 py-0.5 rounded-full">{notifCount}</span>
                     )}
                   </div>
-                  <div className="max-h-72 overflow-y-auto">
+                  <div className="max-h-[60vh] sm:max-h-72 overflow-y-auto">
                     {notifications.length === 0 ? (
                       <div className="px-4 py-6 text-center text-sm text-[#6b7280]">
                         Aucune demande de validation en attente.
@@ -188,7 +212,7 @@ export default function AdminLayout({ children }) {
                             key={profile.id}
                             to={`/admin/review/${profile.id}`}
                             onClick={() => setNotifOpen(false)}
-                            className="flex items-start gap-3 px-4 py-3 hover:bg-[#F4F6F8] transition-colors border-b border-gray-50 last:border-b-0"
+                            className="flex items-start gap-3 px-3 sm:px-4 py-3 hover:bg-[#F4F6F8] transition-colors border-b border-gray-50 last:border-b-0"
                           >
                             <div className="w-8 h-8 rounded-full bg-[#e76f51]/15 flex items-center justify-center shrink-0 mt-0.5">
                               <User className="h-4 w-4 text-[#e76f51]" />
@@ -216,18 +240,19 @@ export default function AdminLayout({ children }) {
                     </div>
                   )}
                 </div>
+                </>
               )}
             </div>
-            <Link to="/contact" className="p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors" title="Aide">
+            <Link to="/contact" className="hidden sm:flex p-2 rounded-xl hover:bg-[#E8F4F3] text-[#6b7280] hover:text-[#226D68] transition-colors" title="Aide">
               <HelpCircle className="h-5 w-5" />
             </Link>
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-[#E8F4F3] transition-colors"
+                className="flex items-center gap-2 p-1 sm:p-1.5 rounded-xl hover:bg-[#E8F4F3] transition-colors"
                 aria-expanded={userMenuOpen}
               >
-                <div className="w-9 h-9 rounded-full bg-[#226D68] flex items-center justify-center text-white font-semibold text-sm shrink-0 border-2 border-[#E8F4F3]">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#226D68] flex items-center justify-center text-white font-semibold text-xs sm:text-sm shrink-0 border-2 border-[#E8F4F3]">
                   {user?.email?.[0]?.toUpperCase() || 'A'}
                 </div>
               </button>

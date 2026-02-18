@@ -315,7 +315,12 @@ export default function CandidateDashboard() {
   const location = useLocation()
   const { tab, offerId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024
+    }
+    return false
+  })
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState(null)
@@ -434,6 +439,19 @@ export default function CandidateDashboard() {
 
   useEffect(() => {
     loadProfile()
+  }, [])
+
+  // Auto-close sidebar on mobile resize, auto-open on desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(true)
+      } else {
+        setSidebarOpen(false)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   // Synchroniser activeTab avec l'URL (pathname ou params)
@@ -1112,15 +1130,13 @@ export default function CandidateDashboard() {
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100 safe-top">
         <div className="flex items-center justify-between gap-3 sm:gap-4 px-4 sm:px-6 py-3 max-w-7xl mx-auto">
           <div className="flex items-center gap-2 shrink-0">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-[#E8F4F3] text-[#2C2C2C]"
-                aria-label="Ouvrir le menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            )}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-[#E8F4F3] text-[#2C2C2C]"
+              aria-label={sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+            >
+              {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
             <Link to="/" className="flex items-center gap-2">
               <img src="/favicon.ico" alt="Yemma Solutions" className="h-8 w-8 object-contain" onError={(e) => { e.target.onerror = null; e.target.src = '/logo-icon.svg' }} />
             </Link>
