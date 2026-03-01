@@ -5,8 +5,8 @@
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import {
-  User, Mail, MapPin, Briefcase, GraduationCap, Award, Code, Target,
-  ChevronDown, ChevronUp, Phone,
+  Briefcase, GraduationCap, Award, Code, Target,
+  ChevronDown, ChevronUp, Building2,
 } from 'lucide-react'
 
 export default function CandidateDataView({ data }) {
@@ -24,98 +24,38 @@ export default function CandidateDataView({ data }) {
 
   return (
     <div className="space-y-6">
-      {/* Identité & profil */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-[#F4F6F8]/50">
-          <h3 className="flex items-center gap-2 text-base font-semibold text-[#2C2C2C]">
-            <User className="h-5 w-5 text-[#226D68]" />
-            Identité & profil
-          </h3>
-        </div>
-        <div className="p-4 sm:p-6 space-y-5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-0.5">Prénom</p>
-              <p className="text-sm font-medium text-[#2C2C2C]">{data.first_name || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-0.5">Nom</p>
-              <p className="text-sm font-medium text-[#2C2C2C]">{data.last_name || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-0.5">Date de naissance</p>
-              <p className="text-sm text-[#2C2C2C]">
-                {data.date_of_birth ? new Date(data.date_of_birth).toLocaleDateString('fr-FR') : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-0.5">Nationalité</p>
-              <p className="text-sm text-[#2C2C2C]">{data.nationality || '—'}</p>
-            </div>
+      {/* Compétences */}
+      {data.skills?.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-[#F4F6F8]/50">
+            <h3 className="flex items-center gap-2 text-base font-semibold text-[#2C2C2C]">
+              <Code className="h-5 w-5 text-[#226D68]" />
+              Compétences
+            </h3>
           </div>
-
-          <div className="flex flex-wrap items-center gap-4 text-sm text-[#2C2C2C]">
-            {data.email && (
-              <span className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-[#226D68]" />
-                {data.email}
-              </span>
-            )}
-            {data.phone && (
-              <span className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-[#226D68]" />
-                {data.phone}
-              </span>
-            )}
-          </div>
-
-          {(data.city || data.country || data.address) && (
-            <div className="flex items-center gap-2 text-sm text-[#2C2C2C]">
-              <MapPin className="h-4 w-4 text-[#226D68] shrink-0" />
-              {[data.city, data.country].filter(Boolean).join(', ')}
-              {data.address && ` · ${data.address}`}
-            </div>
-          )}
-
-          <div>
-            <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-0.5">Titre du profil</p>
-            <p className="text-sm font-semibold text-[#2C2C2C]">{data.profile_title || '—'}</p>
-          </div>
-
-          {data.professional_summary && (
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-1.5">Résumé professionnel</p>
-              <div
-                className="text-sm text-[#2C2C2C] whitespace-pre-wrap max-h-40 overflow-y-auto rounded-lg border border-gray-100 p-4 bg-[#F4F6F8]/50 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: data.professional_summary }}
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-gray-100">
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] mb-0.5">Secteur</p>
-              <p className="text-sm text-[#2C2C2C]">{data.sector || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] mb-0.5">Métier principal</p>
-              <p className="text-sm text-[#2C2C2C]">{data.main_job || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-[#6b7280] mb-0.5">Expérience</p>
-              <p className="text-sm text-[#2C2C2C]">{data.total_experience ?? 0} an(s)</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className={data.status === 'VALIDATED' ? 'bg-[#226D68]/15 text-[#1a5a55] border-[#226D68]/30' : 'bg-gray-100 text-[#6b7280] border-gray-200'}>
-                {data.status || 'DRAFT'}
-              </Badge>
-              {data.completion_percentage != null && (
-                <span className="text-xs text-[#6b7280]">{data.completion_percentage.toFixed(0)}%</span>
-              )}
-            </div>
+          <div className="p-4 sm:p-6 space-y-4">
+            {['TECHNICAL', 'SOFT', 'TOOL'].map((type) => {
+              const skills = data.skills.filter((s) => s.skill_type === type)
+              if (skills.length === 0) return null
+              const label = type === 'TECHNICAL' ? 'Techniques' : type === 'SOFT' ? 'Comportementales' : 'Outils & logiciels'
+              return (
+                <div key={type}>
+                  <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-2">{label}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {skills.map((skill, idx) => (
+                      <Badge key={skill.id || idx} variant="outline" className="bg-[#E8F4F3]/50 border-[#226D68]/20 text-[#1a5a55] font-normal">
+                        {skill.name}
+                        {skill.level && ` · ${skill.level}`}
+                        {skill.years_of_practice != null && skill.years_of_practice > 0 && ` · ${skill.years_of_practice} an(s)`}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Expériences */}
       {data.experiences?.length > 0 && (
@@ -128,8 +68,6 @@ export default function CandidateDataView({ data }) {
           </div>
           <div className="p-4 sm:p-6 space-y-4">
             {data.experiences.map((exp, index) => {
-              const defaultLogo = `https://ui-avatars.com/api/?name=${encodeURIComponent(exp.company_name || 'Co')}&size=80&background=226D68&color=fff&bold=true`
-              const logo = exp.company_logo_url || defaultLogo
               const expKey = exp.id || index
               const isExpanded = expandedExp[expKey]
               const hasLongContent = (exp.description?.length > 150 || exp.achievements?.length > 150)
@@ -137,12 +75,9 @@ export default function CandidateDataView({ data }) {
               return (
                 <div key={expKey} className="rounded-xl border border-gray-100 p-4 hover:border-[#226D68]/20 transition-colors">
                   <div className="flex gap-4">
-                    <img
-                      src={logo}
-                      alt=""
-                      className="w-14 h-14 rounded-full object-cover border border-gray-100 shrink-0"
-                      onError={(e) => { if (e.target.src !== defaultLogo) e.target.src = defaultLogo }}
-                    />
+                    <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-[#226D68]/10 border border-[#226D68]/20 shrink-0" aria-hidden>
+                      <Building2 className="w-7 h-7 text-[#226D68]" strokeWidth={1.5} />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-[#2C2C2C]">{exp.position}</span>
@@ -199,16 +134,23 @@ export default function CandidateDataView({ data }) {
               Formations & diplômes
             </h3>
           </div>
-          <div className="p-4 sm:p-6 space-y-3">
+          <div className="p-4 sm:p-6 space-y-4">
             {data.educations.map((edu, index) => (
-              <div key={edu.id || index} className="flex justify-between items-start gap-4 py-3 border-b border-gray-100 last:border-0">
-                <div className="min-w-0">
-                  <p className="font-medium text-[#2C2C2C]">{edu.diploma}</p>
-                  <p className="text-sm text-[#6b7280]">{edu.institution}{edu.country ? ` · ${edu.country}` : ''}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm text-[#6b7280]">{edu.graduation_year}</span>
-                  {edu.level && <Badge variant="outline" className="text-xs border-[#226D68]/20">{edu.level}</Badge>}
+              <div key={edu.id || index} className="rounded-xl border border-gray-100 p-4 hover:border-[#226D68]/20 transition-colors">
+                <div className="flex gap-4">
+                  <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-[#226D68]/10 border border-[#226D68]/20 shrink-0" aria-hidden>
+                    <GraduationCap className="w-7 h-7 text-[#226D68]" strokeWidth={1.5} />
+                  </div>
+                  <div className="flex-1 min-w-0 flex justify-between items-start gap-4">
+                    <div className="min-w-0">
+                      <p className="font-medium text-[#2C2C2C]">{edu.diploma}</p>
+                      <p className="text-sm text-[#6b7280]">{edu.institution}{edu.country ? ` · ${edu.country}` : ''}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm text-[#6b7280]">{edu.graduation_year}</span>
+                      {edu.level && <Badge variant="outline" className="text-xs border-[#226D68]/20">{edu.level}</Badge>}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -225,56 +167,30 @@ export default function CandidateDataView({ data }) {
               Certifications
             </h3>
           </div>
-          <div className="p-4 sm:p-6 space-y-3">
-            {data.certifications.map((cert, index) => (
-              <div key={cert.id || index} className="flex justify-between items-start gap-4 py-3 border-b border-gray-100 last:border-0">
-                <div>
-                  <p className="font-medium text-[#2C2C2C]">{cert.title}</p>
-                  <p className="text-sm text-[#6b7280]">{cert.issuer} · {cert.year}</p>
-                  {cert.expiration_date && (
-                    <p className="text-xs text-[#6b7280] mt-0.5">Expire le {new Date(cert.expiration_date).toLocaleDateString('fr-FR')}</p>
-                  )}
-                </div>
-                {cert.verification_url && (
-                  <a href={cert.verification_url} target="_blank" rel="noopener noreferrer" className="text-sm text-[#226D68] hover:underline shrink-0">
-                    Vérifier
-                  </a>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Compétences */}
-      {data.skills?.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-          <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-[#F4F6F8]/50">
-            <h3 className="flex items-center gap-2 text-base font-semibold text-[#2C2C2C]">
-              <Code className="h-5 w-5 text-[#226D68]" />
-              Compétences
-            </h3>
-          </div>
           <div className="p-4 sm:p-6 space-y-4">
-            {['TECHNICAL', 'SOFT', 'TOOL'].map((type) => {
-              const skills = data.skills.filter((s) => s.skill_type === type)
-              if (skills.length === 0) return null
-              const label = type === 'TECHNICAL' ? 'Techniques' : type === 'SOFT' ? 'Comportementales' : 'Outils & logiciels'
-              return (
-                <div key={type}>
-                  <p className="text-xs font-medium text-[#6b7280] uppercase tracking-wider mb-2">{label}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {skills.map((skill, idx) => (
-                      <Badge key={skill.id || idx} variant="outline" className="bg-[#E8F4F3]/50 border-[#226D68]/20 text-[#1a5a55] font-normal">
-                        {skill.name}
-                        {skill.level && ` · ${skill.level}`}
-                        {skill.years_of_practice != null && skill.years_of_practice > 0 && ` · ${skill.years_of_practice} an(s)`}
-                      </Badge>
-                    ))}
+            {data.certifications.map((cert, index) => (
+              <div key={cert.id || index} className="rounded-xl border border-gray-100 p-4 hover:border-[#226D68]/20 transition-colors">
+                <div className="flex gap-4">
+                  <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-[#226D68]/10 border border-[#226D68]/20 shrink-0" aria-hidden>
+                    <Award className="w-7 h-7 text-[#226D68]" strokeWidth={1.5} />
+                  </div>
+                  <div className="flex-1 min-w-0 flex justify-between items-start gap-4">
+                    <div>
+                      <p className="font-medium text-[#2C2C2C]">{cert.title}</p>
+                      <p className="text-sm text-[#6b7280]">{cert.issuer} · {cert.year}</p>
+                      {cert.expiration_date && (
+                        <p className="text-xs text-[#6b7280] mt-0.5">Expire le {new Date(cert.expiration_date).toLocaleDateString('fr-FR')}</p>
+                      )}
+                    </div>
+                    {cert.verification_url && (
+                      <a href={cert.verification_url} target="_blank" rel="noopener noreferrer" className="text-sm text-[#226D68] hover:underline shrink-0">
+                        Vérifier
+                      </a>
+                    )}
                   </div>
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

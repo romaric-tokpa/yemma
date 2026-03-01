@@ -1,0 +1,20 @@
+# Override pour le développement local : expose les ports des services
+# pour que le proxy Vite puisse les atteindre directement
+# Usage : docker compose up (merge automatique avec docker-compose.yml)
+
+services:
+  auth:
+    ports:
+      - "${AUTH_PORT:-8001}:8000"
+
+  candidate:
+    ports:
+      - "${CANDIDATE_PORT:-8002}:8000"
+
+  search:
+    ports:
+      - "${SEARCH_PORT:-8004}:8000"
+
+  nginx:
+    ports:
+      - "${NGINX_HTTP_PORT:-8080}:80"

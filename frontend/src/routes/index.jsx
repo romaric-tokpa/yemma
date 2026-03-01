@@ -41,6 +41,7 @@ const AdminValidationPage = lazy(() => import('@/pages/AdminValidationPage'))
 const AdminCvtheque = lazy(() => import('@/pages/AdminCvtheque'))
 const AdminStatisticsPage = lazy(() => import('@/pages/AdminStatisticsPage'))
 const AdminReview = lazy(() => import('@/pages/AdminReview'))
+const AdminEvaluationPage = lazy(() => import('@/pages/AdminEvaluationPage'))
 const AdminInvitationsPage = lazy(() => import('@/pages/AdminInvitationsPage'))
 const AdminJobManager = lazy(() => import('@/pages/AdminJobManager'))
 const AdminJobFormPage = lazy(() => import('@/pages/AdminJobFormPage'))
@@ -204,23 +205,31 @@ export default function AppRoutes() {
       />
 
       {/* Routes protégées - Entreprise / Recruteur */}
-      {/* Onboarding entreprise - routes par étape */}
+      {/* Onboarding entreprise - routes par étape (gère trailing slash pour éviter 404) */}
       <Route 
         path="/company/onboarding" 
         element={
           <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
-            <Navigate to="/company/onboarding/etape-1" replace />
+            <Navigate to="/company/onboarding/etape/1" replace />
           </AuthGuard>
         } 
       />
       <Route 
-        path="/company/onboarding/etape-:step" 
+        path="/company/onboarding/" 
+        element={<Navigate to="/company/onboarding/etape/1" replace />} 
+      />
+      <Route 
+        path="/company/onboarding/etape/:step" 
         element={
           <AuthGuard allowedRoles={['ROLE_COMPANY_ADMIN']}>
             <CompanyOnboarding />
           </AuthGuard>
         } 
       />
+      {/* Redirection anciennes URLs (etape-1, etape-2, etape-3) → etape/1, etape/2, etape/3 */}
+      <Route path="/company/onboarding/etape-1" element={<Navigate to="/company/onboarding/etape/1" replace />} />
+      <Route path="/company/onboarding/etape-2" element={<Navigate to="/company/onboarding/etape/2" replace />} />
+      <Route path="/company/onboarding/etape-3" element={<Navigate to="/company/onboarding/etape/3" replace />} />
       
       {/* Dashboard entreprise - routes par onglet */}
       <Route 
@@ -463,7 +472,7 @@ export default function AppRoutes() {
         path="/admin/review/:candidateId/evaluation" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
-            <AdminReview defaultTab="evaluation" />
+            <AdminEvaluationPage />
           </AuthGuard>
         } 
       />

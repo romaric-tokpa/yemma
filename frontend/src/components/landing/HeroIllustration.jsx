@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
  */
 export default function HeroIllustration() {
   return (
-    <div className="relative w-full max-w-[280px] xs:max-w-[320px] sm:max-w-[380px] lg:max-w-[440px] mx-auto min-h-[240px] xs:min-h-[280px] sm:min-h-[320px] lg:min-h-[380px]">
+    <div className="relative w-full max-w-[320px] xs:max-w-[365px] sm:max-w-[435px] lg:max-w-[505px] mx-auto min-h-[275px] xs:min-h-[320px] sm:min-h-[368px] lg:min-h-[435px]">
       {/* Laptop - incliné légèrement */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
@@ -17,12 +17,12 @@ export default function HeroIllustration() {
           transformOrigin: 'center bottom',
         }}
       >
-        <div className="relative bg-white rounded-t-xl rounded-b-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] border border-gray-200 overflow-hidden">
+        <div className="relative bg-white rounded-t-xl rounded-b-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.12)] border border-gray-200 overflow-hidden">
           {/* Écran */}
-          <div className="aspect-[4/3] bg-gray-50 flex items-center justify-center p-3">
-            <div className="w-full h-full bg-white rounded border border-gray-100 flex items-center justify-center">
-              <div className="text-center text-gray-300 text-[10px]">
-                <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-gray-200" />
+          <div className="aspect-[4/3] bg-gray-100 flex items-center justify-center p-3">
+            <div className="w-full h-full bg-white rounded border border-gray-200 flex items-center justify-center">
+              <div className="text-center text-[10px]">
+                <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-[#226D68]/20" />
                 <div className="space-y-1.5">
                   <div className="h-1.5 bg-gray-200 rounded w-4/5 mx-auto" />
                   <div className="h-1.5 bg-gray-200 rounded w-3/5 mx-auto" />
@@ -42,12 +42,12 @@ export default function HeroIllustration() {
         initial={{ opacity: 0, x: -24, y: 8 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
         transition={{ duration: 0.5, delay: 0.35 }}
-        className="absolute top-[12%] left-[2%] w-[42%] max-w-[130px] bg-white rounded-lg shadow-[0_10px_40px_-10px_rgba(0,0,0,0.2)] border border-gray-100 p-2.5"
+        className="absolute top-[12%] left-[2%] w-[42%] max-w-[130px] bg-white rounded-lg shadow-[0_10px_40px_-10px_rgba(0,0,0,0.12)] border border-gray-200 p-2.5"
         style={{ transform: 'rotate(-8deg)' }}
       >
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-[#226D68]/25 shrink-0" />
+            <div className="w-7 h-7 rounded-full bg-[#226D68]/30 shrink-0" />
             <div className="flex-1 space-y-1">
               <div className="h-1.5 bg-gray-200 rounded w-full" />
               <div className="h-1.5 bg-gray-200 rounded w-4/5" />
@@ -74,11 +74,11 @@ export default function HeroIllustration() {
             className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{
               background: 'linear-gradient(135deg, #226D68 0%, #2d8a84 100%)',
-              boxShadow: '0 0 24px 10px rgba(34, 109, 104, 0.2)',
+              boxShadow: '0 0 28px 12px rgba(34, 109, 104, 0.35)',
             }}
           />
           {/* Pied articulé */}
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 w-1 h-4 bg-amber-100 rounded" style={{ backgroundColor: '#d4a574' }} />
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 w-1 h-4 rounded" style={{ backgroundColor: '#8a6a4a' }} />
         </div>
       </motion.div>
 
@@ -87,8 +87,8 @@ export default function HeroIllustration() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.55 }}
-        className="absolute bottom-[32%] left-[0%] w-10 h-10 bg-[#e76f51] rounded-lg opacity-90"
-        style={{ transform: 'rotate(15deg)', boxShadow: '0 4px 14px rgba(231, 111, 81, 0.3)' }}
+        className="absolute bottom-[32%] left-[0%] w-10 h-10 bg-[#e76f51] rounded-lg"
+        style={{ transform: 'rotate(15deg)', boxShadow: '0 4px 18px rgba(231, 111, 81, 0.4)', opacity: 0.95 }}
       />
 
       {/* Cercle décoratif discret */}
@@ -96,7 +96,7 @@ export default function HeroIllustration() {
         initial={{ opacity: 0, scale: 0 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, delay: 0.65 }}
-        className="absolute top-[5%] right-[15%] w-5 h-5 rounded-full border-2 border-[#226D68]/25"
+        className="absolute top-[5%] right-[15%] w-5 h-5 rounded-full border-2 border-[#226D68]/40"
       />
     </div>
   )

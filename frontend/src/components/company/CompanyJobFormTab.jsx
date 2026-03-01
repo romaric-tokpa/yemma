@@ -35,7 +35,7 @@ export function CompanyJobFormTab({ companyId, company, jobId, basePath = '/comp
     requirements: '',
     expires_at: '',
     company_name: company?.name || '',
-    company_logo_url: company?.logo_url || '',
+    company_logo_url: documentApi.normalizeLogoUrl(company?.logo_url) || '',
     application_type: 'internal',
     external_application_url: '',
     application_email: '',
@@ -48,7 +48,7 @@ export function CompanyJobFormTab({ companyId, company, jobId, basePath = '/comp
 
   useEffect(() => {
     if (company && !isEdit) {
-      setForm((f) => ({ ...f, company_name: company.name || '', company_logo_url: company.logo_url || '' }))
+      setForm((f) => ({ ...f, company_name: company.name || '', company_logo_url: documentApi.normalizeLogoUrl(company.logo_url) || '' }))
     }
   }, [company, isEdit])
 
@@ -70,7 +70,7 @@ export function CompanyJobFormTab({ companyId, company, jobId, basePath = '/comp
             requirements: job.requirements || '',
             expires_at: job.expires_at ? job.expires_at.slice(0, 10) : '',
             company_name: job.company_name || company?.name || '',
-            company_logo_url: job.company_logo_url || company?.logo_url || '',
+            company_logo_url: documentApi.normalizeLogoUrl(job.company_logo_url || company?.logo_url) || '',
             application_type: appType,
             external_application_url: job.external_application_url || '',
             application_email: job.application_email || '',

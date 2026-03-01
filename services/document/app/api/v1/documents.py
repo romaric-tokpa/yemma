@@ -177,18 +177,11 @@ async def upload_company_logo(
         )
         logger.info(f"Successfully uploaded logo to S3: {s3_key}")
         
-        # Générer l'URL publique
-        # Si on utilise MinIO avec un endpoint public, on peut construire l'URL directement
-        # Sinon, on génère une URL présignée
-        if settings.S3_PUBLIC_ENDPOINT and settings.S3_FORCE_PATH_STYLE:
-            # URL publique directe pour MinIO
-            public_url = f"{settings.S3_PUBLIC_ENDPOINT}/{settings.S3_BUCKET_NAME}/{s3_key}"
-        else:
-            # URL présignée temporaire (24h)
-            public_url = await s3_storage.generate_presigned_url(s3_key, expiration=86400)
+        # Retourner une URL via le service /serve (évite ERR_CONNECTION_REFUSED avec MinIO non exposé)
+        serve_url = f"/api/v1/documents/serve/company-logo/{company_id}/{stored_filename}"
         
         return {
-            "url": public_url,
+            "url": serve_url,
             "s3_key": s3_key,
             "filename": stored_filename,
             "size": len(file_content),
@@ -258,13 +251,9 @@ async def upload_job_offer_logo(
         )
         logger.info(f"Successfully uploaded job offer logo to S3: {s3_key}")
 
-        if settings.S3_PUBLIC_ENDPOINT and settings.S3_FORCE_PATH_STYLE:
-            public_url = f"{settings.S3_PUBLIC_ENDPOINT}/{settings.S3_BUCKET_NAME}/{s3_key}"
-        else:
-            public_url = await s3_storage.generate_presigned_url(s3_key, expiration=31536000)  # 1 an
-
+        serve_url = f"/api/v1/documents/serve/job-offer-logo/{stored_filename}"
         return {
-            "url": public_url,
+            "url": serve_url,
             "s3_key": s3_key,
             "filename": stored_filename,
             "size": len(file_content),
@@ -498,6 +487,66 @@ async def get_candidate_documents(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la récupération des documents: {err_msg}"
+        )
+
+
+@router.get("/serve/job-offer-logo/{filename}")
+@router.head("/serve/job-offer-logo/{filename}")
+async def serve_job_offer_logo(filename: str):
+    """Sert un logo d'offre d'emploi depuis S3."""
+    s3_key = f"job-offers/logos/{filename}"
+    try:
+        def _download():
+            response = s3_storage.client.get_object(Bucket=s3_storage.bucket_name, Key=s3_key)
+            return response['Body'].read()
+        file_content = await asyncio.to_thread(_download)
+        mime = 'image/png' if filename.lower().endswith('.png') else 'image/jpeg' if filename.lower().endswith(('.jpg', '.jpeg')) else 'image/webp'
+        return StreamingResponse(
+            io.BytesIO(file_content),
+            media_type=mime,
+            headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "public, max-age=3600", "Content-Length": str(len(file_content))}
+        )
+    except ClientError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Logo introuvable")
+
+
+@router.get("/serve/company-logo/{company_id}/{filename}")
+@router.head("/serve/company-logo/{company_id}/{filename}")
+async def serve_company_logo(
+    company_id: int,
+    filename: str,
+):
+    """
+    Sert un logo d'entreprise depuis S3 (proxy vers MinIO).
+    Évite ERR_CONNECTION_REFUSED quand MinIO n'est pas exposé sur l'hôte.
+    """
+    s3_key = f"companies/{company_id}/logo/{filename}"
+    try:
+        def _download_file():
+            response = s3_storage.client.get_object(
+                Bucket=s3_storage.bucket_name,
+                Key=s3_key
+            )
+            return response['Body'].read()
+        
+        file_content = await asyncio.to_thread(_download_file)
+        mime = 'image/png' if filename.lower().endswith('.png') else 'image/jpeg'
+        return StreamingResponse(
+            io.BytesIO(file_content),
+            media_type=mime,
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "public, max-age=3600",
+                "Content-Length": str(len(file_content))
+            }
+        )
+    except ClientError as e:
+        logger.warning(f"Company logo not found: {s3_key} - {e}")
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="12" fill="#E8F4F3"/><path d="M20 56V32a4 4 0 0 1 4-4h32a4 4 0 0 1 4 4v24M14 56h52M32 56V44h16v12" stroke="#226D68" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+        return StreamingResponse(
+            io.BytesIO(svg),
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=60"},
         )
 
 

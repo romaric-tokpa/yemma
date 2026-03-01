@@ -19,7 +19,7 @@ import {
   Briefcase,
   BarChart3,
 } from 'lucide-react'
-import { companyApi, authApiService, paymentApiService } from '@/services/api'
+import { companyApi, authApiService, paymentApiService, documentApi } from '@/services/api'
 import CompanyManagement from './CompanyManagement'
 import { SearchTab } from '../components/company/SearchTab'
 import { CompanySettingsTab } from '../components/company/CompanySettingsTab'
@@ -106,14 +106,12 @@ export default function CompanyDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [companyData, membersData] = await Promise.all([
-        companyApi.getMyCompany().catch(() => null),
-        companyApi.getMyCompany()
-          .then(c => companyApi.getTeamMembers(c.id))
-          .catch(() => []),
-      ])
+      const companyData = await companyApi.getMyCompanyOrNull()
       setCompany(companyData)
-      setTeamMembers(membersData || [])
+      const membersData = companyData?.id
+        ? await companyApi.getTeamMembers(companyData.id).catch(() => [])
+        : []
+      setTeamMembers(membersData)
 
       if (companyData?.id) {
         try {
@@ -209,7 +207,7 @@ export default function CompanyDashboard() {
     )
   }
 
-  const displayLogo = company.logo_url || generateAvatarUrl(company.name)
+  const displayLogo = documentApi.normalizeLogoUrl(company.logo_url) || generateAvatarUrl(company.name)
   const activeMembers = teamMembers.filter(m => m.status === 'active')
   const quotaUsed = subscription?.quota_limit != null && subscription?.quota_remaining != null
     ? Math.max(0, subscription.quota_limit - subscription.quota_remaining)

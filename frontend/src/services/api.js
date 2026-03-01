@@ -56,20 +56,13 @@ const getBaseUrl = (envVar, defaultPort) => {
   return ''
 }
 
+// En développement local (port 3000), toutes les requêtes passent par le proxy Vite → nginx
+// Les URLs de base sont vides (chemins relatifs) sauf si une variable d'env est définie
 const AUTH_API_URL = getBaseUrl('VITE_AUTH_API_URL', 8001)
 const CANDIDATE_API_URL = getBaseUrl('VITE_CANDIDATE_API_URL', 8002)
 const DOCUMENT_API_URL = getBaseUrl('VITE_DOCUMENT_API_URL', 8003)
 const SEARCH_API_URL = getBaseUrl('VITE_SEARCH_API_URL', 8004)
-// Company : en dev (port 3000 Vite), URL directe pour éviter les erreurs proxy (500 text/plain)
-const COMPANY_API_URL = (() => {
-  const envUrl = getBaseUrl('VITE_COMPANY_API_URL', 8005)
-  if (envUrl) return envUrl
-  if (typeof window !== 'undefined' && window.location.port === '3000') {
-    const protocol = window.location.protocol || 'http:'
-    return `${protocol}//${window.location.hostname}:8005`
-  }
-  return ''
-})()
+const COMPANY_API_URL = getBaseUrl('VITE_COMPANY_API_URL', 8005)
 const PAYMENT_API_URL = getBaseUrl('VITE_PAYMENT_API_URL', 8006)
 const NOTIFICATION_API_URL = getBaseUrl('VITE_NOTIFICATION_API_URL', 8007)
 const AUDIT_API_URL = getBaseUrl('VITE_AUDIT_API_URL', 8008)
@@ -1073,6 +1066,25 @@ export const documentApi = {
     const response = await documentApiClient.delete(`/api/v1/documents/${documentId}`)
     return response.data
   },
+
+  /**
+   * Normalise une URL de logo (convertit les anciennes URLs MinIO en URL serve)
+   * pour éviter ERR_CONNECTION_REFUSED quand MinIO n'est pas exposé.
+   */
+  normalizeLogoUrl: (url) => {
+    if (!url || typeof url !== 'string') return url
+    // Déjà une URL serve relative
+    if (url.startsWith('/api/v1/documents/serve/')) return url
+    // Ancienne URL MinIO (plusieurs formats possibles) :
+    // http://localhost:9000/documents/companies/123/logo/xxx.png
+    // http://localhost:9000/bucket/companies/123/logo/xxx.png
+    const m = url.match(/companies\/(\d+)\/logo\/([^/?#]+)/)
+    if (m) return `/api/v1/documents/serve/company-logo/${m[1]}/${m[2]}`
+    // Job offer logo
+    const m2 = url.match(/job-offers\/logos\/([^/?#]+)/)
+    if (m2) return `/api/v1/documents/serve/job-offer-logo/${m2[1]}`
+    return url
+  },
 }
 
 export const searchApiService = {
@@ -1151,20 +1163,20 @@ export const paymentApiService = {
     return response.data
   },
 
-  // Récupérer l'abonnement d'une entreprise
+  // Récupérer l'abonnement d'une entreprise (null si aucun abonnement / plan gratuit)
   getSubscription: async (companyId) => {
     const response = await paymentApiClient.get(`/api/v1/subscriptions/company/${companyId}`)
-    return response.data
+    return response.data || null
   },
 }
 
 export const paymentApi = {
   ...paymentApiService,
   
-  // Récupérer l'abonnement d'une entreprise
+  // Récupérer l'abonnement d'une entreprise (null si aucun abonnement / plan gratuit)
   getCompanySubscription: async (companyId) => {
     const response = await paymentApiClient.get(`/api/v1/subscriptions/company/${companyId}`)
-    return response.data
+    return response.data || null
   },
 
   // Récupérer les plans disponibles
@@ -1205,9 +1217,22 @@ export const companyApi = {
     return response.data
   },
 
-  // Récupérer l'entreprise de l'utilisateur actuel
+  // Récupérer l'entreprise de l'utilisateur actuel (throws si pas d'entreprise)
   getMyCompany: async () => {
     const response = await companyApiClient.get('/api/v1/companies/me/company')
+    if (!response.data) throw new Error('No company found')
+    return response.data
+  },
+
+  // Récupère l'entreprise ou null si pas d'entreprise (200 + null)
+  getMyCompanyOrNull: async () => {
+    const response = await companyApiClient.get('/api/v1/companies/me/company')
+    return response.data || null
+  },
+
+  // Fermer/supprimer l'entreprise (soft delete RGPD) - appelé avant anonymizeAccount
+  closeMyCompany: async () => {
+    const response = await companyApiClient.delete('/api/v1/companies/me/company')
     return response.data
   },
 

@@ -1,24 +1,21 @@
 /**
  * Page de revue/validation du profil candidat par l'administrateur.
- * Affiche le profil complet, les documents et le formulaire d'évaluation.
+ * Profil détaillé + lien vers la page d'évaluation dédiée.
  */
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import CandidateDataView from '@/components/admin/CandidateDataView'
-import DocumentViewer from '@/components/admin/DocumentViewer'
-import EvaluationForm from '@/components/admin/EvaluationForm'
 import { candidateApi, documentApi, adminApi } from '@/services/api'
+import { ROUTES } from '@/constants/routes'
 import { formatDateTime } from '@/utils/dateUtils'
 import AdminLayout from '@/components/admin/AdminLayout'
 import {
-  Loader2, AlertCircle, RefreshCw, ChevronRight,
-  User, Mail, Phone, MapPin, Briefcase, FileText, CheckCircle2, Star,
-  Clock, Sparkles, ArrowLeft, Archive, ArchiveRestore,
+  Loader2, AlertCircle, RefreshCw,
+  Mail, Phone, MapPin, Briefcase, FileText, CheckCircle2, Star,
+  Clock, ArrowLeft, Archive, ArchiveRestore, Download, MapPinned, Calendar, X, Eye, ClipboardCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const generateAvatarUrl = (firstName, lastName) => {
@@ -44,33 +41,31 @@ const STATUS_LABELS = {
   ARCHIVED: 'Archivé',
 }
 
-const pathToTab = (path) => {
-  if (path.endsWith('/documents')) return 'documents'
-  if (path.endsWith('/evaluation')) return 'evaluation'
-  return 'profile'
-}
+const formatAvailability = (v) => ({ immediate: 'Immédiate', '1_week': 'Sous 1 semaine', '2_weeks': 'Sous 2 semaines', '1_month': 'Sous 1 mois', '2_months': 'Sous 2 mois', '3_months': 'Sous 3 mois', negotiable: 'À négocier' }[v] || v || '—')
 
-export default function AdminReview({ defaultTab }) {
+export default function AdminReview() {
   const { candidateId } = useParams()
   const navigate = useNavigate()
-  const location = useLocation()
   const [candidateData, setCandidateData] = useState(null)
   const [documents, setDocuments] = useState([])
-  const [selectedDocument, setSelectedDocument] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [refreshKey, setRefreshKey] = useState(0)
   const [photoError, setPhotoError] = useState(false)
   const [photoUrl, setPhotoUrl] = useState(null)
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [unarchiveLoading, setUnarchiveLoading] = useState(false)
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false)
   const [unarchiveDialogOpen, setUnarchiveDialogOpen] = useState(false)
-  const activeTab = pathToTab(location.pathname) || defaultTab || 'profile'
+  const [previewDocument, setPreviewDocument] = useState(null)
 
-  const goToTab = (tab) => {
-    if (tab === 'profile') navigate(`/admin/review/${candidateId}`)
-    else navigate(`/admin/review/${candidateId}/${tab}`)
+  const handleDownloadDocument = (doc) => {
+    const link = document.createElement('a')
+    link.href = doc.viewUrl
+    link.download = doc.originalFilename || doc.original_filename || `document_${doc.id}`
+    link.target = '_blank'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const fetchCandidateData = async () => {
@@ -97,14 +92,8 @@ export default function AdminReview({ defaultTab }) {
           fileSize: doc.file_size,
         }))
         setDocuments(docsWithUrls)
-        if (docsWithUrls.length > 0 && (!selectedDocument || !docsWithUrls.find(d => d.id === selectedDocument.id))) {
-          setSelectedDocument(docsWithUrls[0])
-        } else if (docsWithUrls.length === 0) {
-          setSelectedDocument(null)
-        }
       } catch (docError) {
         setDocuments([])
-        setSelectedDocument(null)
       }
     } catch (err) {
       let errorMessage = 'Erreur lors du chargement des données du candidat'
@@ -123,7 +112,7 @@ export default function AdminReview({ defaultTab }) {
 
   useEffect(() => {
     if (candidateId) fetchCandidateData()
-  }, [candidateId, refreshKey])
+  }, [candidateId])
 
   useEffect(() => {
     if (!candidateData?.id) {
@@ -151,12 +140,6 @@ export default function AdminReview({ defaultTab }) {
     }).catch(() => setPhotoUrl(null))
   }, [candidateData?.id, candidateData?.photo_url])
 
-  const handleValidationSuccess = async () => {
-    await new Promise(r => setTimeout(r, 1000))
-    await fetchCandidateData()
-    setRefreshKey(k => k + 1)
-  }
-
   const performArchive = async () => {
     setArchiveDialogOpen(false)
     try {
@@ -177,7 +160,6 @@ export default function AdminReview({ defaultTab }) {
       setUnarchiveLoading(true)
       await adminApi.unarchiveProfile(candidateId)
       await fetchCandidateData()
-      setRefreshKey(k => k + 1)
     } catch (err) {
       const msg = err.response?.data?.detail || err.message || 'Erreur lors du déarchivage'
       setError(msg)
@@ -199,23 +181,19 @@ export default function AdminReview({ defaultTab }) {
   if (error) {
     return (
       <AdminLayout>
-        <div className="min-w-0 w-full">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h2 className="font-semibold text-red-800">Erreur de chargement</h2>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
-                <div className="flex gap-3 mt-4">
-                  <Button variant="outline" size="sm" onClick={fetchCandidateData} className="border-red-300 text-red-700 hover:bg-red-100">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Réessayer
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/admin/validation')}>
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Retour
-                  </Button>
-                </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h2 className="font-semibold text-red-800">Erreur de chargement</h2>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <div className="flex gap-3 mt-4">
+                <Button variant="outline" size="sm" onClick={fetchCandidateData} className="border-red-300 text-red-700 hover:bg-red-100">
+                  <RefreshCw className="w-4 h-4 mr-2" />Réessayer
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate('/admin/validation')}>
+                  <ArrowLeft className="w-4 h-4 mr-2" />Retour
+                </Button>
               </div>
             </div>
           </div>
@@ -227,278 +205,344 @@ export default function AdminReview({ defaultTab }) {
   const defaultAvatar = candidateData ? generateAvatarUrl(candidateData.first_name, candidateData.last_name) : ''
   const displayPhoto = (photoUrl && !photoError && !photoUrl.includes('ui-avatars.com')) ? photoUrl : defaultAvatar
   const fullName = candidateData ? `${candidateData.first_name || ''} ${candidateData.last_name || ''}`.trim() || 'Candidat' : ''
-    const candidateLocation = candidateData ? [candidateData.city, candidateData.country].filter(Boolean).join(', ') : ''
+  const candidateLocation = candidateData ? [candidateData.city, candidateData.country].filter(Boolean).join(', ') : ''
+  const hasHistory = candidateData?.created_at || candidateData?.submitted_at || candidateData?.validated_at || candidateData?.rejected_at
+
+  const skills = Array.isArray(candidateData?.skills) ? candidateData.skills.slice(0, 5) : []
 
   return (
     <AdminLayout>
-      <div className="min-w-0 w-full">
-        {/* Fil d'Ariane */}
-        <nav className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[#6b7280] mb-4 sm:mb-6 overflow-x-auto">
-          <Link to="/admin/dashboard" className="hover:text-[#226D68] shrink-0">Dashboard</Link>
-          <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-          <Link to="/admin/validation" className="hover:text-[#226D68] shrink-0">Validation</Link>
-          <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-          <span className="text-[#2C2C2C] font-medium truncate">{fullName || `#${candidateId}`}</span>
-        </nav>
+      <div className="space-y-0">
 
-        {/* Hero profil */}
-        <div className="rounded-xl sm:rounded-2xl border border-gray-200 bg-gradient-to-br from-[#226D68] to-[#1a5a55] overflow-hidden shadow-lg mb-6">
-          <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-              <div className="relative shrink-0">
-                <img
-                  src={displayPhoto}
-                  alt={fullName}
-                  className="w-20 h-20 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-white/30 shadow-xl"
-                  onError={(e) => {
-                    if (!photoError && e.target.src !== defaultAvatar) {
-                      setPhotoError(true)
-                      e.target.src = defaultAvatar
-                    } else {
-                      e.target.src = defaultAvatar
-                    }
-                  }}
-                />
-                {candidateData?.status === 'VALIDATED' && candidateData?.is_verified && (
-                  <div className="absolute -top-1 -right-1 bg-white rounded-full p-1 shadow-lg">
-                    <CheckCircle2 className="h-4 w-4 text-[#226D68]" />
-                  </div>
-                )}
-                {candidateData?.admin_score != null && (
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-[#e76f51] text-white rounded-full px-2 py-0.5 text-xs font-bold shadow-lg flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-current" />
-                    {candidateData.admin_score.toFixed(1)}/5
-                  </div>
-                )}
+        {/* Hero section — style ProfileCVHeroIllustration */}
+        <section className="relative pt-4 pb-6 sm:pb-8 overflow-hidden bg-white">
+          <div className="relative max-w-6xl mx-auto px-3 sm:px-4 lg:px-6">
+            {/* Breadcrumb + actions */}
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
+              <div className="flex items-center gap-2 min-w-0">
+                <Link
+                  to="/admin/validation"
+                  className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#226D68] hover:bg-[#E8F4F3] transition-colors shrink-0"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+                <div className="flex items-center gap-2 text-sm min-w-0 flex-wrap">
+                  <Link to="/admin/validation" className="text-[#6b7280] hover:text-[#226D68] shrink-0 transition-colors">
+                    Validation
+                  </Link>
+                  <span className="text-gray-300 shrink-0">/</span>
+                  <span className="font-semibold text-[#2C2C2C] truncate">{fullName}</span>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <h1 className="text-lg sm:text-2xl font-bold text-white truncate max-w-full">{fullName}</h1>
-                  <Badge className={`text-xs font-medium ${STATUS_COLORS[candidateData?.status] || STATUS_COLORS.DRAFT}`}>
-                    {STATUS_LABELS[candidateData?.status] || candidateData?.status}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  asChild
+                  size="sm"
+                  className="h-8 px-3 text-xs bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                >
+                  <Link to={ROUTES.ADMIN_REVIEW_EVALUATION(candidateId)}>
+                    <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
+                    Grille d&apos;évaluation
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchCandidateData}
+                  disabled={loading}
+                  className="h-8 px-3 text-xs border-gray-200 hover:border-[#226D68]/50 hover:bg-[#E8F4F3]/50"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Actualiser
+                </Button>
+                {candidateData?.status === 'ARCHIVED' ? (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    onClick={fetchCandidateData}
-                    disabled={loading}
-                    className="h-8 text-white/90 hover:text-white hover:bg-white/10 text-xs sm:text-sm"
+                    onClick={() => setUnarchiveDialogOpen(true)}
+                    disabled={unarchiveLoading}
+                    className="h-8 px-3 text-xs border-gray-200 hover:border-[#226D68]/50 hover:bg-[#E8F4F3]/50"
                   >
-                    <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
-                    Actualiser
+                    {unarchiveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <ArchiveRestore className="h-3.5 w-3.5 mr-1.5" />}
+                    Déarchiver
                   </Button>
-                  {candidateData?.status === 'ARCHIVED' ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setUnarchiveDialogOpen(true)}
-                      disabled={unarchiveLoading}
-                      className="h-8 text-white/90 hover:text-white hover:bg-white/10 text-xs sm:text-sm"
-                      title="Déarchiver le profil"
-                    >
-                      {unarchiveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArchiveRestore className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
-                      Déarchiver
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setArchiveDialogOpen(true)}
-                      disabled={archiveLoading}
-                      className="h-8 text-white/90 hover:text-white hover:bg-white/10 text-xs sm:text-sm"
-                      title="Archiver le profil"
-                    >
-                      {archiveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
-                      Archiver
-                    </Button>
-                  )}
-                </div>
-                {candidateData?.profile_title && (
-                  <p className="text-white/95 text-sm sm:text-base mb-3">{candidateData.profile_title}</p>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setArchiveDialogOpen(true)}
+                    disabled={archiveLoading}
+                    className="h-8 px-3 text-xs border-gray-200 hover:border-gray-300 text-[#6b7280]"
+                  >
+                    {archiveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Archive className="h-3.5 w-3.5 mr-1.5" />}
+                    Archiver
+                  </Button>
                 )}
-                <div className="flex flex-wrap gap-x-3 sm:gap-x-4 gap-y-1.5 text-xs sm:text-sm text-white/90">
-                  {candidateLocation && <span className="flex items-center gap-1"><MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /><span className="truncate max-w-[150px] sm:max-w-none">{candidateLocation}</span></span>}
-                  {candidateData?.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" /><span className="truncate max-w-[180px] sm:max-w-none">{candidateData.email}</span></span>}
-                  {candidateData?.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />{candidateData.phone}</span>}
-                  {candidateData?.total_experience != null && (
-                    <span className="flex items-center gap-1"><Briefcase className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />{candidateData.total_experience} an{candidateData.total_experience > 1 ? 's' : ''}</span>
-                  )}
-                  {candidateData?.completion_percentage != null && (
-                    <span>{candidateData.completion_percentage.toFixed(0)}% complété</span>
-                  )}
-                </div>
               </div>
             </div>
+
+            {/* Carte CV principale — style ProfileCVHeroIllustration */}
+            <div
+              className="relative bg-white rounded-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.12)] border border-gray-200 overflow-hidden"
+              style={{ boxShadow: '0 20px 60px -15px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04)' }}
+            >
+              {/* En-tête CV - photo + nom + badge */}
+              <div className="p-5 sm:p-6 pb-4 border-b border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="relative shrink-0">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden ring-2 ring-gray-100 bg-[#226D68]/10">
+                      <img
+                        src={displayPhoto}
+                        alt={fullName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          if (!photoError && e.target.src !== defaultAvatar) {
+                            setPhotoError(true)
+                            e.target.src = defaultAvatar
+                          } else {
+                            e.target.src = defaultAvatar
+                          }
+                        }}
+                      />
+                    </div>
+                    {candidateData?.status === 'VALIDATED' && candidateData?.is_verified && (
+                      <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5 shadow border border-gray-100">
+                        <CheckCircle2 className="h-4 w-4 text-[#226D68]" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold text-[#2C2C2C] font-heading leading-tight">
+                      {fullName}
+                    </h1>
+                    {candidateData?.profile_title && (
+                      <p className="text-sm sm:text-base text-[#226D68] font-medium mt-0.5">{candidateData.profile_title}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-[#6b7280]">
+                      {candidateData?.total_experience != null && (
+                        <span className="flex items-center gap-1">
+                          <Briefcase className="h-3 w-3 shrink-0" />
+                          {candidateData.total_experience} an{candidateData.total_experience > 1 ? 's' : ''} d&apos;expérience
+                        </span>
+                      )}
+                      {candidateLocation && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3 shrink-0" />{candidateLocation}
+                        </span>
+                      )}
+                      {(candidateData?.job_preferences?.mobility || candidateData?.job_preferences?.willing_to_relocate) && (
+                        <span className="flex items-center gap-1">
+                          <MapPinned className="h-3 w-3 shrink-0" />
+                          {candidateData.job_preferences.willing_to_relocate ? 'Prêt(e) à déménager' : candidateData.job_preferences.mobility}
+                        </span>
+                      )}
+                      {candidateData?.job_preferences?.availability && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 shrink-0" />
+                          {formatAvailability(candidateData.job_preferences.availability)}
+                        </span>
+                      )}
+                      {candidateData?.email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3 shrink-0" />
+                          <span className="truncate max-w-[200px]">{candidateData.email}</span>
+                        </span>
+                      )}
+                      {candidateData?.phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3 shrink-0" />{candidateData.phone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <Badge className={`text-xs font-medium ${STATUS_COLORS[candidateData?.status] || STATUS_COLORS.DRAFT}`}>
+                      {STATUS_LABELS[candidateData?.status] || candidateData?.status}
+                    </Badge>
+                    {candidateData?.admin_score != null && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#226D68]/10">
+                        <Star className="w-4 h-4 text-[#226D68]" fill="currentColor" strokeWidth={0} />
+                        <span className="text-xs sm:text-sm font-semibold text-[#226D68]">{candidateData.admin_score.toFixed(1)}/5</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Corps du CV — résumé, compétences, documents + infos clés */}
+              <div className="p-5 sm:p-6 space-y-4">
+                {candidateData?.professional_summary && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[#226D68]" strokeWidth={1.5} />
+                      <span className="text-sm font-semibold text-[#2C2C2C]">Résumé professionnel</span>
+                    </div>
+                    <div
+                      className="text-sm text-[#374151] leading-relaxed rounded-lg border border-gray-100 p-3 bg-[#F9FAFB]/80 rich-text-content"
+                      dangerouslySetInnerHTML={{ __html: candidateData.professional_summary }}
+                    />
+                  </div>
+                )}
+                {documents.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-[#226D68]" strokeWidth={1.5} />
+                      <span className="text-sm font-semibold text-[#2C2C2C]">Documents</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {documents.map((doc) => (
+                        <div key={doc.id} className="inline-flex items-center gap-1 rounded-md overflow-hidden border border-[#226D68]/20 bg-[#226D68]/10">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDocument(doc)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#226D68] hover:bg-[#226D68]/20 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate max-w-[140px]">{doc.originalFilename || doc.original_filename || `Document ${doc.id}`}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDocument(doc)}
+                            className="p-1.5 text-[#226D68] hover:bg-[#226D68]/20 transition-colors"
+                            title="Télécharger"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {candidateData?.completion_percentage != null && (
+                    <Badge variant="outline" className="text-xs border-gray-200 text-[#6b7280]">
+                      {candidateData.completion_percentage.toFixed(0)}% complété
+                    </Badge>
+                  )}
+                </div>
+                {skills.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Briefcase className="w-4 h-4 sm:w-5 sm:h-5 text-[#226D68]" strokeWidth={1.5} />
+                      <span className="text-sm font-semibold text-[#2C2C2C]">Compétences</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {skills.map((s) => (
+                        <span
+                          key={s.id || s.name || s}
+                          className="px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium bg-[#226D68]/10 text-[#226D68]"
+                        >
+                          {typeof s === 'string' ? s : (s.name || s.skill_name || s)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Pied de carte — validé par Yemma + historique */}
+              <div className="px-5 sm:px-6 py-3 bg-[#F9FAFB] border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm text-[#6b7280]">
+                    {candidateData?.status === 'VALIDATED' ? 'Profil validé' : 'En cours de validation'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-4 h-4 rounded-full bg-[#226D68]/30" />
+                    <span className="text-xs sm:text-sm font-medium text-[#226D68]">Yemma</span>
+                  </div>
+                </div>
+                {hasHistory && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6b7280]">
+                    {candidateData.created_at && (
+                      <span><Clock className="h-3 w-3 inline mr-1 text-gray-400" />Inscrit {formatDateTime(candidateData.created_at)}</span>
+                    )}
+                    {candidateData.submitted_at && (
+                      <span>Soumis {formatDateTime(candidateData.submitted_at)}</span>
+                    )}
+                    {candidateData.validated_at && (
+                      <span className="text-[#1a5a55] font-medium">Validé {formatDateTime(candidateData.validated_at)}</span>
+                    )}
+                    {candidateData.rejected_at && (
+                      <span className="text-[#c04a2f] font-medium">Rejeté {formatDateTime(candidateData.rejected_at)}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Contenu détaillé — profil */}
+        <div className="bg-[#F9FAFB] pt-6 sm:pt-8 pb-10">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-6">
+            <CandidateDataView data={candidateData} />
           </div>
         </div>
 
-        {/* Dates et historique */}
-        {(candidateData?.created_at || candidateData?.submitted_at || candidateData?.validated_at || candidateData?.rejected_at) && (
-          <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 mb-6 shadow-sm">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-[#2C2C2C] mb-3">
-              <Clock className="h-4 w-4 text-[#226D68]" />
-              Historique
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {candidateData.created_at && (
-                <div>
-                  <p className="text-xs text-[#6b7280] font-medium">Inscription</p>
-                  <p className="text-sm font-medium text-[#2C2C2C] mt-0.5">{formatDateTime(candidateData.created_at)}</p>
-                </div>
-              )}
-              {candidateData.submitted_at && (
-                <div>
-                  <p className="text-xs text-[#6b7280] font-medium">Soumission</p>
-                  <p className="text-sm font-medium text-[#2C2C2C] mt-0.5">{formatDateTime(candidateData.submitted_at)}</p>
-                </div>
-              )}
-              {candidateData.validated_at && (
-                <div>
-                  <p className="text-xs text-[#6b7280] font-medium">Validation</p>
-                  <p className="text-sm font-medium text-[#1a5a55] mt-0.5">{formatDateTime(candidateData.validated_at)}</p>
-                </div>
-              )}
-              {candidateData.rejected_at && (
-                <div>
-                  <p className="text-xs text-[#6b7280] font-medium">Rejet</p>
-                  <p className="text-sm font-medium text-[#c04a2f] mt-0.5">{formatDateTime(candidateData.rejected_at)}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Avis Expert */}
-        {candidateData?.admin_report && Object.keys(candidateData.admin_report).length > 0 && (
-          <div className="rounded-xl border border-[#226D68]/30 bg-gradient-to-r from-white to-[#E8F4F3]/50 p-4 sm:p-5 mb-6 shadow-sm">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-[#2C2C2C] mb-4">
-              <Sparkles className="h-4 w-4 text-[#226D68]" />
-              Avis de l&apos;Expert
-            </h3>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {candidateData.admin_report.overall_score !== undefined && (
-                <Badge className="bg-[#226D68]/15 text-[#1a5a55] border-[#226D68]/30">
-                  <Star className="h-3 w-3 fill-current mr-1" />
-                  Globale {candidateData.admin_report.overall_score.toFixed(1)}/5
-                </Badge>
-              )}
-              {candidateData.admin_report.technical_skills_rating !== undefined && (
-                <Badge variant="outline" className="border-[#226D68]/30 text-[#1a5a55]">Technique {candidateData.admin_report.technical_skills_rating}/5</Badge>
-              )}
-              {candidateData.admin_report.soft_skills_rating !== undefined && (
-                <Badge variant="outline" className="border-[#226D68]/30 text-[#1a5a55]">Soft {candidateData.admin_report.soft_skills_rating}/5</Badge>
-              )}
-              {candidateData.admin_report.communication_rating !== undefined && (
-                <Badge variant="outline" className="border-[#226D68]/30 text-[#1a5a55]">Com. {candidateData.admin_report.communication_rating}/5</Badge>
-              )}
-              {candidateData.admin_report.motivation_rating !== undefined && (
-                <Badge variant="outline" className="border-[#226D68]/30 text-[#1a5a55]">Motiv. {candidateData.admin_report.motivation_rating}/5</Badge>
-              )}
-            </div>
-            {candidateData.admin_report.soft_skills_tags?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {candidateData.admin_report.soft_skills_tags.map((tag, i) => (
-                  <Badge key={i} variant="outline" className="text-xs border-[#226D68]/20 text-[#1a5a55]">{tag}</Badge>
-                ))}
-              </div>
-            )}
-            {candidateData.admin_report.summary && (
-              <p className="text-sm text-[#2C2C2C] whitespace-pre-wrap leading-relaxed">{candidateData.admin_report.summary}</p>
-            )}
-            {(candidateData.admin_report.interview_notes || candidateData.admin_report.recommendations) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
-                {candidateData.admin_report.interview_notes && (
-                  <div>
-                    <p className="text-xs font-semibold text-[#6b7280] mb-1">Notes d&apos;entretien</p>
-                    <p className="text-sm text-[#2C2C2C] whitespace-pre-wrap">{candidateData.admin_report.interview_notes}</p>
+        {/* Modale prévisualisation document — centrée, animation bas → haut */}
+        <Dialog open={!!previewDocument} onOpenChange={(open) => !open && setPreviewDocument(null)}>
+          <DialogContent className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 lg:p-6 xl:p-8 bg-black/70 backdrop-blur-sm border-0 max-w-none rounded-none [&>button:last-child]:hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 !left-0 !top-0 !translate-x-0 !translate-y-0">
+            {previewDocument && (() => {
+              const mimeType = previewDocument.mimeType || previewDocument.mime_type
+              const isPDF = mimeType?.includes('pdf')
+              const isImage = mimeType?.includes('image')
+              const filename = previewDocument.originalFilename || previewDocument.original_filename || `Document ${previewDocument.id}`
+              return (
+                <div className="slide-in-from-bottom w-full max-w-4xl md:max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[90rem] h-[85vh] md:h-[88vh] lg:h-[90vh] max-h-[calc(100dvh-2rem)] md:max-h-[calc(100dvh-2.5rem)] lg:max-h-[calc(100dvh-3rem)] flex flex-col rounded-xl overflow-hidden bg-white shadow-2xl border border-gray-200">
+                  <div className="shrink-0 flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 border-b border-gray-200 bg-[#F9FAFB]">
+                    <span className="text-sm font-medium text-[#2C2C2C] truncate max-w-[60%]" title={filename}>{filename}</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadDocument(previewDocument)}
+                        className="h-9 px-3 border-gray-200 hover:bg-[#E8F4F3] hover:border-[#226D68]/30 text-[#226D68]"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Télécharger
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDocument(null)}
+                        className="p-2 rounded-lg text-[#6b7280] hover:bg-gray-200 hover:text-[#2C2C2C] transition-colors"
+                        aria-label="Fermer"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
-                )}
-                {candidateData.admin_report.recommendations && (
-                  <div>
-                    <p className="text-xs font-semibold text-[#6b7280] mb-1">Recommandations</p>
-                    <p className="text-sm text-[#2C2C2C] whitespace-pre-wrap">{candidateData.admin_report.recommendations}</p>
+                  <div className="flex-1 overflow-auto flex items-center justify-center p-4 lg:p-6 xl:p-8 bg-gray-100/50 min-h-0">
+                    {isPDF ? (
+                      <iframe
+                        src={previewDocument.viewUrl}
+                        className="w-full h-full min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] border-0 rounded-lg bg-white shadow-sm"
+                        title={filename}
+                      />
+                    ) : isImage ? (
+                      <img
+                        src={previewDocument.viewUrl}
+                        alt={filename}
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-sm"
+                      />
+                    ) : (
+                      <div className="text-center py-12">
+                        <FileText className="w-16 h-16 mx-auto mb-4 text-[#9ca3af]" />
+                        <p className="text-base text-[#6b7280] mb-4">Aperçu non disponible pour ce type de fichier.</p>
+                        <Button
+                          onClick={() => handleDownloadDocument(previewDocument)}
+                          className="bg-[#226D68] hover:bg-[#1a5a55] text-white"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Télécharger le fichier
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tabs — routes dédiées */}
-        <Tabs value={activeTab} onValueChange={goToTab} className="w-full">
-          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide">
-            <TabsList className="bg-white border border-gray-200 p-1 rounded-xl mb-4 h-10 sm:h-11 w-max sm:w-full">
-              <TabsTrigger value="profile" className="rounded-lg px-2.5 sm:px-4 text-xs sm:text-sm data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
-                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                Profil
-              </TabsTrigger>
-              <TabsTrigger value="documents" className="rounded-lg px-2.5 sm:px-4 text-xs sm:text-sm data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
-                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                Docs ({documents.length})
-              </TabsTrigger>
-              <TabsTrigger value="evaluation" className="rounded-lg px-2.5 sm:px-4 text-xs sm:text-sm data-[state=active]:bg-[#226D68] data-[state=active]:text-white data-[state=inactive]:text-[#6b7280]">
-                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                Évaluation
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="profile" className="mt-0">
-            <CandidateDataView data={candidateData} />
-          </TabsContent>
-
-          <TabsContent value="documents" className="mt-0">
-            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-              <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-[#F4F6F8]/50">
-                <h3 className="flex items-center gap-2 text-base font-semibold text-[#2C2C2C]">
-                  <FileText className="h-5 w-5 text-[#226D68]" />
-                  Documents
-                </h3>
-                <p className="text-sm text-[#6b7280] mt-0.5">
-                  {documents.length > 0 ? `${documents.length} document${documents.length !== 1 ? 's' : ''} déposé${documents.length !== 1 ? 's' : ''}` : 'Aucun document'}
-                </p>
-              </div>
-              <div className="min-h-[480px]">
-                <DocumentViewer
-                  documents={documents}
-                  selectedDocument={selectedDocument}
-                  onSelectDocument={setSelectedDocument}
-                />
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="evaluation" className="mt-0">
-            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-              <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-[#E8F4F3]/50">
-                <h3 className="flex items-center gap-2 text-base font-semibold text-[#2C2C2C]">
-                  <CheckCircle2 className="h-5 w-5 text-[#226D68]" />
-                  Grille d&apos;évaluation
-                </h3>
-                <p className="text-sm text-[#6b7280] mt-0.5">
-                  {candidateData?.status === 'VALIDATED'
-                    ? 'Modifier l\'évaluation et mettre à jour avec les nouvelles informations du candidat'
-                    : 'Valider ou rejeter le profil'}
-                </p>
-                {candidateData?.status === 'VALIDATED' && (
-                  <p className="text-xs text-[#6b7280] mt-2 flex items-center gap-1.5">
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Cliquez sur &quot;Actualiser&quot; en haut pour recharger les dernières modifications du candidat avant de mettre à jour l&apos;évaluation.
-                  </p>
-                )}
-              </div>
-              <div className="p-4 sm:p-6">
-                <EvaluationForm
-                  candidateId={candidateId}
-                  candidateData={candidateData}
-                  onSuccess={handleValidationSuccess}
-                />
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+                </div>
+              )
+            })()}
+          </DialogContent>
+        </Dialog>
 
         {/* Modale confirmation archivage */}
         <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
@@ -581,6 +625,7 @@ export default function AdminReview({ defaultTab }) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
       </div>
     </AdminLayout>
   )

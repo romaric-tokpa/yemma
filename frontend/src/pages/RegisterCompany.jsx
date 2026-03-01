@@ -60,6 +60,7 @@ export default function RegisterCompany() {
       
       const user = await authApiService.getCurrentUser()
       
+      let companyConflict = false
       try {
         await companyApi.createCompany({
           name: data.companyName,
@@ -67,13 +68,22 @@ export default function RegisterCompany() {
           admin_id: user.id,
         })
       } catch (companyError) {
-        console.warn('Erreur lors de la création de l\'entreprise:', companyError)
+        if (companyError.response?.status === 409) {
+          companyConflict = true
+          // Compte créé mais entreprise déjà existante → rediriger vers onboarding
+          // L'utilisateur pourra y saisir un autre RCCM ou compléter les infos
+        } else {
+          console.warn('Erreur lors de la création de l\'entreprise:', companyError)
+        }
       }
       
       setSuccess(true)
       
       setTimeout(() => {
-        navigate('/company/onboarding')
+        if (companyConflict) {
+          sessionStorage.setItem('company_onboarding_message', 'Une entreprise avec ce RCCM existe déjà. Vous pouvez saisir un autre numéro ou compléter les informations.')
+        }
+        window.location.href = '/company/onboarding/etape/1'
       }, 2000)
     } catch (err) {
       console.error('Erreur d\'inscription:', err)
@@ -86,7 +96,7 @@ export default function RegisterCompany() {
         
         if (status === 409) {
           errorMessage = data?.detail || data?.message || 
-            'Un compte avec cet email existe déjà. Veuillez vous connecter ou utiliser un autre email.'
+            'Un compte avec cet email existe déjà. Connectez-vous pour accéder à votre espace ou compléter la configuration de votre entreprise.'
         } else if (status === 400) {
           errorMessage = data?.detail || data?.message || 
             'Les données fournies sont invalides. Vérifiez vos informations.'

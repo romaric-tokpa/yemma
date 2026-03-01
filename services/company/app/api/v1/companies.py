@@ -3,7 +3,8 @@ Endpoints de gestion des entreprises
 """
 import logging
 import traceback
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -120,48 +121,72 @@ async def list_companies(
     return [CompanyResponse.model_validate(company) for company in companies]
 
 
-@router.get("/me/company", response_model=CompanyResponse)
+@router.get("/me/company", response_model=Optional[CompanyResponse])
 async def get_my_company(
     current_user: TokenData = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
     """
     Récupère l'entreprise de l'utilisateur connecté.
-    Retourne 404 si l'utilisateur n'a pas d'entreprise (cas onboarding).
+    Retourne null (200) si l'utilisateur n'a pas encore d'entreprise (cas onboarding).
     """
     company = None
     try:
         logger.info(f"get_my_company called for user_id={current_user.user_id}, email={current_user.email}")
         repo = CompanyRepository(session)
         company = await repo.get_by_admin_id(current_user.user_id)
-        
+
         if not company:
             team_member_repo = TeamMemberRepository(session)
             team_member = await team_member_repo.get_by_user_id(current_user.user_id)
             if team_member and team_member.company_id:
                 company = await repo.get_by_id(team_member.company_id)
     except Exception as e:
-        # Erreur DB ou schéma (table manquante, colonne absente) → considérer comme "pas d'entreprise"
         tb = traceback.format_exc()
         logger.warning(f"get_my_company DB lookup failed for user_id={current_user.user_id}: {e}\n{tb}")
         company = None
-    
+
     if not company:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You don't have a company"
-        )
-    
+        return None
+
     try:
         return CompanyResponse.model_validate(company)
     except Exception as e:
         tb = traceback.format_exc()
         logger.error(f"CompanyResponse validation failed for user_id={current_user.user_id}: {e}\n{tb}")
-        print(f"[COMPANY] get_my_company validation 500: {e}\n{tb}", flush=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
         )
+
+
+@router.delete("/me/company", status_code=status.HTTP_200_OK)
+async def close_my_company(
+    current_user: TokenData = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Ferme/supprime l'entreprise de l'admin connecté (soft delete RGPD).
+    Seul l'admin de l'entreprise peut effectuer cette action.
+    Appelé avant anonymizeAccount() lors de la suppression du compte.
+    """
+    if "ROLE_COMPANY_ADMIN" not in current_user.roles and "ROLE_SUPER_ADMIN" not in current_user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only company admins can close their company"
+        )
+    repo = CompanyRepository(session)
+    company = await repo.get_by_admin_id(current_user.user_id)
+    if not company:
+        # Pas d'entreprise ou déjà supprimée
+        return {"message": "No company to close", "closed": False}
+    if company.deleted_at:
+        return {"message": "Company already closed", "closed": True}
+    company.deleted_at = datetime.utcnow()
+    company.updated_at = datetime.utcnow()
+    await repo.update(company)
+    logger.info(f"Company {company.id} soft-deleted by admin user_id={current_user.user_id}")
+    return {"message": "Company closed successfully", "closed": True}
 
 
 @router.get("/ping")

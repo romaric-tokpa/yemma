@@ -50,17 +50,17 @@ export default function Login() {
           navigate(ROUTES.ONBOARDING, { replace: true })
         }
       } else if (roles.includes('ROLE_COMPANY_ADMIN')) {
-        try {
-          await companyApi.getMyCompany()
+        const company = await companyApi.getMyCompanyOrNull()
+        if (company) {
           navigate(from || ROUTES.COMPANY_DASHBOARD, { replace: true })
-        } catch (e) {
-          navigate(ROUTES.COMPANY_ONBOARDING, { replace: true })
+        } else {
+          navigate(from || ROUTES.COMPANY_ONBOARDING, { replace: true })
         }
       } else if (roles.includes('ROLE_RECRUITER')) {
-        try {
-          await companyApi.getMyCompany()
+        const company = await companyApi.getMyCompanyOrNull()
+        if (company) {
           navigate(from || ROUTES.COMPANY_DASHBOARD, { replace: true })
-        } catch (e) {
+        } else {
           setError('Votre compte n\'est pas encore associé à une entreprise. Contactez votre administrateur.')
         }
       } else if (roles.includes('ROLE_ADMIN') || roles.includes('ROLE_SUPER_ADMIN')) {

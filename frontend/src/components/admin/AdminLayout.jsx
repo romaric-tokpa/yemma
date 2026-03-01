@@ -134,6 +134,7 @@ export default function AdminLayout({ children }) {
 
   const isCvtheque = location.pathname === '/admin/cvtheque'
   const isJobs = location.pathname.startsWith('/admin/jobs')
+  const isReview = location.pathname.startsWith('/admin/review')
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -384,6 +385,10 @@ export default function AdminLayout({ children }) {
             </div>
           ) : isJobs ? (
             <div className="flex-1 w-full max-w-full min-w-0 px-3 sm:px-4 py-4 sm:py-6 pb-20 sm:pb-24 lg:px-8 lg:pb-8 safe-x">
+              {children}
+            </div>
+          ) : isReview ? (
+            <div className="flex-1 w-full max-w-6xl mx-auto min-w-0 px-3 sm:px-4 py-4 sm:py-5 pb-10 lg:px-6 lg:pb-8 safe-x">
               {children}
             </div>
           ) : (

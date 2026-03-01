@@ -1,6 +1,7 @@
 """
 Endpoints de gestion des abonnements
 """
+from typing import Optional
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,19 +13,20 @@ from app.infrastructure.repositories import SubscriptionRepository, PlanReposito
 router = APIRouter()
 
 
-@router.get("/company/{company_id}", response_model=SubscriptionDetailResponse)
+@router.get("/company/{company_id}", response_model=Optional[SubscriptionDetailResponse])
 async def get_company_subscription(
     company_id: int,
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Récupère l'abonnement actif d'une entreprise
+    Récupère l'abonnement actif d'une entreprise.
+    Retourne null (200) si aucun abonnement (plan gratuit par défaut).
     """
     subscription_repo = SubscriptionRepository(session)
     subscription = await subscription_repo.get_by_company_id(company_id)
-    
+
     if not subscription:
-        raise SubscriptionNotFoundError(f"company_{company_id}")
+        return None
     
     # Récupérer le plan
     plan_repo = PlanRepository(session)

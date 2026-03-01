@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { companyApi, documentApi, authApiService, paymentApi } from '@/services/api'
 import { Check, Crown, Zap, CreditCard } from 'lucide-react'
+import { SEO } from '@/components/seo/SEO'
 
 const companyOnboardingSchema = z.object({
   name: z.string().min(2, 'Nom entreprise min. 2 caractères'),
@@ -64,7 +65,16 @@ const STEPS = [
 
 export default function CompanyOnboarding() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { step } = useParams()
+  const [routeMessage, setRouteMessage] = useState(
+    () => location.state?.message || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('company_onboarding_message') : null)
+  )
+  useEffect(() => {
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('company_onboarding_message')) {
+      sessionStorage.removeItem('company_onboarding_message')
+    }
+  }, [])
   const stepNum = Math.min(3, Math.max(1, parseInt(step || '1', 10) || 1))
   const currentStep = stepNum
   const [company, setCompany] = useState(null)
@@ -99,17 +109,26 @@ export default function CompanyOnboarding() {
 
   useEffect(() => {
     if (step && step !== String(stepNum)) {
-      navigate(`/company/onboarding/etape-${stepNum}`, { replace: true })
+      navigate(`/company/onboarding/etape/${stepNum}`, { replace: true })
     }
   }, [step, stepNum, navigate])
 
   const loadCompany = async () => {
+    const LOAD_TIMEOUT_MS = 12000
+    let cancelled = false
+    const timeoutId = setTimeout(() => {
+      cancelled = true
+      setLoading(false)
+      setError('Délai dépassé. Vérifiez que les services sont démarrés (docker compose up).')
+    }, LOAD_TIMEOUT_MS)
+
     try {
       setLoading(true)
       setError(null)
-      const companyData = await companyApi.getMyCompany()
+      const companyData = await companyApi.getMyCompanyOrNull()
+      if (cancelled) return
       setCompany(companyData)
-      setLogoUrl(companyData.logo_url)
+      setLogoUrl(documentApi.normalizeLogoUrl(companyData?.logo_url) || null)
       if (companyData) {
         setValue('name', companyData.name || '')
         setValue('legal_id', companyData.legal_id || '')
@@ -119,36 +138,30 @@ export default function CompanyOnboarding() {
         setValue('contact_email', companyData.contact_email || '')
         setValue('contact_phone', companyData.contact_phone || '')
         setValue('contact_function', companyData.contact_function || '')
-        const noContact = !companyData.contact_first_name && !companyData.contact_last_name && !companyData.contact_email
-        if (noContact) {
-          try {
-            const user = await authApiService.getCurrentUser()
-            setValue('contact_first_name', user.first_name || '')
-            setValue('contact_last_name', user.last_name || '')
-            setValue('contact_email', user.email || '')
-          } catch (e) {
-            console.warn('Préremplissage contact:', e)
-          }
-        }
       }
-    } catch (err) {
-      console.error('Error loading company:', err)
-      if (err.response?.status === 404) {
-        setCompany(null)
-        setError(null)
+      const noContact = !companyData?.contact_first_name && !companyData?.contact_last_name && !companyData?.contact_email
+      if (noContact) {
         try {
           const user = await authApiService.getCurrentUser()
+          if (cancelled) return
           setValue('contact_first_name', user.first_name || '')
           setValue('contact_last_name', user.last_name || '')
           setValue('contact_email', user.email || '')
-        } catch (e) {}
-      } else if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-        setError('Connexion impossible. Vérifiez votre réseau.')
+        } catch (e) {
+          console.warn('Préremplissage contact:', e)
+        }
+      }
+    } catch (err) {
+      if (cancelled) return
+      console.error('Error loading company:', err)
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+        setError('Connexion impossible. Vérifiez votre réseau et que les services Docker sont démarrés.')
       } else {
         setError(err.response?.data?.detail || err.response?.data?.message || err.message || 'Erreur de chargement')
       }
     } finally {
-      setLoading(false)
+      clearTimeout(timeoutId)
+      if (!cancelled) setLoading(false)
     }
   }
 
@@ -248,12 +261,22 @@ export default function CompanyOnboarding() {
           setError('Nom et RCCM obligatoires')
           return
         }
-        navigate('/company/onboarding/etape-2')
-        setLastSaved(new Date())
+        // Sauvegarder les données avant de passer à l'étape 2
+        try {
+          await saveCompanyData(data)
+          setLastSaved(new Date())
+        } catch (saveErr) {
+          if (saveErr.response?.status === 409) {
+            setError('Une entreprise avec ce RCCM existe déjà. Utilisez un autre numéro.')
+            return
+          }
+          throw saveErr
+        }
+        navigate('/company/onboarding/etape/2')
       } else if (currentStep === 2) {
         await saveCompanyData(data)
         setLastSaved(new Date())
-        navigate('/company/onboarding/etape-3')
+        navigate('/company/onboarding/etape/3')
         loadPlans()
       } else if (currentStep === 3) {
         await finalizeOnboarding(data)
@@ -344,6 +367,10 @@ export default function CompanyOnboarding() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-green-emerald/[0.03]">
+      <SEO
+        title={`Configuration entreprise - Étape ${currentStep}/3 | Yemma Solutions`}
+        description="Configurez votre entreprise sur Yemma Solutions. Informations légales, logo et choix de plan pour accéder à la CVthèque."
+      />
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-neutral-200/80">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4">
@@ -402,7 +429,7 @@ export default function CompanyOnboarding() {
               return (
                 <div key={stepItem.id} className="flex items-center flex-1">
                   {isClickable ? (
-                    <Link to={`/company/onboarding/etape-${stepItem.id}`} className="flex flex-col items-center flex-1 no-underline">
+                    <Link to={`/company/onboarding/etape/${stepItem.id}`} className="flex flex-col items-center flex-1 no-underline">
                       {stepContent}
                     </Link>
                   ) : (
@@ -443,6 +470,12 @@ export default function CompanyOnboarding() {
 
             <CardContent className="p-6 sm:p-8">
               <form onSubmit={handleSubmit(onStepSubmit)} className="space-y-6">
+                {routeMessage && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span>{routeMessage}</span>
+                  </div>
+                )}
                 {error && (
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
                     <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -450,59 +483,76 @@ export default function CompanyOnboarding() {
                   </div>
                 )}
 
-                {/* Step 1 */}
+                {/* Step 1 - Votre entreprise */}
                 {currentStep === 1 && (
                   <div className="space-y-8">
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-anthracite mb-4 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-green-emerald" />
+                    {/* Intro */}
+                    <div className="p-4 rounded-xl bg-green-emerald/5 border border-green-emerald/20">
+                      <p className="text-sm text-gray-anthracite">
+                        Bienvenue ! Renseignez les informations légales de votre entreprise. Ces données seront utilisées pour vos offres et la facturation.
+                      </p>
+                    </div>
+
+                    {/* Informations légales */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-green-emerald/10 flex items-center justify-center">
+                          <Building2 className="w-4 h-4 text-green-emerald" />
+                        </div>
                         Informations légales
                       </h3>
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="name" className="text-sm font-medium text-gray-anthracite">
-                            Nom de l'entreprise *
+                            Nom de l&apos;entreprise <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="name"
                             {...register('name')}
-                            placeholder="Ex: Acme SAS"
-                            className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20"
+                            placeholder="Ex: Acme SAS, Tech Solutions CI"
+                            className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20 transition-colors"
                           />
-                          {errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}
+                          {errors.name && <p className="text-xs text-red-600 flex items-center gap-1">{errors.name.message}</p>}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="legal_id" className="text-sm font-medium text-gray-anthracite">
-                            RCCM / SIRET *
+                            RCCM / SIRET <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             id="legal_id"
                             {...register('legal_id')}
                             placeholder="CI-ABJ-2024-A-12345"
-                            className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20"
+                            className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20 transition-colors"
                           />
-                          {errors.legal_id && <p className="text-xs text-red-600">{errors.legal_id.message}</p>}
+                          <p className="text-xs text-neutral-500">Numéro d&apos;enregistrement au registre du commerce</p>
+                          {errors.legal_id && <p className="text-xs text-red-600 flex items-center gap-1">{errors.legal_id.message}</p>}
                         </div>
                       </div>
-                      <div className="mt-4 space-y-2">
+                      <div className="space-y-2">
                         <Label htmlFor="adresse" className="text-sm font-medium text-gray-anthracite">
-                          Adresse
+                          Adresse du siège
                         </Label>
                         <Input
                           id="adresse"
                           {...register('adresse')}
-                          placeholder="Ex: Plateau, 01 BP 123 Abidjan 01"
-                          className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20"
+                          placeholder="Ex: Plateau, 01 BP 123 Abidjan 01 ou 12 rue de la Paix, 75002 Paris"
+                          className="h-11 border-neutral-200 focus:border-green-emerald focus:ring-green-emerald/20 transition-colors"
                         />
                         {errors.adresse && <p className="text-xs text-red-600">{errors.adresse.message}</p>}
                       </div>
                     </div>
 
-                    <div className="pt-6 border-t border-neutral-100">
-                      <h3 className="text-sm font-semibold text-gray-anthracite mb-4 flex items-center gap-2">
-                        <User className="w-4 h-4 text-green-emerald" />
+                    {/* Contact référent */}
+                    <div className="pt-6 border-t border-neutral-100 space-y-4">
+                      <h3 className="text-sm font-semibold text-gray-anthracite flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-green-emerald/10 flex items-center justify-center">
+                          <User className="w-4 h-4 text-green-emerald" />
+                        </div>
                         Contact référent
                       </h3>
+                      <p className="text-xs text-neutral-500 -mt-2">
+                        Personne à contacter pour les offres et la gestion du compte
+                      </p>
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="contact_first_name" className="text-sm text-neutral-600">Prénom</Label>
@@ -510,7 +560,7 @@ export default function CompanyOnboarding() {
                             id="contact_first_name"
                             {...register('contact_first_name')}
                             placeholder="Jean"
-                            className="h-11 border-neutral-200"
+                            className="h-11 border-neutral-200 focus:border-green-emerald"
                           />
                         </div>
                         <div className="space-y-2">
@@ -519,19 +569,19 @@ export default function CompanyOnboarding() {
                             id="contact_last_name"
                             {...register('contact_last_name')}
                             placeholder="Dupont"
-                            className="h-11 border-neutral-200"
+                            className="h-11 border-neutral-200 focus:border-green-emerald"
                           />
                         </div>
                         <div className="space-y-2 sm:col-span-2">
                           <Label htmlFor="contact_email" className="text-sm text-neutral-600 flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5" /> Email
+                            <Mail className="w-3.5 h-3.5" /> Email professionnel
                           </Label>
                           <Input
                             id="contact_email"
                             type="email"
                             {...register('contact_email')}
-                            placeholder="jean@entreprise.com"
-                            className="h-11 border-neutral-200"
+                            placeholder="jean.dupont@entreprise.com"
+                            className="h-11 border-neutral-200 focus:border-green-emerald"
                           />
                         </div>
                         <div className="space-y-2">
@@ -543,7 +593,7 @@ export default function CompanyOnboarding() {
                             type="tel"
                             {...register('contact_phone')}
                             placeholder="+225 07 12 34 56 78"
-                            className="h-11 border-neutral-200"
+                            className="h-11 border-neutral-200 focus:border-green-emerald"
                           />
                         </div>
                         <div className="space-y-2">
@@ -553,8 +603,8 @@ export default function CompanyOnboarding() {
                           <Input
                             id="contact_function"
                             {...register('contact_function')}
-                            placeholder="DRH, Responsable Recrutement"
-                            className="h-11 border-neutral-200"
+                            placeholder="DRH, Responsable Recrutement, Directeur"
+                            className="h-11 border-neutral-200 focus:border-green-emerald"
                           />
                         </div>
                       </div>
@@ -736,7 +786,7 @@ export default function CompanyOnboarding() {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => currentStep > 1 ? navigate(`/company/onboarding/etape-${currentStep - 1}`) : navigate('/company/dashboard')}
+                    onClick={() => currentStep > 1 ? navigate(`/company/onboarding/etape/${currentStep - 1}`) : navigate('/company/dashboard')}
                     className="text-neutral-600 hover:text-gray-anthracite"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />

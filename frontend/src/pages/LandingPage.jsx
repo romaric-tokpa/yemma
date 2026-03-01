@@ -1,16 +1,13 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '@/constants/routes'
 import { motion } from 'framer-motion'
 import { SEO } from '../components/seo/SEO'
 import {
-  ArrowRight, CheckCircle2, Users, Shield, Clock, Star, Zap,
-  Target, Timer, Cpu, Briefcase, HeartPulse, ShoppingCart,
-  Factory, GraduationCap, Building2, Truck, Lightbulb, Megaphone,
-  Scale, Home, Leaf, Rocket, ShoppingBag, FileText, GitBranch, UserCheck
+  ArrowRight, Cpu, Briefcase, Factory,
+  FileText, GitBranch, UserCheck
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
-import { Card, CardContent } from '../components/ui/card'
-import HeroIllustration from '../components/landing/HeroIllustration'
+import ProfileCVHeroIllustration from '../components/landing/ProfileCVHeroIllustration'
 import CTACardsIllustration from '../components/landing/CTACardsIllustration'
 import PublicNavbar from '../components/layout/PublicNavbar'
 import PublicFooter from '../components/layout/PublicFooter'
@@ -18,46 +15,28 @@ import PublicFooter from '../components/layout/PublicFooter'
 export default function LandingPage() {
   const navigate = useNavigate()
 
-  const stats = [
-    { value: '10 000+', label: 'Candidats vérifiés', icon: Users },
-    { value: '48h', label: 'Délai moyen', icon: Clock },
-    { value: '95%', label: 'Satisfaction', icon: Star },
-    { value: '-60%', label: 'Coûts recrutement', icon: Zap },
-  ]
-
-  // Bloc "Pourquoi 500+ entreprises nous font confiance" - aligné BRIEF_PROJET.md (§2 Réponse Yemma)
   const trustSteps = [
     {
-      title: '100 % des profils visibles validés par des experts',
-      desc: 'Entretien, évaluation, compte-rendu : chaque profil visible dans la CVthèque a été vérifié par nos experts RH. Fini le coût élevé des agences, le temps perdu à trier des CV non qualifiés et le risque de profils embellis.',
+      title: 'Zéro profil non qualifié dans notre CVthèque',
+      desc: 'Entretien, évaluation, compte-rendu expert : chaque candidat visible a été vérifié par nos experts RH. Scores, soft skills, synthèse — vous ne voyez que des profils qui tiennent la route.',
       icon: 'brief',
       dotColor: '#e76f51',
     },
     {
-      title: 'Recherche multi-critères et matching affiché',
-      desc: 'Secteur, compétences, expérience, localisation… Ciblez rapidement les bons profils. Matching affiché (ex. taux ~87 %) et évaluations détaillées (scores, soft skills, synthèse) pour aider à la décision.',
+      title: 'Trouvez le bon profil en quelques minutes',
+      desc: 'Secteur, compétences, expérience, localisation… Filtres précis et matching affiché (ex. 87 %) avec évaluations détaillées pour décider rapidement et en toute confiance.',
       icon: 'candidates',
       dotColor: '#226D68',
       cta: true,
     },
     {
-      title: 'Économies et gain de temps',
-      desc: '~60 % sur les coûts de recrutement et ~15 h par semaine gagnées grâce à l\'automatisation de la recherche et du tri. Conformité RGPD garantie.',
+      title: '−60 % sur vos coûts de recrutement',
+      desc: 'Supprimez les honoraires d\'agence et les heures perdues à trier des CV. Nos clients économisent en moyenne 60 % et récupèrent ~15h par semaine. Conformité RGPD incluse.',
       icon: 'mission',
       dotColor: '#e76f51',
     },
   ]
 
-  const features = [
-    'Recherche multi-critères ultra-précise',
-    'Profils enrichis avec évaluations expertes',
-    'Matching intelligent par IA',
-    'Interface intuitive, zéro formation nécessaire',
-    'Support dédié 7j/7',
-    'Conformité RGPD garantie',
-  ]
-
-  // Secteurs groupés pour le bloc style capture - textes d'origine respectés
   const sectorCategories = [
     {
       title: 'Technologie & Digital',
@@ -79,16 +58,16 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen min-h-[100dvh] relative overflow-x-hidden w-full max-w-[100vw]">
       <SEO
-        title="Plateforme de Recrutement | CVthèque de candidats vérifiés"
-        description="Yemma Solutions - CVthèque de candidats 100% validés par des experts RH. Réduisez vos coûts de recrutement (~60%), accélérez vos embauches (objectif 48h). Recherche avancée, matching et évaluations expertes. Essai gratuit 14 jours."
-        keywords="recrutement, emploi, offre emploi, recherche emploi, candidat, recruteur, cvthèque, profils préqualifiés, matching, scoring, plateforme recrutement, RH"
+        title="CVthèque de candidats pré-validés | Recrutez en 48h | Yemma Solutions"
+        description="Yemma Solutions — 10 700+ candidats interviewés et évalués par des experts RH. Recrutez sans trier de CV, réduisez vos coûts de 60 % et shortlistez en moins de 48h. Recherche avancée, matching et scoring."
+        keywords="recrutement, cvthèque, candidats validés, profils préqualifiés, matching, scoring, recrutement Afrique, plateforme RH, sans agence"
         canonical="/"
       />
       <PublicNavbar variant="light" />
 
       {/* Hero */}
-      <section className="relative pt-16 xs:pt-20 md:pt-24 pb-12 xs:pb-16 md:pb-24 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
+      <section className="relative pt-16 xs:pt-20 md:pt-24 pb-14 xs:pb-20 md:pb-28 overflow-hidden bg-white">
+        <div className="relative max-w-7xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 sm:gap-12 lg:gap-16">
             {/* Contenu gauche */}
             <div className="lg:max-w-[50%] lg:flex-1">
@@ -98,9 +77,7 @@ export default function LandingPage() {
                 transition={{ duration: 0.5 }}
                 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-bold text-[#2C2C2C] leading-[1.15] mb-4 sm:mb-6 font-heading"
               >
-                La plateforme qui met en relation
-                <br />
-                <span className="text-[#226D68]">candidats et entreprises</span>
+                100% des profils validés par entretien expert.
               </motion.h1>
 
               <motion.div
@@ -109,11 +86,11 @@ export default function LandingPage() {
                 transition={{ duration: 0.5, delay: 0.1 }}
                 className="mb-8"
               >
-                <p className="text-base sm:text-lg text-[#6b7280] leading-relaxed mb-1">
-                  <strong className="text-[#2C2C2C]">Réduisez les coûts</strong> de recrutement (moins d&apos;agences), <strong className="text-[#2C2C2C]">accélérez</strong> vos embauches (objectif 48h) et <strong className="text-[#2C2C2C]">garantissez la qualité</strong> des profils grâce à une validation par des experts RH avant mise en visibilité.
+                <p className="text-base sm:text-lg text-[#374151] leading-relaxed mb-3">
+                  Accédez directement aux bons candidats — scorés, évalués, prêts à rejoindre votre équipe.
                 </p>
-                <p className="text-base sm:text-lg text-[#6b7280] leading-relaxed mb-6">
-                  Une CVthèque de candidats vérifiés, accessibles via recherche avancée, avec des évaluations expertes (scores, résumés, avis) pour faciliter le matching et la décision.
+                <p className="text-base sm:text-lg text-[#374151] leading-relaxed mb-6">
+                  <span className="text-[#226D68] font-semibold">→ Shortlist en 48h. Zéro tri inutile.</span>
                 </p>
               </motion.div>
 
@@ -128,28 +105,28 @@ export default function LandingPage() {
                   onClick={() => navigate(ROUTES.REGISTER_COMPANY)}
                   className="h-11 px-6 text-base font-semibold bg-[#226D68] hover:bg-[#1a5a55] text-white"
                 >
-                  Obtenir des profils
+                  Accéder à la CVthèque
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
                   onClick={() => navigate(ROUTES.CONTACT)}
-                  className="h-11 px-6 text-base font-semibold border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] bg-white"
+                  className="h-11 px-6 text-base font-semibold border-[#2C2C2C]/40 text-[#2C2C2C] hover:bg-[#2C2C2C]/5 bg-transparent"
                 >
-                  Prendre rdv
+                  Prendre rendez-vous
                 </Button>
               </motion.div>
             </div>
 
-            {/* Illustration droite - ordinateur, CV, lampe */}
+            {/* Illustration droite - CV de profil validé */}
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
               className="lg:flex-1 lg:flex lg:justify-end lg:items-center"
             >
-              <HeroIllustration />
+              <ProfileCVHeroIllustration />
             </motion.div>
           </div>
         </div>
@@ -159,8 +136,8 @@ export default function LandingPage() {
       <section className="py-5 xs:py-6 md:py-8 border-b border-gray-100 overflow-hidden">
         <div className="max-w-5xl mx-auto px-3 xs:px-4 sm:px-6 mb-6">
           <p className="text-center text-sm md:text-base text-[#2C2C2C]">
-            <span className="font-semibold underline decoration-[#226D68] decoration-2 underline-offset-2">+ 500 entreprises</span>
-            {' '}nous font confiance pour recruter des candidats vérifiés
+            <span className="font-semibold underline decoration-[#226D68] decoration-2 underline-offset-2">+500 entreprises</span>
+            {' '}recrutent sans agences grâce à Yemma
           </p>
         </div>
         <div className="relative w-full overflow-hidden">
@@ -192,12 +169,12 @@ export default function LandingPage() {
               <p className="text-xl xs:text-2xl md:text-3xl lg:text-4xl font-bold text-[#2C2C2C] leading-tight">
                 Déjà{' '}
                 <span className="inline-block px-2 xs:px-3 py-0.5 xs:py-1 rounded-full bg-[#2C2C2C] text-white text-xl xs:text-2xl md:text-3xl lg:text-4xl font-bold whitespace-nowrap">
-                  +10700
+                  +10 700
                 </span>{' '}
-                profils de qualité
+                profils validés
               </p>
               <p className="text-base xs:text-lg md:text-xl text-[#374151] mt-2 font-medium">
-                préqualifiés avec soin dans la CVthèque
+                interviewés, évalués, prêts à être recrutés.
               </p>
             </motion.div>
             <motion.div
@@ -232,12 +209,12 @@ export default function LandingPage() {
               className="lg:w-2/5 lg:sticky lg:top-24 mb-10 lg:mb-0"
             >
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight">
-                La plateforme de recrutement
+                Quel que soit votre secteur,
                 <br />
-                <span className="text-[#e76f51]">des profils préqualifiés</span>
+                <span className="text-[#e76f51]">nous avons les profils.</span>
               </h2>
               <p className="text-white/80 text-sm md:text-base mt-4 max-w-md">
-                Tous les secteurs d&apos;activité couverts. Recrutez des profils vérifiés dans votre domaine.
+                Tous les domaines d&apos;activité couverts. Des candidats vérifiés prêts à rejoindre votre équipe.
               </p>
             </motion.div>
 
@@ -301,7 +278,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
             className="text-xl md:text-2xl font-bold text-[#2C2C2C] text-center mb-2"
           >
-            Pourquoi 500+ entreprises nous font confiance
+            Pourquoi 500+ entreprises nous choisissent
           </motion.h2>
           <motion.p
             initial={{ opacity: 0 }}
@@ -310,7 +287,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-sm text-[#6b7280] text-center mb-12"
           >
-            Réponse Yemma : profils 100 % validés par des experts, recherche multi-critères, matching affiché et économies sur les coûts de recrutement
+            Sans agences. Sans CV non qualifiés. Sans mauvaises surprises.
           </motion.p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 md:gap-6">
@@ -423,7 +400,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* La promesse de Yemma pour vous */}
+      {/* Notre méthode. Vos résultats. */}
       <section id="promesse" className="py-12 xs:py-16 md:py-20 bg-[#F9FAFB] overflow-hidden">
         <div className="max-w-6xl mx-auto px-3 xs:px-4 sm:px-6 lg:px-8">
           <motion.h2
@@ -433,7 +410,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
             className="text-2xl md:text-3xl font-bold text-[#2C2C2C] text-center mb-3"
           >
-            La promesse de Yemma pour vous
+            Notre méthode. Vos résultats.
           </motion.h2>
           <motion.p
             initial={{ opacity: 0 }}
@@ -442,7 +419,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-center text-[#6b7280] text-sm md:text-base max-w-2xl mx-auto mb-16"
           >
-            Une CVthèque de candidats vérifiés, accessibles via recherche avancée. Évaluations expertes (scores, résumés, avis) pour faciliter le matching et la décision. Pas d&apos;agences, pas d&apos;intermédiaires : des profils validés par nos experts RH avant mise en visibilité.
+            Moins d&apos;intermédiaires, plus de qualité. Des profils vérifiés et évalués, disponibles dès que vous en avez besoin.
           </motion.p>
 
           {/* Bloc 1 - Identification des profils */}
@@ -489,20 +466,20 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="md:w-3/5">
-              <p className="text-[#226D68] font-semibold text-sm mb-2">Arrêtez de perdre du temps</p>
+              <p className="text-[#226D68] font-semibold text-sm mb-2">Recrutement ciblé</p>
               <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-4">
-                Nous identifions pour vous les meilleurs profils
+                Accédez directement aux bons candidats
               </h3>
               <p className="text-[#6b7280] text-sm md:text-base leading-relaxed mb-3">
-                Accédez à une CVthèque de candidats déjà validés par nos experts. Recherche multi-critères, <strong>matching</strong> et <strong>scoring</strong> pour cibler rapidement les profils les plus adaptés à vos besoins.
+                Notre CVthèque rassemble des profils déjà validés par nos experts RH. Recherche multi-critères, <strong>matching</strong> et <strong>scoring</strong> pour identifier en quelques clics le candidat qui correspond exactement à votre besoin.
               </p>
               <p className="text-[#6b7280] text-sm md:text-base leading-relaxed">
-                Chaque profil est préqualifié avec une évaluation détaillée (scores, synthèse, compétences). Vous recevez une sélection pertinente en moins de 48h.
+                Chaque profil est évalué en détail : score global, compétences techniques, soft skills, synthèse RH. Vous recevez une sélection pertinente en moins de 48h.
               </p>
             </div>
           </motion.div>
 
-          {/* Bloc 2 - Gestion de A à Z */}
+          {/* Bloc 2 - Conformité et sérénité */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -534,15 +511,15 @@ export default function LandingPage() {
               </div>
                     </div>
             <div className="md:w-3/5 text-left md:text-right">
-              <p className="text-[#226D68] font-semibold text-sm mb-2">Concentrez-vous sur l&apos;essentiel</p>
+              <p className="text-[#226D68] font-semibold text-sm mb-2">Zéro risque légal</p>
               <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-4">
-                Nous gérons tout de A à Z
+                RGPD, audit et conformité : on s&apos;en occupe
               </h3>
               <p className="text-[#6b7280] text-sm md:text-base leading-relaxed mb-3">
-                Conformité RGPD garantie, traçabilité des accès et audit. Nos experts valident chaque profil par entretien et évaluation avant mise en CVthèque.
+                Accès sécurisé aux profils, traçabilité complète des consultations, audit disponible. Nous gérons la conformité réglementaire pour que vous puissiez vous concentrer sur vos recrutements.
               </p>
               <p className="text-[#6b7280] text-sm md:text-base leading-relaxed">
-                Concentrez-vous sur l&apos;essentiel : votre recrutement. Nous assurons la qualité et la fiabilité des profils.
+                Chaque candidat a donné son consentement explicite. Pas de zone grise, pas de friction : un recrutement 100 % serein et conforme.
               </p>
                   </div>
           </motion.div>
@@ -583,15 +560,15 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="md:w-3/5">
-              <p className="text-[#226D68] font-semibold text-sm mb-2">Votre projet est exigeant, nous aussi</p>
+              <p className="text-[#226D68] font-semibold text-sm mb-2">Notre process</p>
               <h3 className="text-xl md:text-2xl font-bold text-[#2C2C2C] mb-4">
-                La sélection de profils la plus rigoureuse du marché
+                3 étapes avant qu&apos;un profil soit visible
               </h3>
               <p className="text-[#6b7280] text-sm md:text-base leading-relaxed mb-3">
-                Chaque candidat intègre la CVthèque après une phase de validation poussée. Nos experts RH échangent avec chaque candidat pour vérifier ses compétences, ses références et ses motivations.
+                Entretien individuel, évaluation des compétences, validation finale par notre équipe RH. Un filtre exigeant qui garantit que chaque profil visible correspond réellement à ce que vous cherchez.
               </p>
               <p className="text-[#6b7280] text-sm md:text-base leading-relaxed">
-                Nous ne retenons que les meilleurs profils audités. Matching et scoring vous aident à prendre la bonne décision.
+                Résultat : des candidats fiables, vérifiés, avec des évaluations détaillées pour prendre la bonne décision rapidement.
               </p>
           </div>
           </motion.div>
@@ -607,13 +584,13 @@ export default function LandingPage() {
           >
             <div className="lg:flex-[1.2] min-w-0">
               <h2 className="text-xl xs:text-2xl md:text-3xl lg:text-4xl font-bold text-[#2C2C2C] leading-tight mb-3 sm:mb-4">
-                Recrutement : centralisez vos recherches !
-          </h2>
+                Votre prochain recrutement peut prendre 48h.
+              </h2>
               <p className="text-sm xs:text-base md:text-lg text-[#374151] leading-relaxed mb-2">
-                Yemma Solutions simplifie et accélère vos recrutements. Une CVthèque de profils préqualifiés, avec matching et scoring, validés par des experts RH.
+                Accédez à +10 700 profils validés par nos experts RH. Recherche avancée, matching et évaluations détaillées pour recruter vite et bien — sans intermédiaires.
               </p>
               <p className="text-sm xs:text-base md:text-lg text-[#374151] leading-relaxed mb-4 sm:mb-6">
-                Une gestion recrutement simple, fluide et éprouvée, avec des économies jusqu&apos;à 60%.
+                14 jours pour tester la plateforme gratuitement. Sans engagement, sans carte bancaire.
               </p>
               <Button
                 variant="outline"
@@ -621,10 +598,10 @@ export default function LandingPage() {
                 onClick={() => navigate(ROUTES.REGISTER_COMPANY)}
                 className="h-12 px-6 border-2 border-[#2C2C2C] bg-transparent text-[#2C2C2C] hover:bg-[#2C2C2C] hover:text-white font-medium rounded-lg transition-colors"
               >
-                En savoir plus
+                Démarrer maintenant
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-              <p className="text-sm text-[#6b7280] mt-3">Essai gratuit 14 jours · Sans carte bancaire</p>
+              <p className="text-sm text-[#6b7280] mt-3">Essai gratuit · Sans engagement · Annulez à tout moment</p>
             </div>
             <div className="lg:flex-1 flex items-center justify-center lg:justify-end">
               <CTACardsIllustration />

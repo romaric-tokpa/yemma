@@ -16,6 +16,7 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Trash2,
 } from 'lucide-react'
 import { companyApi, documentApi, authApiService } from '@/services/api'
 import { Button } from '@/components/ui/button'
@@ -53,7 +54,9 @@ const companySchema = z.object({
 })
 
 export function CompanySettingsTab({ company, onUpdate }) {
-  const [logoUrl, setLogoUrl] = useState(null)
+  const [logoUrl, setLogoUrl] = useState(() =>
+    company?.logo_url ? documentApi.normalizeLogoUrl(company.logo_url) : null
+  )
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
@@ -68,6 +71,10 @@ export function CompanySettingsTab({ company, onUpdate }) {
   const [changingPassword, setChangingPassword] = useState(false)
   const [passwordError, setPasswordError] = useState(null)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
+
+  // Account deletion state
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   const form = useForm({
     resolver: zodResolver(companySchema),
@@ -95,7 +102,7 @@ export function CompanySettingsTab({ company, onUpdate }) {
       setValue('contact_email', company.contact_email || '')
       setValue('contact_phone', company.contact_phone || '')
       setValue('contact_function', company.contact_function || '')
-      setLogoUrl(company.logo_url)
+      setLogoUrl(documentApi.normalizeLogoUrl(company.logo_url))
     }
   }, [company, setValue])
 
@@ -195,6 +202,35 @@ export function CompanySettingsTab({ company, onUpdate }) {
       setPasswordError(typeof detail === 'string' ? detail : 'Erreur lors du changement de mot de passe.')
     } finally {
       setChangingPassword(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'SUPPRIMER') {
+      setError('Tapez SUPPRIMER pour confirmer la suppression.')
+      return
+    }
+    try {
+      setDeletingAccount(true)
+      setError(null)
+      // 1. Soft-delete l'entreprise (base company) avant d'anonymiser le compte
+      try {
+        await companyApi.closeMyCompany()
+      } catch (companyErr) {
+        // 404 = pas d'entreprise, on continue quand même pour anonymiser le compte
+        if (companyErr.response?.status !== 404) {
+          console.warn('Erreur fermeture entreprise:', companyErr)
+        }
+      }
+      // 2. Anonymiser le compte utilisateur (auth + base auth)
+      await authApiService.anonymizeAccount()
+      authApiService.logout()
+      if (typeof window !== 'undefined') window.location.href = '/login'
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message
+      setError(typeof detail === 'string' ? detail : 'Erreur lors de la suppression du compte.')
+    } finally {
+      setDeletingAccount(false)
     }
   }
 
@@ -368,7 +404,7 @@ export function CompanySettingsTab({ company, onUpdate }) {
                 `}
               >
                 <img
-                  src={logoUrl || generateAvatarUrl(company.name)}
+                  src={documentApi.normalizeLogoUrl(logoUrl) || generateAvatarUrl(company.name)}
                   alt="Logo"
                   className="w-24 h-24 rounded-xl object-cover border border-gray-100 shadow-sm shrink-0"
                   onError={(e) => { e.target.src = generateAvatarUrl(company.name) }}
@@ -496,6 +532,33 @@ export function CompanySettingsTab({ company, onUpdate }) {
           </form>
         </CardContent>
       </Card>
+
+      {/* Zone de danger - Suppression du compte */}
+      <section className="rounded-xl border border-red-200 bg-red-50/30 p-4 sm:p-6">
+        <h3 className="text-sm font-semibold text-red-600 mb-2">Zone de danger</h3>
+        <p className="text-sm text-[#6b7280] mb-3">
+          La suppression de votre compte est irréversible. Toutes vos données personnelles seront anonymisées conformément au RGPD.
+        </p>
+        <div className="space-y-2 max-w-md">
+          <Label htmlFor="delete-confirm">Pour confirmer, tapez <strong>SUPPRIMER</strong></Label>
+          <Input
+            id="delete-confirm"
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="SUPPRIMER"
+            className="border-red-200 focus-visible:ring-red-500"
+          />
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleDeleteAccount}
+            disabled={deletingAccount || deleteConfirmText !== 'SUPPRIMER'}
+          >
+            {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            {deletingAccount ? 'Suppression...' : 'Supprimer mon compte'}
+          </Button>
+        </div>
+      </section>
     </div>
   )
 }
