@@ -352,8 +352,8 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_REDIRECT_URI: "https://yemma-solutions.com/api/v1/auth/oauth/google/callback"
       FORWARDED_ALLOW_IPS: "*"
-      command: >
-        sh -c "cd /app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --forwarded-allow-ips='*'"
+    command: >
+      sh -c "cd /app && uvicorn app.main:app --host 0.0.0.0 --port 8000 --forwarded-allow-ips='*'"
     networks:
       - yemma-network
     depends_on:
@@ -570,7 +570,7 @@ services:
       INVITATION_TOKEN_EXPIRE_DAYS: ${INVITATION_TOKEN_EXPIRE_DAYS:-7}
       INVITATION_SECRET_KEY: ${INVITATION_SECRET_KEY:-your-invitation-secret-key}
       SEARCH_SERVICE_URL: http://search:8000
-      SUBSCRIPTION_SERVICE_URL: http://subscription:8000
+      SUBSCRIPTION_SERVICE_URL: http://payment:8000
       NOTIFICATION_SERVICE_URL: http://notification:8000
       FRONTEND_URL: ${FRONTEND_URL:-https://yemma-solutions.com}
       CORS_ORIGINS: ${CORS_ORIGINS:-https://yemma-solutions.com,https://www.yemma-solutions.com,http://localhost:3000}

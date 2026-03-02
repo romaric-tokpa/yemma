@@ -1,20 +1,114 @@
-# Override pour le développement local : expose les ports des services
-# pour que le proxy Vite puisse les atteindre directement
-# Usage : docker compose up (merge automatique avec docker-compose.yml)
+# Override de développement local — appliqué automatiquement par docker compose
+# (Docker Compose merge automatiquement docker-compose.override.yml)
+#
+# Expose tous les ports pour le débogage direct et le proxy Vite.
+# Ce fichier ne doit PAS être présent sur le VPS de production.
+#
+# Équivalent à : docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 services:
-  auth:
-    ports:
-      - "${AUTH_PORT:-8001}:8000"
-
-  candidate:
-    ports:
-      - "${CANDIDATE_PORT:-8002}:8000"
-
-  search:
-    ports:
-      - "${SEARCH_PORT:-8004}:8000"
 
   nginx:
     ports:
       - "${NGINX_HTTP_PORT:-8080}:80"
+
+  auth:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${AUTH_PORT:-8001}:8000"
+
+  candidate:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${CANDIDATE_PORT:-8002}:8000"
+
+  document:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${DOCUMENT_PORT:-8003}:8000"
+
+  search:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${SEARCH_PORT:-8004}:8000"
+
+  company:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${COMPANY_PORT:-8005}:8000"
+
+  payment:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${PAYMENT_PORT:-8006}:8000"
+
+  notification:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${NOTIFICATION_PORT:-8007}:8000"
+
+  audit:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${AUDIT_PORT:-8008}:8000"
+
+  admin:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${ADMIN_PORT:-8009}:8000"
+
+  parsing:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${PARSING_PORT:-8010}:8000"
+
+  postgres-auth:
+    ports:
+      - "${POSTGRES_AUTH_PORT:-5441}:5432"
+
+  postgres-candidate:
+    ports:
+      - "${POSTGRES_CANDIDATE_PORT:-5442}:5432"
+
+  postgres-company:
+    ports:
+      - "${POSTGRES_COMPANY_PORT:-5443}:5432"
+
+  postgres-payment:
+    ports:
+      - "${POSTGRES_PAYMENT_PORT:-5444}:5432"
+
+  postgres-document:
+    ports:
+      - "${POSTGRES_DOCUMENT_PORT:-5445}:5432"
+
+  postgres-logs:
+    ports:
+      - "${POSTGRES_LOGS_PORT:-5446}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  minio:
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  elasticsearch:
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+
+  kibana:
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
