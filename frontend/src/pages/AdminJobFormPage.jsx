@@ -75,7 +75,7 @@ export default function AdminJobFormPage() {
           })
         } catch {
           setToast({ message: 'Offre introuvable.', type: 'error' })
-          navigate('/admin/jobs')
+          navigate(ROUTES.ADMIN_JOBS)
         } finally {
           setLoading(false)
         }
@@ -117,11 +117,11 @@ export default function AdminJobFormPage() {
       if (isEdit) {
         await candidateApi.adminUpdateJob(parseInt(id, 10), payload)
         setToast({ message: 'Offre mise à jour.', type: 'success' })
-        navigate('/admin/jobs')
+        navigate(ROUTES.ADMIN_JOBS)
       } else {
         await candidateApi.adminCreateJob(payload)
         setToast({ message: 'Offre créée.', type: 'success' })
-        navigate('/admin/jobs')
+        navigate(ROUTES.ADMIN_JOBS)
       }
     } catch (err) {
       const detail = err.response?.data?.detail
@@ -143,9 +143,9 @@ export default function AdminJobFormPage() {
 
   return (
     <AdminLayout>
-      <div id="admin-main" className="max-w-2xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
+      <div id="yemma-main" className="max-w-2xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
         <Link
-          to="/admin/jobs"
+          to={ROUTES.ADMIN_JOBS}
           className="inline-flex items-center gap-2 text-sm text-[#6b7280] hover:text-[#226D68] mb-6 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -424,7 +424,7 @@ export default function AdminJobFormPage() {
             </div>
 
             <div className="pt-4 border-t border-gray-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-              <Link to="/admin/jobs">
+              <Link to={ROUTES.ADMIN_JOBS}>
                 <Button type="button" variant="outline">
                   Annuler
                 </Button>

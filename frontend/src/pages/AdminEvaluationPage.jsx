@@ -1,6 +1,6 @@
 /**
  * Page dédiée à la grille d'évaluation du candidat.
- * Accessible via /admin/review/:candidateId/evaluation
+ * Accessible via /yemma/review/:candidateId/evaluation
  */
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
@@ -98,7 +98,7 @@ export default function AdminEvaluationPage() {
                 <Button variant="outline" size="sm" onClick={fetchCandidateData} className="border-red-300 text-red-700 hover:bg-red-100">
                   <RefreshCw className="w-4 h-4 mr-2" />Réessayer
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => navigate('/admin/validation')}>
+                <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.ADMIN_VALIDATION)}>
                   <ArrowLeft className="w-4 h-4 mr-2" />Retour
                 </Button>
               </div>
@@ -124,7 +124,7 @@ export default function AdminEvaluationPage() {
             </Link>
             <ol className="flex items-center gap-2 text-sm min-w-0 flex-wrap">
               <li>
-                <Link to="/admin/validation" className="text-[#6b7280] hover:text-[#226D68] transition-colors">
+                <Link to={ROUTES.ADMIN_VALIDATION} className="text-[#6b7280] hover:text-[#226D68] transition-colors">
                   Validation
                 </Link>
               </li>

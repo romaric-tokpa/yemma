@@ -84,7 +84,7 @@ async def generate_admin_invitation(
     
     # Construire l'URL d'invitation
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
-    invitation_url = f"{frontend_url}/admin/create-account?token={token}"
+    invitation_url = f"{frontend_url}/yemma/create-account?token={token}"
     
     return AdminInvitationResponse(
         id=invitation.id,
@@ -285,7 +285,7 @@ async def list_admin_invitations(
             expires_at=inv.expires_at,
             created_at=inv.created_at,
             is_used=inv.is_used,
-            invitation_url=f"{frontend_url}/admin/create-account?token={inv.token}",
+            invitation_url=f"{frontend_url}/yemma/create-account?token={inv.token}",
         )
         for inv in invitations
     ]

@@ -197,7 +197,7 @@ export default function AdminJobCandidateListPage() {
               <h1 className="text-sm sm:text-lg font-semibold text-[#2C2C2C] line-clamp-2 sm:truncate">
                 Candidatures — {job.title}
               </h1>
-              <Link to={`/admin/jobs/${job.id}/edit`} className="shrink-0">
+              <Link to={ROUTES.ADMIN_JOB_EDIT(job.id)} className="shrink-0">
                 <Button variant="outline" size="sm" className="h-7 sm:h-8 text-[10px] sm:text-xs px-2 sm:px-3">
                   <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                   <span className="hidden sm:inline">Modifier l&apos;offre</span>

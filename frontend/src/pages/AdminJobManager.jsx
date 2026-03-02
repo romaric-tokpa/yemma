@@ -19,6 +19,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import AdminLayout from '@/components/admin/AdminLayout'
+import { ROUTES } from '@/constants/routes'
 import { Toast } from '@/components/common/Toast'
 import { formatDate } from '@/utils/dateUtils'
 
@@ -160,7 +161,7 @@ export default function AdminJobManager() {
                 Voir la page publique
               </Link>
               <Link
-                to="/admin/jobs/new"
+                to={ROUTES.ADMIN_JOB_NEW}
                 className="inline-flex items-center justify-center h-10 px-4 rounded-md bg-[#226D68] hover:bg-[#1a5a55] text-white text-sm font-medium transition-colors"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -183,7 +184,7 @@ export default function AdminJobManager() {
               <h2 className="text-lg font-semibold text-[#2C2C2C] mb-2">Aucune offre pour le moment</h2>
               <p className="text-[#6b7280] mb-6 max-w-sm mx-auto">Créez votre première offre pour attirer des candidats et enrichir la CVthèque.</p>
               <Link
-                to="/admin/jobs/new"
+                to={ROUTES.ADMIN_JOB_NEW}
                 className="inline-flex items-center justify-center h-11 px-6 rounded-md bg-[#226D68] hover:bg-[#1a5a55] text-white text-sm font-semibold transition-colors"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -266,7 +267,7 @@ export default function AdminJobManager() {
                         <td className="py-3 px-4">
                           <div className="min-w-0">
                             <Link
-                              to={`/admin/jobs/${job.id}/edit`}
+                              to={ROUTES.ADMIN_JOB_EDIT(job.id)}
                               className="font-medium text-[#2C2C2C] hover:text-[#226D68] truncate block"
                             >
                               {job.title}
@@ -340,7 +341,7 @@ export default function AdminJobManager() {
                         </td>
                         <td className="py-3 px-4">
                           <Link
-                            to={`/admin/jobs/${job.id}/candidatures`}
+                            to={ROUTES.ADMIN_JOB_CANDIDATURES(job.id)}
                             className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55] hover:underline"
                             title="Voir les candidatures"
                           >
@@ -398,7 +399,7 @@ export default function AdminJobManager() {
                               </Button>
                             )}
                             <Link
-                              to={`/admin/jobs/${job.id}/edit`}
+                              to={ROUTES.ADMIN_JOB_EDIT(job.id)}
                               className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
                               title="Modifier"
                             >

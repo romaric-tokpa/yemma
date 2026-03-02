@@ -41,7 +41,7 @@ export default function AdminSidebar({
     const className = `w-full justify-start h-8 text-xs px-2 mb-0.5 ${active ? 'bg-[#226D68] hover:bg-[#1a5a55] text-white' : 'text-gray-anthracite hover:bg-[#226D68]/10 hover:text-[#226D68]'}`
     if (mode === 'invitations' && section !== 'admin-invitations') {
       return (
-        <Link to="/admin/dashboard">
+        <Link to="/yemma/dashboard">
           <Button variant="ghost" className={className}>
             <Icon className="w-3.5 h-3.5 mr-2 shrink-0" />
             {sidebarOpen && <span className="truncate">{label}</span>}
@@ -53,10 +53,10 @@ export default function AdminSidebar({
       const invActive = active || mode === 'invitations'
       const invClassName = `w-full justify-start h-8 text-xs px-2 mb-0.5 ${invActive ? 'bg-[#226D68] hover:bg-[#1a5a55] text-white' : 'text-gray-anthracite hover:bg-[#226D68]/10 hover:text-[#226D68]'}`
       return (
-        <Link to="/admin/invitations">
+        <Link to="/yemma/invitations">
           <Button variant="ghost" className={invClassName}>
             <Shield className="w-3.5 h-3.5 mr-2 shrink-0" />
-            {sidebarOpen && <span className="truncate">Invitations Admin</span>}
+            {sidebarOpen && <span className="truncate">Invitations Yemma</span>}
           </Button>
         </Link>
       )
@@ -83,11 +83,11 @@ export default function AdminSidebar({
     `}>
       <div className="h-11 border-b border-border flex items-center justify-between px-2.5 bg-[#226D68]/5">
         {sidebarOpen && (
-          <Link to="/admin/dashboard" className="flex items-center gap-2 min-w-0">
+          <Link to="/yemma/dashboard" className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 bg-[#226D68] rounded-lg flex items-center justify-center shrink-0">
               <Shield className="w-4 h-4 text-white" />
             </div>
-            <span className="font-semibold text-sm text-gray-anthracite truncate">Admin</span>
+            <span className="font-semibold text-sm text-gray-anthracite truncate">Yemma</span>
           </Link>
         )}
         <Button
@@ -132,7 +132,7 @@ export default function AdminSidebar({
         {isSuperAdmin && (
           <>
             <Separator className="my-2" />
-            <div>{btn('admin-invitations', 'Invitations Admin', Shield, activeSection === 'admin-invitations' || mode === 'invitations')}</div>
+            <div>{btn('admin-invitations', 'Invitations Yemma', Shield, activeSection === 'admin-invitations' || mode === 'invitations')}</div>
           </>
         )}
 
@@ -152,7 +152,7 @@ export default function AdminSidebar({
               {sidebarOpen && (companiesSubmenuOpen ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />)}
             </Button>
           ) : (
-            <Link to="/admin/dashboard">
+            <Link to="/yemma/dashboard">
               <Button variant="ghost" className="w-full justify-between h-8 text-xs px-2 text-gray-anthracite hover:bg-[#226D68]/10 hover:text-[#226D68]">
                 <div className="min-w-0 flex items-center">
                   <Building className="w-3.5 h-3.5 mr-2 shrink-0" />

@@ -145,7 +145,7 @@ export default function AdminReview() {
     try {
       setArchiveLoading(true)
       await adminApi.archiveProfile(candidateId)
-      navigate('/admin/validation')
+      navigate(ROUTES.ADMIN_VALIDATION)
     } catch (err) {
       const msg = err.response?.data?.detail || err.message || 'Erreur lors de l\'archivage'
       setError(msg)
@@ -191,7 +191,7 @@ export default function AdminReview() {
                 <Button variant="outline" size="sm" onClick={fetchCandidateData} className="border-red-300 text-red-700 hover:bg-red-100">
                   <RefreshCw className="w-4 h-4 mr-2" />Réessayer
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => navigate('/admin/validation')}>
+                <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.ADMIN_VALIDATION)}>
                   <ArrowLeft className="w-4 h-4 mr-2" />Retour
                 </Button>
               </div>
@@ -221,13 +221,13 @@ export default function AdminReview() {
             <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
               <div className="flex items-center gap-2 min-w-0">
                 <Link
-                  to="/admin/validation"
+                  to={ROUTES.ADMIN_VALIDATION}
                   className="p-1.5 rounded-lg text-[#6b7280] hover:text-[#226D68] hover:bg-[#E8F4F3] transition-colors shrink-0"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Link>
                 <div className="flex items-center gap-2 text-sm min-w-0 flex-wrap">
-                  <Link to="/admin/validation" className="text-[#6b7280] hover:text-[#226D68] shrink-0 transition-colors">
+                  <Link to={ROUTES.ADMIN_VALIDATION} className="text-[#6b7280] hover:text-[#226D68] shrink-0 transition-colors">
                     Validation
                   </Link>
                   <span className="text-gray-300 shrink-0">/</span>

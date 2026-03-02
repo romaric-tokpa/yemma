@@ -99,7 +99,7 @@ export default function PublicNavbar({ variant = 'light' }) {
   const getDashboardLink = () => {
     if (userRoles.includes('ROLE_CANDIDAT')) return '/candidate/dashboard'
     if (userRoles.includes('ROLE_COMPANY_ADMIN') || userRoles.includes('ROLE_RECRUITER')) return '/company/dashboard'
-    if (userRoles.includes('ROLE_ADMIN') || userRoles.includes('ROLE_SUPER_ADMIN')) return '/admin/dashboard'
+    if (userRoles.includes('ROLE_ADMIN') || userRoles.includes('ROLE_SUPER_ADMIN')) return '/yemma/dashboard'
     return '/login'
   }
 

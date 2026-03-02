@@ -11,38 +11,39 @@ import {
 } from 'lucide-react'
 import { LogoutConfirmDialog } from '@/components/common/LogoutConfirmDialog'
 import { authApiService, notificationApi } from '@/services/api'
+import { ROUTES } from '@/constants/routes'
 
 const NAV_GROUPS = [
   {
     label: 'Accueil',
     items: [
-      { path: '/admin/dashboard', label: 'Accueil', icon: LayoutDashboard },
+      { path: ROUTES.ADMIN_DASHBOARD, label: 'Accueil', icon: LayoutDashboard },
     ],
   },
   {
     label: 'Candidats',
     items: [
-      { path: '/admin/validation', label: 'Validation', icon: FileCheck },
-      { path: '/admin/cvtheque', label: 'CVthèque', icon: Search },
+      { path: ROUTES.ADMIN_VALIDATION, label: 'Validation', icon: FileCheck },
+      { path: ROUTES.ADMIN_CVTHEQUE, label: 'CVthèque', icon: Search },
     ],
   },
   {
     label: 'Entreprises',
     items: [
-      { path: '/admin/companies', label: 'Entreprises', icon: Building },
-      { path: '/admin/jobs', label: "Offres d'emploi", icon: Briefcase },
+      { path: ROUTES.ADMIN_COMPANIES, label: 'Entreprises', icon: Building },
+      { path: ROUTES.ADMIN_JOBS, label: "Offres d'emploi", icon: Briefcase },
     ],
   },
   {
     label: 'Analyse',
     items: [
-      { path: '/admin/statistics', label: 'Statistiques', icon: BarChart3 },
+      { path: ROUTES.ADMIN_STATISTICS, label: 'Statistiques', icon: BarChart3 },
     ],
   },
   {
     label: 'Administration',
     items: [
-      { path: '/admin/invitations', label: 'Invitations Admin', icon: Shield, superAdminOnly: true },
+      { path: ROUTES.ADMIN_INVITATIONS, label: 'Invitations Yemma', icon: Shield, superAdminOnly: true },
     ],
   },
 ]
@@ -125,20 +126,20 @@ export default function AdminLayout({ children }) {
   }
 
   const isActive = (path) => {
-    if (path === '/admin/dashboard') return location.pathname === '/admin/dashboard'
-    if (path === '/admin/jobs') return location.pathname.startsWith('/admin/jobs')
-    if (path === '/admin/companies') return location.pathname.startsWith('/admin/companies')
-    if (path === '/admin/statistics') return location.pathname.startsWith('/admin/statistics')
+    if (path === ROUTES.ADMIN_DASHBOARD) return location.pathname === ROUTES.ADMIN_DASHBOARD
+    if (path === ROUTES.ADMIN_JOBS) return location.pathname.startsWith(ROUTES.ADMIN_JOBS)
+    if (path === ROUTES.ADMIN_COMPANIES) return location.pathname.startsWith(ROUTES.ADMIN_COMPANIES)
+    if (path === ROUTES.ADMIN_STATISTICS) return location.pathname.startsWith(ROUTES.ADMIN_STATISTICS)
     return location.pathname === path
   }
 
-  const isCvtheque = location.pathname === '/admin/cvtheque'
-  const isJobs = location.pathname.startsWith('/admin/jobs')
-  const isReview = location.pathname.startsWith('/admin/review')
+  const isCvtheque = location.pathname === ROUTES.ADMIN_CVTHEQUE
+  const isJobs = location.pathname.startsWith(ROUTES.ADMIN_JOBS)
+  const isReview = location.pathname.startsWith('/yemma/review')
 
   return (
     <div className="min-h-screen flex flex-col">
-      <a href="#admin-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:px-3 focus:py-2 focus:bg-[#226D68] focus:text-white focus:rounded-md">
+      <a href="#yemma-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:px-3 focus:py-2 focus:bg-[#226D68] focus:text-white focus:rounded-md">
         Aller au contenu principal
       </a>
 
@@ -211,7 +212,7 @@ export default function AdminLayout({ children }) {
                         return (
                           <Link
                             key={profile.id}
-                            to={`/admin/review/${profile.id}`}
+                            to={ROUTES.ADMIN_REVIEW(profile.id)}
                             onClick={() => setNotifOpen(false)}
                             className="flex items-start gap-3 px-3 sm:px-4 py-3 hover:bg-[#F4F6F8] transition-colors border-b border-gray-50 last:border-b-0"
                           >
@@ -232,7 +233,7 @@ export default function AdminLayout({ children }) {
                   {notifications.length > 0 && (
                     <div className="px-4 py-2 border-t border-gray-100 bg-[#F4F6F8]/30">
                       <Link
-                        to="/admin/validation"
+                        to={ROUTES.ADMIN_VALIDATION}
                         onClick={() => setNotifOpen(false)}
                         className="text-xs text-[#226D68] hover:text-[#1a5a55] font-medium"
                       >
@@ -262,8 +263,8 @@ export default function AdminLayout({ children }) {
                   <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} aria-hidden />
                   <div className="absolute right-0 top-full mt-2 py-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                     <div className="px-4 py-3 bg-[#F4F6F8]/50 border-b border-gray-100">
-                      <p className="font-semibold text-sm text-[#2C2C2C] truncate">{user?.email || 'Admin'}</p>
-                      <p className="text-xs text-[#6b7280] truncate mt-0.5">{isSuperAdmin ? 'Super Admin' : 'Administrateur'}</p>
+                      <p className="font-semibold text-sm text-[#2C2C2C] truncate">{user?.email || 'Yemma'}</p>
+                      <p className="text-xs text-[#6b7280] truncate mt-0.5">{isSuperAdmin ? 'Super Admin' : 'Équipe Yemma'}</p>
                     </div>
                     <Button variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-50 rounded-none h-10 px-4" onClick={() => { setUserMenuOpen(false); setLogoutDialogOpen(true) }}>
                       <LogOut className="h-4 w-4 mr-2" /> Déconnexion
@@ -301,7 +302,7 @@ export default function AdminLayout({ children }) {
                 {user?.email?.[0]?.toUpperCase() || 'A'}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{user?.email?.split('@')[0] || 'Admin'}</p>
+                <p className="text-sm font-semibold text-[#2C2C2C] truncate">{user?.email?.split('@')[0] || 'Yemma'}</p>
                 <p className="text-xs text-[#6b7280] truncate">
                   {isSuperAdmin ? (
                     <span className="inline-flex items-center gap-1 text-[#226D68] font-medium">
@@ -309,7 +310,7 @@ export default function AdminLayout({ children }) {
                       Super Admin
                     </span>
                   ) : (
-                    'Administrateur'
+                    'Équipe Yemma'
                   )}
                 </p>
               </div>
@@ -378,7 +379,7 @@ export default function AdminLayout({ children }) {
 
         {sidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden />}
 
-        <main id="admin-main" className={`flex-1 min-w-0 flex flex-col overflow-x-hidden ${isCvtheque ? 'overflow-hidden' : 'overflow-y-auto'}`} aria-label="Contenu administration">
+        <main id="yemma-main" className={`flex-1 min-w-0 flex flex-col overflow-x-hidden ${isCvtheque ? 'overflow-hidden' : 'overflow-y-auto'}`} aria-label="Contenu Yemma">
           {isCvtheque ? (
             <div className="flex-1 flex flex-col min-h-0 w-full max-w-full min-w-0 px-3 sm:px-4 lg:px-6 py-4 sm:py-5">
               {children}

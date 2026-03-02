@@ -92,7 +92,9 @@ export default function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/invitation/accept" element={<AcceptInvitation />} />
       
-      {/* Route publique pour création de compte admin via token d'invitation */}
+      {/* Route publique pour création de compte Yemma via token d'invitation */}
+      <Route path="/yemma/create-account" element={<CreateAdminAccount />} />
+      {/* Rétrocompatibilité : anciennes invitations avec /admin/create-account */}
       <Route path="/admin/create-account" element={<CreateAdminAccount />} />
 
       {/* Paiement - Retour Stripe (protégé entreprise) */}
@@ -373,9 +375,9 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* CVthèque admin - accès identique à l'entreprise */}
+      {/* CVthèque Yemma - accès identique à l'entreprise */}
       <Route 
-        path="/admin/cvtheque" 
+        path="/yemma/cvtheque" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminCvtheque />
@@ -383,9 +385,9 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* Routes protégées - Admin */}
+      {/* Routes protégées - Yemma (ex-admin) */}
       <Route 
-        path="/admin/companies/abonnements" 
+        path="/yemma/companies/abonnements" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminDashboard />
@@ -393,7 +395,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/companies/recruteurs" 
+        path="/yemma/companies/recruteurs" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminDashboard />
@@ -401,7 +403,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/companies/liste" 
+        path="/yemma/companies/liste" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminDashboard />
@@ -409,7 +411,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/companies" 
+        path="/yemma/companies" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminDashboard />
@@ -417,7 +419,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/dashboard" 
+        path="/yemma/dashboard" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminDashboard />
@@ -425,7 +427,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/validation" 
+        path="/yemma/validation" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminValidationPage />
@@ -433,7 +435,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/statistics/offres" 
+        path="/yemma/statistics/offres" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminStatisticsPage defaultTab="jobs" />
@@ -441,7 +443,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/statistics/periode" 
+        path="/yemma/statistics/periode" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminStatisticsPage defaultTab="period" />
@@ -449,7 +451,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/statistics/secteurs" 
+        path="/yemma/statistics/secteurs" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminStatisticsPage defaultTab="sectors" />
@@ -457,7 +459,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/statistics" 
+        path="/yemma/statistics" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminStatisticsPage />
@@ -465,11 +467,11 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/raccourcis" 
-        element={<Navigate to="/admin/dashboard" replace />}
+        path="/yemma/raccourcis" 
+        element={<Navigate to="/yemma/dashboard" replace />}
       />
       <Route 
-        path="/admin/review/:candidateId/evaluation" 
+        path="/yemma/review/:candidateId/evaluation" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminEvaluationPage />
@@ -477,7 +479,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/review/:candidateId/documents" 
+        path="/yemma/review/:candidateId/documents" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminReview defaultTab="documents" />
@@ -485,7 +487,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/review/:candidateId/profile" 
+        path="/yemma/review/:candidateId/profile" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminReview defaultTab="profile" />
@@ -493,7 +495,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/review/:candidateId" 
+        path="/yemma/review/:candidateId" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminReview />
@@ -501,7 +503,7 @@ export default function AppRoutes() {
         } 
       />
       <Route 
-        path="/admin/invitations" 
+        path="/yemma/invitations" 
         element={
           <AuthGuard allowedRoles={['ROLE_SUPER_ADMIN']}>
             <AdminInvitationsPage />
@@ -509,7 +511,7 @@ export default function AppRoutes() {
         }
       />
       <Route 
-        path="/admin/jobs/new" 
+        path="/yemma/jobs/new" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminJobFormPage />
@@ -517,7 +519,7 @@ export default function AppRoutes() {
         }
       />
       <Route 
-        path="/admin/jobs/:id/edit" 
+        path="/yemma/jobs/:id/edit" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminJobFormPage />
@@ -525,7 +527,7 @@ export default function AppRoutes() {
         }
       />
       <Route 
-        path="/admin/jobs/:id/candidatures" 
+        path="/yemma/jobs/:id/candidatures" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminJobCandidateListPage />
@@ -533,13 +535,17 @@ export default function AppRoutes() {
         }
       />
       <Route 
-        path="/admin/jobs" 
+        path="/yemma/jobs" 
         element={
           <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
             <AdminJobManager />
           </AuthGuard>
         }
       />
+      
+      {/* Redirections anciennes routes /admin vers /yemma (rétrocompatibilité) */}
+      <Route path="/admin/*" element={<Navigate to="/yemma/dashboard" replace />} />
+      <Route path="/admin" element={<Navigate to="/yemma/dashboard" replace />} />
       
       {/* Route 404 - Doit être en dernier */}
       <Route path="*" element={<NotFound />} />

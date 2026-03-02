@@ -63,7 +63,7 @@ export default function CandidateDetailPage() {
   const [photoUrl, setPhotoUrl] = useState(null)
 
   const isAdmin = userRoles.includes('ROLE_ADMIN') || userRoles.includes('ROLE_SUPER_ADMIN')
-  const searchBackUrl = isAdmin ? '/admin/cvtheque' : '/company/dashboard?tab=search'
+  const searchBackUrl = isAdmin ? '/yemma/cvtheque' : '/company/dashboard?tab=search'
 
   useEffect(() => {
     loadUserAndCompany()

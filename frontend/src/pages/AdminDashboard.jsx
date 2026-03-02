@@ -44,7 +44,7 @@ export default function AdminDashboard() {
   const location = useLocation()
   const navigate = useNavigate()
   const path = location.pathname
-  const activeSection = path.includes('/admin/companies') ? 'companies' : 'accueil'
+  const activeSection = path.includes('/yemma/companies') ? 'companies' : 'accueil'
   const activeSubsection = pathToSubsection(path)
   
   const [stats, setStats] = useState({
@@ -306,13 +306,13 @@ export default function AdminDashboard() {
               {/* Grille raccourcis — 6 cartes */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
                 {[
-                  { id: 'ALL', icon: Users, label: 'Tous les candidats', value: Object.values(stats).reduce((a, b) => a + b, 0), desc: 'Inscrits, brouillons et soumis', action: () => navigate('/admin/validation', { state: { status: 'ALL' } }), accent: 'default' },
-                  { id: 'SUBMITTED', icon: Clock, label: 'Candidats soumis', value: stats.SUBMITTED || 0, desc: 'En attente de validation', action: () => navigate('/admin/validation', { state: { status: 'SUBMITTED' } }), accent: 'amber' },
-                  { id: 'VALIDATED', icon: CheckCircle, label: 'Candidats validés', value: stats.VALIDATED || 0, desc: 'Visibles dans la CVthèque', action: () => navigate('/admin/validation', { state: { status: 'VALIDATED' } }), accent: 'green' },
-                  { id: 'REJECTED', icon: XCircle, label: 'Candidats rejetés', value: stats.REJECTED || 0, desc: 'Profils refusés', action: () => navigate('/admin/validation', { state: { status: 'REJECTED' } }), accent: 'red' },
-                  { id: 'stats', icon: BarChart3, label: 'Statistiques', value: '', desc: 'Effectifs et secteurs', action: () => navigate('/admin/statistics'), accent: 'default' },
-                  { id: 'cvtheque', icon: Search, label: 'CVthèque', value: '', desc: 'Recherche dans les profils validés', action: () => navigate('/admin/cvtheque'), accent: 'default' },
-                  { id: 'companies', icon: Building, label: 'Entreprises', value: companies.length, desc: 'Annuaire des partenaires', action: () => navigate('/admin/companies'), accent: 'default' },
+                  { id: 'ALL', icon: Users, label: 'Tous les candidats', value: Object.values(stats).reduce((a, b) => a + b, 0), desc: 'Inscrits, brouillons et soumis', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'ALL' } }), accent: 'default' },
+                  { id: 'SUBMITTED', icon: Clock, label: 'Candidats soumis', value: stats.SUBMITTED || 0, desc: 'En attente de validation', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'SUBMITTED' } }), accent: 'amber' },
+                  { id: 'VALIDATED', icon: CheckCircle, label: 'Candidats validés', value: stats.VALIDATED || 0, desc: 'Visibles dans la CVthèque', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'VALIDATED' } }), accent: 'green' },
+                  { id: 'REJECTED', icon: XCircle, label: 'Candidats rejetés', value: stats.REJECTED || 0, desc: 'Profils refusés', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'REJECTED' } }), accent: 'red' },
+                  { id: 'stats', icon: BarChart3, label: 'Statistiques', value: '', desc: 'Effectifs et secteurs', action: () => navigate(ROUTES.ADMIN_STATISTICS), accent: 'default' },
+                  { id: 'cvtheque', icon: Search, label: 'CVthèque', value: '', desc: 'Recherche dans les profils validés', action: () => navigate(ROUTES.ADMIN_CVTHEQUE), accent: 'default' },
+                  { id: 'companies', icon: Building, label: 'Entreprises', value: companies.length, desc: 'Annuaire des partenaires', action: () => navigate(ROUTES.ADMIN_COMPANIES), accent: 'default' },
                 ].map((item) => {
                   const Icon = item.icon
                   const accentBg = item.accent === 'amber' ? 'bg-amber-50' : item.accent === 'green' ? 'bg-[#E8F4F3]' : item.accent === 'red' ? 'bg-[#e76f51]/5' : 'bg-[#E8F4F3]/60'

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { authApiService, candidateApi, companyApi } from '@/services/api'
 import { loginSchema } from '@/schemas/auth'
-import { AlertCircle, Mail, Lock, User, Building, ArrowRight } from 'lucide-react'
+import { AlertCircle, Mail, Lock, User, Building, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { SEO } from '@/components/seo/SEO'
 import RegisterCandidatIllustration from '@/components/landing/RegisterCandidatIllustration'
 
@@ -18,6 +18,7 @@ export default function Login() {
   const [searchParams] = useSearchParams()
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const redirectUrl = searchParams.get('redirect')
   const from = location.state?.from || redirectUrl || null
   const successMessage = location.state?.message || null
@@ -183,12 +184,21 @@ export default function Login() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="Votre mot de passe"
                     {...register('password')}
                     disabled={isLoading}
-                    className="h-11 pl-10 border-gray-200 bg-[#F4F6F8]/50 focus:bg-white rounded-xl w-full min-w-0"
+                    className="h-11 pl-10 pr-10 border-gray-200 bg-[#F4F6F8]/50 focus:bg-white rounded-xl w-full min-w-0"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-gray-400 hover:text-[#226D68] hover:bg-[#E8F4F3]/50 transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
                 {errors.password && <p className="text-xs text-red-600 mt-0.5">{errors.password.message}</p>}
               </div>

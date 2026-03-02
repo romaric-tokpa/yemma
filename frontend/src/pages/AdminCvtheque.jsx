@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Users, CheckCircle, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import AdminLayout from '@/components/admin/AdminLayout'
+import { ROUTES } from '@/constants/routes'
 import { SearchTab } from '@/components/company/SearchTab'
 
 export default function AdminCvtheque() {
@@ -48,7 +49,7 @@ export default function AdminCvtheque() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/admin/validation', { state: { status: 'VALIDATED' } })}
+                onClick={() => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'VALIDATED' } })}
                 className="h-8 sm:h-7 sm:px-3 rounded-lg border-gray-200 text-[#226D68] hover:bg-[#226D68]/10 shrink-0"
               >
                 <Users className="h-4 w-4 sm:mr-1" />

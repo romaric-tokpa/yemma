@@ -56,7 +56,7 @@ export default function AdminInvitationsPage() {
   }, [])
 
   const handleCopy = async (inv) => {
-    const url = inv.invitation_url || `${window.location.origin}/admin/create-account?token=${inv.token}`
+    const url = inv.invitation_url || `${window.location.origin}/yemma/create-account?token=${inv.token}`
     try {
       await navigator.clipboard.writeText(url)
       setCopiedId(inv.id)

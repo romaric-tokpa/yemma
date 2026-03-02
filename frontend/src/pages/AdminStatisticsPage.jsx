@@ -1,6 +1,6 @@
 /**
  * Page Statistiques admin : effectifs, secteurs, évolution.
- * Route dédiée : /admin/statistics
+ * Route dédiée : /yemma/statistics
  * Responsive et redesign moderne.
  */
 import { useState, useEffect } from 'react'
@@ -290,7 +290,7 @@ export default function AdminStatisticsPage({ defaultTab }) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate('/admin/validation')}
+                    onClick={() => navigate(ROUTES.ADMIN_VALIDATION)}
                     className="shrink-0 border-[#226D68]/30 text-[#226D68] hover:bg-[#226D68]/10 w-full sm:w-auto"
                   >
                     <ChevronRight className="w-4 h-4 mr-1" />
@@ -563,7 +563,7 @@ export default function AdminStatisticsPage({ defaultTab }) {
                           <Button variant="ghost" size="sm" onClick={loadJobStats} disabled={loadingJobStats} className="h-8 w-8 p-0 text-[#6b7280] hover:text-[#226D68]">
                             <RefreshCw className={`w-4 h-4 ${loadingJobStats ? 'animate-spin' : ''}`} />
                           </Button>
-                          <Link to="/admin/jobs" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]">
+                          <Link to={ROUTES.ADMIN_JOBS} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]">
                             Gérer les offres
                             <ChevronRight className="w-4 h-4" />
                           </Link>
@@ -645,7 +645,7 @@ export default function AdminStatisticsPage({ defaultTab }) {
                       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                         <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-[#E8F4F3]/60 to-white flex flex-wrap items-center justify-between gap-3">
                           <h3 className="text-sm font-semibold text-[#2C2C2C]">Top offres par candidatures</h3>
-                          <Link to="/admin/jobs" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]">
+                          <Link to={ROUTES.ADMIN_JOBS} className="inline-flex items-center gap-1.5 text-sm font-medium text-[#226D68] hover:text-[#1a5a55]">
                             Voir toutes
                             <ChevronRight className="w-4 h-4" />
                           </Link>
@@ -654,7 +654,7 @@ export default function AdminStatisticsPage({ defaultTab }) {
                           {jobStats.top_jobs_by_applications.slice(0, 8).map((job, i) => (
                             <Link
                               key={job.job_id}
-                              to={`/admin/jobs/${job.job_id}/candidatures`}
+                              to={ROUTES.ADMIN_JOB_CANDIDATURES(job.job_id)}
                               className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-[#E8F4F3]/30 transition-colors"
                             >
                               <span className="text-sm text-[#6b7280] w-6 shrink-0">{i + 1}.</span>

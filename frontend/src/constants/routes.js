@@ -45,31 +45,35 @@ export const ROUTES = {
   CANDIDATE_JOBS: '/candidate/dashboard/offres',
   CANDIDATE_JOB_DETAIL: (id) => `/candidate/dashboard/offres/${id}`,
 
-  // Admin - Offres
-  ADMIN_JOBS: '/admin/jobs',
-  ADMIN_JOB_NEW: '/admin/jobs/new',
-  ADMIN_JOB_EDIT: (id) => `/admin/jobs/${id}/edit`,
-  ADMIN_JOB_CANDIDATURES: (id) => `/admin/jobs/${id}/candidatures`,
+  // Yemma (ex-admin) - Offres
+  ADMIN_JOBS: '/yemma/jobs',
+  ADMIN_JOB_NEW: '/yemma/jobs/new',
+  ADMIN_JOB_EDIT: (id) => `/yemma/jobs/${id}/edit`,
+  ADMIN_JOB_CANDIDATURES: (id) => `/yemma/jobs/${id}/candidatures`,
 
   // Routes recherche
   SEARCH: '/search',
   SEARCH_PRO: '/search/pro',
   CANDIDATE_DETAIL: (candidateId) => `/candidates/${candidateId}`,
   
-  // Routes admin
-  ADMIN_DASHBOARD: '/admin/dashboard',
-  ADMIN_COMPANIES: '/admin/companies',
-  ADMIN_COMPANIES_LISTE: '/admin/companies/liste',
-  ADMIN_COMPANIES_RECRUTEURS: '/admin/companies/recruteurs',
-  ADMIN_COMPANIES_ABONNEMENTS: '/admin/companies/abonnements',
-  ADMIN_STATISTICS: '/admin/statistics',
-  ADMIN_STATISTICS_SECTEURS: '/admin/statistics/secteurs',
-  ADMIN_STATISTICS_PERIODE: '/admin/statistics/periode',
-  ADMIN_STATISTICS_OFFRES: '/admin/statistics/offres',
-  ADMIN_REVIEW: (candidateId) => `/admin/review/${candidateId}`,
-  ADMIN_REVIEW_PROFILE: (candidateId) => `/admin/review/${candidateId}/profile`,
-  ADMIN_REVIEW_DOCUMENTS: (candidateId) => `/admin/review/${candidateId}/documents`,
-  ADMIN_REVIEW_EVALUATION: (candidateId) => `/admin/review/${candidateId}/evaluation`,
+  // Routes Yemma (ex-admin)
+  ADMIN_DASHBOARD: '/yemma/dashboard',
+  ADMIN_COMPANIES: '/yemma/companies',
+  ADMIN_COMPANIES_LISTE: '/yemma/companies/liste',
+  ADMIN_COMPANIES_RECRUTEURS: '/yemma/companies/recruteurs',
+  ADMIN_COMPANIES_ABONNEMENTS: '/yemma/companies/abonnements',
+  ADMIN_STATISTICS: '/yemma/statistics',
+  ADMIN_STATISTICS_SECTEURS: '/yemma/statistics/secteurs',
+  ADMIN_STATISTICS_PERIODE: '/yemma/statistics/periode',
+  ADMIN_STATISTICS_OFFRES: '/yemma/statistics/offres',
+  ADMIN_REVIEW: (candidateId) => `/yemma/review/${candidateId}`,
+  ADMIN_REVIEW_PROFILE: (candidateId) => `/yemma/review/${candidateId}/profile`,
+  ADMIN_REVIEW_DOCUMENTS: (candidateId) => `/yemma/review/${candidateId}/documents`,
+  ADMIN_REVIEW_EVALUATION: (candidateId) => `/yemma/review/${candidateId}/evaluation`,
+  ADMIN_CREATE_ACCOUNT: '/yemma/create-account',
+  ADMIN_CVTHEQUE: '/yemma/cvtheque',
+  ADMIN_VALIDATION: '/yemma/validation',
+  ADMIN_INVITATIONS: '/yemma/invitations',
 
   // Routes entreprise - onglets avec routes
   COMPANY_DASHBOARD_OVERVIEW: '/company/dashboard',
@@ -89,8 +93,8 @@ export const ROUTES = {
     ROLE_CANDIDAT: '/candidate/dashboard',
     ROLE_COMPANY_ADMIN: '/company/dashboard',
     ROLE_RECRUITER: '/company/dashboard',
-    ROLE_ADMIN: '/admin/dashboard',
-    ROLE_SUPER_ADMIN: '/admin/dashboard',
+    ROLE_ADMIN: '/yemma/dashboard',
+    ROLE_SUPER_ADMIN: '/yemma/dashboard',
   },
 }
 

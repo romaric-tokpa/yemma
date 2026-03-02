@@ -111,7 +111,7 @@ export default function CreateAdminAccount() {
       setSuccess(true)
       
       setTimeout(() => {
-        navigate('/admin/dashboard')
+        navigate('/yemma/dashboard')
       }, 2000)
     } catch (err) {
       console.error('Erreur lors de la création du compte admin:', err)

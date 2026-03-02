@@ -1,945 +1,141 @@
-services:
-  # ============================================
-  # API GATEWAY - NGINX
-  # ============================================
+# Supplément de développement local — fonctionne AVEC docker-compose.yml (database-per-service)
+#
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Expose tous les ports pour le débogage, et passe APP_ENV=development
+# pour que les services démarrent en mode --reload (plus rapide à l'itération).
+#
+# Ports :
+#   nginx         → 8080          (gateway, cible du proxy Vite)
+#   auth          → 8001
+#   candidate     → 8002
+#   document      → 8003
+#   search        → 8004
+#   company       → 8005
+#   payment       → 8006
+#   notification  → 8007
+#   audit         → 8008
+#   admin         → 8009
+#   parsing       → 8010
+#   postgres-auth → 5441          (accès DBeaver / psql)
+#   postgres-candidate → 5442
+#   postgres-company   → 5443
+#   postgres-payment   → 5444
+#   postgres-document  → 5445
+#   postgres-logs      → 5446
+#   redis         → 6379
+#   minio         → 9000 (API S3), 9001 (console)
+#   elasticsearch → 9200
+#   kibana        → 5601
 
+services:
+
+  # --- API GATEWAY ---
   nginx:
-    image: nginx:alpine
-    container_name: yemma-nginx
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "${NGINX_HTTP_PORT:-8080}:80"
-    networks:
-      - yemma-network
-    depends_on:
-      auth:
-        condition: service_started # Plus souple pour le démarrage
-      candidate:
-        condition: service_started
-      frontend:
-        condition: service_started
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=yemma-network"
-      # Utilise bien les ` autour du domaine
-      - "traefik.http.routers.yemma.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
-      - "traefik.http.routers.yemma.entrypoints=websecure"
-      - "traefik.http.routers.yemma.tls.certresolver=myresolver"
-      - "traefik.http.services.yemma.loadbalancer.server.port=80"
-    #healthcheck:
-      # Si /health n'existe pas dans ton nginx.conf, ce test échouera. 
-      # Tu peux tester avec "http://localhost/" si besoin.
-      #test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
-     # interval: 30s
-     # timeout: 10s
-     # retries: 3
-    restart: unless-stopped
 
-  # ============================================
-  # INFRASTRUCTURE
-  # ============================================
-  
-  postgres:
-    image: postgres:15-alpine
-    container_name: yemma-postgres
+  # --- BACKEND SERVICES ---
+  auth:
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-yemma_db}
-      # PGDATA défini dans un sous-répertoire pour éviter les conflits
-      PGDATA: /var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - yemma-network
-    # Port exposé pour migrations locales (alembic depuis la machine hôte)
-    # 5433 par défaut pour éviter conflit avec PostgreSQL système sur 5432
+      APP_ENV: development
     ports:
-      - "${DB_PORT:-5433}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-yemma_db}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
+      - "${AUTH_PORT:-8001}:8000"
 
+  candidate:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${CANDIDATE_PORT:-8002}:8000"
+
+  document:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${DOCUMENT_PORT:-8003}:8000"
+
+  search:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${SEARCH_PORT:-8004}:8000"
+
+  company:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${COMPANY_PORT:-8005}:8000"
+
+  payment:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${PAYMENT_PORT:-8006}:8000"
+
+  notification:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${NOTIFICATION_PORT:-8007}:8000"
+
+  audit:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${AUDIT_PORT:-8008}:8000"
+
+  admin:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${ADMIN_PORT:-8009}:8000"
+
+  parsing:
+    environment:
+      APP_ENV: development
+    ports:
+      - "${PARSING_PORT:-8010}:8000"
+
+  # --- BASES DE DONNÉES (accès direct DBeaver / psql) ---
+  postgres-auth:
+    ports:
+      - "${POSTGRES_AUTH_PORT:-5441}:5432"
+
+  postgres-candidate:
+    ports:
+      - "${POSTGRES_CANDIDATE_PORT:-5442}:5432"
+
+  postgres-company:
+    ports:
+      - "${POSTGRES_COMPANY_PORT:-5443}:5432"
+
+  postgres-payment:
+    ports:
+      - "${POSTGRES_PAYMENT_PORT:-5444}:5432"
+
+  postgres-document:
+    ports:
+      - "${POSTGRES_DOCUMENT_PORT:-5445}:5432"
+
+  postgres-logs:
+    ports:
+      - "${POSTGRES_LOGS_PORT:-5446}:5432"
+
+  # --- INFRASTRUCTURE ---
   redis:
-    image: redis:7-alpine
-    container_name: yemma-redis
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
-    volumes:
-      - redis_data:/data
-    networks:
-      - yemma-network
-    # Port non exposé car utilisé uniquement par les services Docker internes
-    # ports:
-    #   - "${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
 
   minio:
-    image: minio/minio:latest
-    container_name: yemma-minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-    volumes:
-      - minio_data:/data
-    networks:
-      - yemma-network
-    # Ports exposés uniquement pour l'administration (optionnel, peut être retiré)
-    # En production, accéder via Nginx reverse proxy
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    restart: unless-stopped
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-    container_name: yemma-elasticsearch
-    environment:
-      # Mode single-node pour le développement
-      - discovery.type=single-node
-      
-      # Désactiver la sécurité SSL/Auth pour faciliter l'intégration locale
-      - xpack.security.enabled=false
-      - xpack.security.http.ssl.enabled=false
-      - xpack.security.transport.ssl.enabled=false
-      - xpack.security.enrollment.enabled=false
-      
-      # Configuration Java
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      
-      # Désactiver les warnings de bootstrap
-      - bootstrap.memory_lock=false
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    networks:
-      - yemma-network
-    # Ports exposés uniquement pour l'administration (optionnel, peut être retiré)
-    # En production, accéder via Nginx reverse proxy
     ports:
       - "${ELASTICSEARCH_PORT:-9200}:9200"
-      - "${ELASTICSEARCH_TRANSPORT_PORT:-9300}:9300"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 300s
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-    restart: unless-stopped
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.0
-    container_name: yemma-kibana
-    environment:
-      # Connexion à ElasticSearch
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      
-      # Désactiver la sécurité pour correspondre à ElasticSearch
-      - xpack.security.enabled=false
-      - xpack.encryptedSavedObjects.encryptionKey=minimal-32-character-encryption-key-for-dev
-      
-      # Configuration du serveur
-      - SERVER_NAME=kibana
-      - SERVER_HOST=0.0.0.0
-      
-      # Désactiver les télémetries (optionnel)
-      - TELEMETRY_OPTIN=false
-    networks:
-      - yemma-network
-    # Port exposé uniquement pour l'administration (optionnel, peut être retiré)
-    # En production, accéder via Nginx reverse proxy
     ports:
       - "${KIBANA_PORT:-5601}:5601"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
-
-  # ============================================
-  # BACKEND SERVICES
-  # ============================================
-
-  auth:
-    build:
-      context: ./services
-      dockerfile: auth-service/Dockerfile
-    container_name: yemma-auth
-    environment:
-      # Application
-      APP_NAME: auth-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      
-      # JWT
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
-      
-      # OAuth2
-      OAUTH2_SECRET_KEY: ${OAUTH2_SECRET_KEY:-your-oauth2-secret-key-change-in-production}
-      
-      # CORS (format JSON pour les listes Pydantic) - inclut 8080 pour reset-password via nginx
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8080","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8080","http://127.0.0.1:8000","http://127.0.0.1"]}
-      
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-      # Notification (email après inscription candidat)
-      NOTIFICATION_SERVICE_URL: http://notification:8000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
-      
-      # OAuth (Google, LinkedIn)
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
-      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
-      AUTH_SERVICE_EXTERNAL_URL: ${AUTH_SERVICE_EXTERNAL_URL:-http://localhost:8001}
-    volumes:
-      - ./services/auth-service:/app
-      - ./services/shared:/shared
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port exposé pour le développement (accès direct)
-    # En production, utiliser uniquement via Nginx Gateway
-    ports:
-      - "${AUTH_PORT:-8001}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      notification:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  candidate:
-    build:
-      context: ./services
-      dockerfile: candidate/Dockerfile
-    container_name: yemma-candidate
-    env_file:
-      - .env
-    environment:
-      # Application
-      APP_NAME: candidate-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      REQUIRE_FULL_PROFILE_FOR_APPLY: ${REQUIRE_FULL_PROFILE_FOR_APPLY:-true}
-      PROFILE_COMPLETION_THRESHOLD: ${PROFILE_COMPLETION_THRESHOLD:-80}
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      
-      # JWT Validation
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      AUTH_SERVICE_URL: http://auth:8000
-      
-      # Document Service
-      DOCUMENT_SERVICE_URL: http://document:8000
-      
-      # CORS (format JSON pour les listes Pydantic)
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost","http://127.0.0.1:3000","http://127.0.0.1:8000","http://127.0.0.1"]}
-      
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-      
-      # Authentification inter-services (pour accepter les appels du service admin)
-      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
-    volumes:
-      - ./services/candidate:/app
-      - ./services/shared:/shared
-      - ./.cursor:/app/.cursor:rw
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port exposé pour le développement (accès direct)
-    # En production, utiliser uniquement via Nginx Gateway
-    ports:
-      - "${CANDIDATE_PORT:-8002}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      auth:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  parsing:
-    build:
-      context: ./services
-      dockerfile: yemma-parsing-service/Dockerfile
-    container_name: yemma-parsing
-    env_file:
-      - .env
-    environment:
-      # Application
-      APP_NAME: yemma-parsing-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-
-      # HRFlow API
-      HRFLOW_API_KEY: ${HRFLOW_API_KEY:-your-hrflow-api-key}
-      HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-ae16505f6f0eebe3abb79ad1bf83ec53b4886432}
-      HRFLOW_USER_EMAIL: ${HRFLOW_USER_EMAIL:-}
-      HRFLOW_API_URL: ${HRFLOW_API_URL:-https://api.hrflow.ai/v1}
-
-      # Database
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-
-      # Redis / Celery
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-
-      # Auth Service
-      AUTH_SERVICE_URL: http://auth:8000
-      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key}
-    volumes:
-      - ./services/yemma-parsing-service:/app
-      - ./.cursor:/app/.cursor:rw
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    ports:
-      - "${PARSING_PORT:-8010}:8000"
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  parsing-worker:
-    build:
-      context: ./services
-      dockerfile: yemma-parsing-service/Dockerfile
-    container_name: yemma-parsing-worker
-    environment:
-      # Application
-      APP_NAME: yemma-parsing-worker
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-
-      # HRFlow API
-      HRFLOW_API_KEY: ${HRFLOW_API_KEY:-your-hrflow-api-key}
-      HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-ae16505f6f0eebe3abb79ad1bf83ec53b4886432}
-      HRFLOW_API_URL: ${HRFLOW_API_URL:-https://api.hrflow.ai/v1}
-
-      # Redis / Celery
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
-    volumes:
-      - ./services/yemma-parsing-service:/app
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2 --queues=parsing
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  document:
-    build:
-      context: ./services/document
-      dockerfile: Dockerfile
-    container_name: yemma-document
-    environment:
-      # Application
-      APP_NAME: document-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      
-      # S3 / MinIO
-      S3_ENDPOINT: http://minio:9000
-      S3_PUBLIC_ENDPOINT: http://localhost:9000
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-documents}
-      S3_REGION: ${S3_REGION:-us-east-1}
-      S3_USE_SSL: ${S3_USE_SSL:-false}
-      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
-      
-      # File Upload
-      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
-      ALLOWED_EXTENSIONS: "pdf,jpg,jpeg,png,webp,docx"
-      TEMP_LINK_EXPIRE_HOURS: ${TEMP_LINK_EXPIRE_HOURS:-24}
-      
-      # JWT Validation
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      AUTH_SERVICE_URL: http://auth:8000
-      
-      # CORS (string séparée par virgules ; pas de JSON)
-      CORS_ORIGINS: ${CORS_ORIGINS:-"http://localhost:3000,http://localhost:8000,http://localhost,http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1"}
-    volumes:
-      - ./services/document:/app
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port exposé pour accès direct (dev) - accès aussi via Nginx Gateway
-    ports:
-      - "${DOCUMENT_PORT:-8003}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  search:
-    build:
-      context: ./services/search
-      dockerfile: Dockerfile
-    container_name: yemma-search
-    environment:
-      # Application
-      APP_NAME: search-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      
-      # ElasticSearch
-      ELASTICSEARCH_HOST: elasticsearch
-      ELASTICSEARCH_PORT: 9200
-      ELASTICSEARCH_USER: ${ELASTICSEARCH_USER:-}
-      ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD:-}
-      ELASTICSEARCH_USE_SSL: ${ELASTICSEARCH_USE_SSL:-false}
-      ELASTICSEARCH_VERIFY_CERTS: ${ELASTICSEARCH_VERIFY_CERTS:-false}
-      ELASTICSEARCH_INDEX_NAME: ${ELASTICSEARCH_INDEX_NAME:-certified_candidates}
-      
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: ${RABBITMQ_USER:-rabbitmq}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbitmq_password}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
-      
-      # Service URLs
-      CANDIDATE_SERVICE_URL: http://candidate:8000
-      ADMIN_SERVICE_URL: http://admin:8000
-      AUTH_SERVICE_URL: http://auth:8000
-      PAYMENT_SERVICE_URL: http://payment:8000
-      AUDIT_SERVICE_URL: http://audit:8000
-      COMPANY_SERVICE_URL: http://company:8000
-
-      # JWT Validation (pour le fallback si AUTH_SERVICE_URL ne répond pas)
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-
-      # Authentification inter-services (pour accepter les appels du service admin lors de l'indexation)
-      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
-
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000","http://localhost:8000","http://localhost"]}
-    volumes:
-      - ./services/search:/app
-      - ./services/shared:/shared
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port exposé pour le développement (accès direct)
-    # En production, utiliser uniquement via Nginx Gateway
-    ports:
-      - "${SEARCH_PORT:-8004}:8000"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-      auth:
-        condition: service_healthy
-      candidate:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  admin:
-    build:
-      context: ./services
-      dockerfile: admin/Dockerfile
-    container_name: yemma-admin
-    env_file:
-      - .env
-    environment:
-      # Application
-      APP_NAME: admin-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      
-      # Service URLs
-      CANDIDATE_SERVICE_URL: http://candidate:8000
-      SEARCH_SERVICE_URL: http://search:8000
-      NOTIFICATION_SERVICE_URL: http://notification:8000
-      
-      # Authentification inter-services (requis pour appeler le service candidat)
-      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
-      
-      # JWT (validation des tokens utilisateur - même secret que Auth Service)
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      
-      # HrFlow.ai - Profile Asking (CvGPT) pour Analyse par IA
-      HRFLOW_API_KEY: ${HRFLOW_API_KEY:-}
-      HRFLOW_SOURCE_KEY: ${HRFLOW_SOURCE_KEY:-ae16505f6f0eebe3abb79ad1bf83ec53b4886432}
-      HRFLOW_USER_EMAIL: ${HRFLOW_USER_EMAIL:-}
-      HRFLOW_API_URL: ${HRFLOW_API_URL:-https://api.hrflow.ai/v1}
-      
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
-    volumes:
-      - ./services/admin:/app
-      - ./services/shared:/shared
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port exposé pour le développement (accès direct)
-    # En production, utiliser uniquement via Nginx Gateway
-    ports:
-      - "${ADMIN_PORT:-8009}:8000"
-    depends_on:
-      candidate:
-        condition: service_healthy
-      # search peut être unhealthy, on démarre quand même
-      # search:
-      #   condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  company:
-    build:
-      context: ./services
-      dockerfile: company/Dockerfile
-    container_name: yemma-company
-    environment:
-      # Application
-      APP_NAME: company-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      
-      # JWT Validation
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      AUTH_SERVICE_URL: http://auth:8000
-      
-      # Invitation
-      INVITATION_TOKEN_EXPIRE_DAYS: ${INVITATION_TOKEN_EXPIRE_DAYS:-7}
-      INVITATION_SECRET_KEY: ${INVITATION_SECRET_KEY:-your-invitation-secret-key}
-      
-      # Service URLs
-      SEARCH_SERVICE_URL: http://search:8000
-      SUBSCRIPTION_SERVICE_URL: http://subscription:8000
-      NOTIFICATION_SERVICE_URL: http://notification:8000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000,http://localhost}
-    volumes:
-      - ./services/company:/app
-      - ./services/shared:/shared
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port exposé pour le développement (accès direct)
-    # En production, utiliser uniquement via Nginx Gateway
-    ports:
-      - "${COMPANY_PORT:-8005}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      auth:
-        condition: service_healthy
-      # search peut être unhealthy, on démarre quand même
-      # search:
-      #   condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  payment:
-    build:
-      context: ./services/payment
-      dockerfile: Dockerfile
-    container_name: yemma-payment
-    environment:
-      # Application
-      APP_NAME: payment-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      
-      # Stripe
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_your_stripe_secret_key}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_your_stripe_publishable_key}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_your_webhook_secret}
-      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
-      TRIAL_DAYS: ${TRIAL_DAYS:-3}
-      
-      # Service URLs
-      COMPANY_SERVICE_URL: http://company:8000
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
-    volumes:
-      - ./services/payment:/app
-      - ./services/shared:/shared
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Exposé pour accès direct (Vite proxy localhost:8006) ou via Nginx
-    ports:
-      - "${PAYMENT_PORT:-8006}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:$$PORT/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  notification:
-    build:
-      context: ./services
-      dockerfile: notification/Dockerfile
-    container_name: yemma-notification
-    env_file:
-      - .env
-    environment:
-      # Application
-      APP_NAME: notification-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      PORT: ${NOTIFICATION_PORT:-8000}
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      
-      # Email Provider (smtp = configuration SMTP existante du projet)
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
-      
-      # SMTP
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply.yemma@gmail.com}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Yemma Solutions}
-      
-      # SendGrid
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
-      SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL:-noreply@yemma.com}
-      SENDGRID_FROM_NAME: ${SENDGRID_FROM_NAME:-Yemma Solutions}
-      
-      # Mailgun
-      MAILGUN_API_KEY: ${MAILGUN_API_KEY:-}
-      MAILGUN_DOMAIN: ${MAILGUN_DOMAIN:-}
-      MAILGUN_FROM_EMAIL: ${MAILGUN_FROM_EMAIL:-noreply@yemma.com}
-      MAILGUN_FROM_NAME: ${MAILGUN_FROM_NAME:-Yemma Solutions}
-      
-      # Task Queue (background_tasks ou celery)
-      TASK_QUEUE: ${TASK_QUEUE:-background_tasks}
-      
-      # Redis (pour Celery)
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      
-      # Frontend
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      
-      # Token inter-services (doit être identique à auth, company, etc.)
-      INTERNAL_SERVICE_TOKEN_SECRET: ${INTERNAL_SERVICE_TOKEN_SECRET:-yemma-internal-service-secret-key-change-in-production-min-64-chars-12345678901234567890123456789012}
-      
-      # CORS (format string séparée par virgules)
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
-    volumes:
-      - ./services/notification:/app
-      - ./services:/services
-      - ./yemma_emails:/tmp/yemma_emails
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port exposé pour le développement (accès direct)
-    ports:
-      - "${NOTIFICATION_PORT:-8007}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "sh", "-c", "curl -f http://localhost:$$PORT/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  notification-worker:
-    build:
-      context: ./services
-      dockerfile: notification/Dockerfile
-    container_name: yemma-notification-worker
-    env_file:
-      - .env
-    environment:
-      # Application
-      APP_NAME: notification-worker
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-      
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-      
-      # Email Provider (smtp = configuration SMTP existante)
-      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
-      
-      # SMTP
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply.yemma@gmail.com}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Yemma Solutions}
-      
-      # SendGrid
-      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
-      SENDGRID_FROM_EMAIL: ${SENDGRID_FROM_EMAIL:-noreply@yemma.com}
-      SENDGRID_FROM_NAME: ${SENDGRID_FROM_NAME:-Yemma Solutions}
-      
-      # Redis (pour Celery)
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      
-      # Frontend
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      
-      # Task Queue
-      TASK_QUEUE: celery
-    volumes:
-      - ./services/notification:/app
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    command: celery -A app.infrastructure.celery_app worker --loglevel=info --concurrency=2 --queues=notifications
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  audit:
-    build:
-      context: ./services/audit
-      dockerfile: Dockerfile
-    container_name: yemma-audit
-    environment:
-      # Application
-      APP_NAME: audit-service
-      APP_ENV: ${APP_ENV:-development}
-      DEBUG: ${DEBUG:-true}
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-yemma_db}
-      DATABASE_URL: postgresql+asyncpg://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-yemma_db}
-
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
-    volumes:
-      - ./services/audit:/app
-      - /app/__pycache__
-    networks:
-      - yemma-network
-    # Port non exposé - accès via Nginx Gateway
-    # ports:
-    #   - "${AUDIT_PORT:-8008}:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    restart: unless-stopped
-
-  # ============================================
-  # FRONTEND
-  # ============================================
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-    container_name: yemma-frontend
-    environment:
-      - VITE_API_BASE_URL=https://yemma-solutions.com
-    # On enlève les ports ici pour que seul Traefik soit la porte d'entrée
-    networks:
-      - yemma-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=yemma-network"
-      - "traefik.http.routers.yemma-frontend.rule=Host(`yemma-solutions.com`) || Host(`www.yemma-solutions.com`)"
-      - "traefik.http.routers.yemma-frontend.entrypoints=websecure"
-      - "traefik.http.routers.yemma-frontend.tls.certresolver=myresolver"
-      - "traefik.http.services.yemma-frontend.loadbalancer.server.port=3000"
-    restart: unless-stopped
-
-# ============================================
-# NETWORKS
-# ============================================
-
-networks:
-  yemma-network:
-    name: yemma-network
-    driver: bridge
-
-# ============================================
-# VOLUMES
-# ============================================
-
-volumes:
-  postgres_data:
-    name: yemma-postgres-data
-  redis_data:
-    name: yemma-redis-data
-  minio_data:
-    name: yemma-minio-data
-  elasticsearch_data:
-    name: yemma-elasticsearch-data
-

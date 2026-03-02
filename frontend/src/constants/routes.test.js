@@ -20,7 +20,7 @@ describe('routes', () => {
     })
 
     it('ADMIN_REVIEW génère la bonne URL', () => {
-      expect(ROUTES.ADMIN_REVIEW(10)).toBe('/admin/review/10')
+      expect(ROUTES.ADMIN_REVIEW(10)).toBe('/yemma/review/10')
     })
   })
 

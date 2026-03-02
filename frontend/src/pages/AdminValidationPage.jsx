@@ -11,6 +11,7 @@ import { candidateApi, documentApi } from '@/services/api'
 import { buildPhotoUrl } from '@/utils/photoUtils'
 import { formatDateTime } from '@/utils/dateUtils'
 import AdminLayout from '@/components/admin/AdminLayout'
+import { ROUTES } from '@/constants/routes'
 import {
   Users, Search, Loader2, Eye, User, AlertCircle, Briefcase, Calendar,
   Star, ChevronLeft, ChevronRight
@@ -175,7 +176,7 @@ export default function AdminValidationPage() {
     }
   }, [selectedStatus, debouncedSearch, pageSize, profilesPage])
 
-  const handleViewProfile = (profileId) => navigate(`/admin/review/${profileId}`)
+  const handleViewProfile = (profileId) => navigate(ROUTES.ADMIN_REVIEW(profileId))
 
   const totalForStatus = selectedStatus === 'ALL'
     ? (profilesListTotal != null ? profilesListTotal : Object.values(stats).reduce((a, b) => a + b, 0))

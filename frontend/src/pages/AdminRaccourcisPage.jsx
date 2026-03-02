@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { candidateApi, companyApi } from '@/services/api'
 import AdminLayout from '@/components/admin/AdminLayout'
+import { ROUTES } from '@/constants/routes'
 import { Clock, CheckCircle, XCircle, BarChart3, Search, Building } from 'lucide-react'
 
 export default function AdminRaccourcisPage() {
@@ -56,12 +57,12 @@ export default function AdminRaccourcisPage() {
   }, [])
 
   const items = [
-    { id: 'SUBMITTED', icon: Clock, label: 'Candidats soumis', value: stats.SUBMITTED || 0, desc: 'En attente de validation', action: () => navigate('/admin/validation', { state: { status: 'SUBMITTED' } }), done: (stats.SUBMITTED || 0) > 0 },
-    { id: 'VALIDATED', icon: CheckCircle, label: 'Candidats validés', value: stats.VALIDATED || 0, desc: 'Visibles dans la CVthèque', action: () => navigate('/admin/validation', { state: { status: 'VALIDATED' } }), done: (stats.VALIDATED || 0) > 0 },
-    { id: 'REJECTED', icon: XCircle, label: 'Candidats rejetés', value: stats.REJECTED || 0, desc: 'Profils refusés', action: () => navigate('/admin/validation', { state: { status: 'REJECTED' } }), done: (stats.REJECTED || 0) > 0 },
-    { id: 'stats', icon: BarChart3, label: 'Statistiques', value: '', desc: 'Effectifs et secteurs', action: () => navigate('/admin/statistics'), done: true },
-    { id: 'cvtheque', icon: Search, label: 'CVthèque', value: '', desc: 'Recherche dans les profils validés', action: () => navigate('/admin/cvtheque'), done: true },
-    { id: 'companies', icon: Building, label: 'Entreprises', value: companies.length, desc: 'Annuaire des partenaires', action: () => navigate('/admin/companies'), done: companies.length > 0 },
+    { id: 'SUBMITTED', icon: Clock, label: 'Candidats soumis', value: stats.SUBMITTED || 0, desc: 'En attente de validation', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'SUBMITTED' } }), done: (stats.SUBMITTED || 0) > 0 },
+    { id: 'VALIDATED', icon: CheckCircle, label: 'Candidats validés', value: stats.VALIDATED || 0, desc: 'Visibles dans la CVthèque', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'VALIDATED' } }), done: (stats.VALIDATED || 0) > 0 },
+    { id: 'REJECTED', icon: XCircle, label: 'Candidats rejetés', value: stats.REJECTED || 0, desc: 'Profils refusés', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'REJECTED' } }), done: (stats.REJECTED || 0) > 0 },
+    { id: 'stats', icon: BarChart3, label: 'Statistiques', value: '', desc: 'Effectifs et secteurs', action: () => navigate(ROUTES.ADMIN_STATISTICS), done: true },
+    { id: 'cvtheque', icon: Search, label: 'CVthèque', value: '', desc: 'Recherche dans les profils validés', action: () => navigate(ROUTES.ADMIN_CVTHEQUE), done: true },
+    { id: 'companies', icon: Building, label: 'Entreprises', value: companies.length, desc: 'Annuaire des partenaires', action: () => navigate(ROUTES.ADMIN_COMPANIES), done: companies.length > 0 },
   ]
 
   return (
