@@ -212,7 +212,8 @@ export default function CandidatLanding() {
               className="lg:w-2/5 lg:sticky lg:top-24"
             >
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight mb-6">
-                Rejoignez la meilleure Cvthèque en afrique
+                Rejoignez la meilleure Cvthèque{' '}
+                <span className="text-[#e76f51]">en afrique</span>
               </h2>
               <p className="text-white/80 text-sm md:text-base mb-6">
                 Tous les secteurs d&apos;activité. Rendez votre profil visible aux entreprises qui recrutent.
@@ -257,7 +258,7 @@ export default function CandidatLanding() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, margin: '-30px' }}
                     transition={{ duration: 0.5, delay: idx * 0.08 }}
-                    className="border-b border-white/20 last:border-b-0 py-5 md:py-6 first:pt-0"
+                    className="border-b border-dashed border-[#e76f51]/50 last:border-b-0 py-6 md:py-8 first:pt-0"
                   >
                     <div className="flex items-start gap-4">
                       <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
@@ -269,7 +270,7 @@ export default function CandidatLanding() {
                           <ul className="space-y-1">
                             {leftCol.map((sector) => (
                               <li key={sector} className="flex items-center gap-2 text-white/85 text-sm">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#226D68] shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#e76f51] shrink-0" />
                                 {sector}
                               </li>
                             ))}
@@ -277,7 +278,7 @@ export default function CandidatLanding() {
                           <ul className="space-y-1">
                             {rightCol.map((sector) => (
                               <li key={sector} className="flex items-center gap-2 text-white/85 text-sm">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#226D68] shrink-0" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#e76f51] shrink-0" />
                                 {sector}
                               </li>
                             ))}

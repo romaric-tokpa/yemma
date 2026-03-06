@@ -31,7 +31,7 @@ export default function LandingPage() {
     },
     {
       title: '−60 % sur vos coûts de recrutement',
-      desc: 'Supprimez les honoraires d\'agence et les heures perdues à trier des CV. Nos clients économisent en moyenne 60 % et récupèrent ~15h par semaine. Conformité RGPD incluse.',
+      desc: 'Nos clients économisent en moyenne 60 % et récupèrent ~15h par semaine. Conformité RGPD incluse.',
       icon: 'mission',
       dotColor: '#e76f51',
     },
@@ -186,7 +186,7 @@ export default function LandingPage() {
             >
               <div className="w-36 h-36 xs:w-48 xs:h-48 md:w-64 md:h-64 rounded-full overflow-hidden bg-[#FDF2F0] border-2 xs:border-4 border-white shadow-lg">
                 <img
-                  src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=400&fit=crop"
+                  src="/recruiter-profile-cvtheque.png"
                   alt="Profils qualifiés dans la CVthèque Yemma"
                   className="w-full h-full object-cover"
                 />
