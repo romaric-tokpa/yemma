@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  Shield, UserCheck, Euro, ArrowRight, CheckCircle2, AlertCircle,
+  Shield, UserCheck, Euro, ArrowRight, MessageCircle, CheckCircle2, AlertCircle,
   Mail, MapPin, Linkedin
 } from 'lucide-react'
 import { ROUTES } from '@/constants/routes'
@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import PublicPageLayout from '@/components/layout/PublicPageLayout'
 
 const contactEmail = 'contact@yemma-solutions.com'
+const whatsappLink = 'https://wa.me/22589515801'
 const linkedinUrl = 'https://www.linkedin.com/company/yemma-solutions/'
 
 const strengths = [
@@ -25,6 +26,7 @@ const strengths = [
 
 const contactChannels = [
   { icon: Mail, label: 'Email', href: `mailto:${contactEmail}`, accent: false },
+  { icon: MessageCircle, label: 'WhatsApp', href: whatsappLink, accent: true },
   { icon: Linkedin, label: 'LinkedIn', href: linkedinUrl, accent: false },
   { icon: MapPin, label: 'Siège', href: 'https://maps.google.com/?q=Abidjan,Cote+Ivoire', accent: false },
 ]
@@ -185,6 +187,16 @@ export default function Contact() {
                     )
                   })}
                 </ul>
+
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-medium bg-[#25D366] text-white hover:bg-[#20BA5A] transition-colors shadow-sm"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Nous contacter par WhatsApp
+                </a>
               </motion.div>
 
               {/* Colonne droite — Formulaire */}
