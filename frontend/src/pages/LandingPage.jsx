@@ -276,20 +276,10 @@ export default function LandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="text-xl md:text-2xl font-bold text-[#2C2C2C] text-center mb-2"
+            className="text-xl md:text-2xl font-bold text-[#2C2C2C] text-center mb-12"
           >
             Pourquoi 500+ entreprises nous choisissent
           </motion.h2>
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-sm text-[#6b7280] text-center mb-12"
-          >
-            Sans agences. Sans CV non qualifiés. Sans mauvaises surprises.
-          </motion.p>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 md:gap-6">
             {trustSteps.map((step, i) => (
               <motion.div
@@ -419,7 +409,7 @@ export default function LandingPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-center text-[#6b7280] text-sm md:text-base max-w-2xl mx-auto mb-16"
           >
-            Moins d&apos;intermédiaires, plus de qualité. Des profils vérifiés et évalués, disponibles dès que vous en avez besoin.
+            Des profils vérifiés et évalués, disponibles dès que vous en avez besoin.
           </motion.p>
 
           {/* Bloc 1 - Identification des profils */}
