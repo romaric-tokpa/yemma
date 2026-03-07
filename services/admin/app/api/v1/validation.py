@@ -3,9 +3,10 @@ Endpoints de validation des profils candidats
 """
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, status, File, UploadFile
+from fastapi.exceptions import RequestValidationError
 from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
 
 from app.infrastructure.auth import require_admin_role
 from app.infrastructure.candidate_client import get_candidate_profile, update_candidate_status, update_candidate_evaluation, update_candidate_hrflow_key, delete_candidate_profile
@@ -20,9 +21,47 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _compute_weighted_score(ratings: Dict[str, int]) -> float:
+    """Calcule le score pondéré 0-100 à partir des ratings (1-5 par critère)."""
+    if not ratings:
+        return 0.0
+    weighted_sum = 0.0
+    total_weight = 0.0
+    category_weights = {"tech": 30, "exp": 25, "soft": 20, "mot": 15, "pot": 10}
+    category_items = {
+        "tech": ["tech_1", "tech_2", "tech_3", "tech_4"],
+        "exp": ["exp_1", "exp_2", "exp_3"],
+        "soft": ["soft_1", "soft_2", "soft_3", "soft_4"],
+        "mot": ["mot_1", "mot_2", "mot_3"],
+        "pot": ["pot_1", "pot_2"],
+    }
+    for cat, items in category_items.items():
+        rated = [ratings.get(k) for k in items if ratings.get(k) and ratings[k] > 0]
+        if rated:
+            avg = sum(rated) / len(rated)
+            weighted_sum += avg * category_weights[cat]
+            total_weight += category_weights[cat]
+    return (weighted_sum / total_weight) * 20 if total_weight > 0 else 0.0
+
+
+def _derive_legacy_scores(ratings: Dict[str, int]) -> Dict[str, Optional[float]]:
+    """Dérive les notes legacy (0-5) à partir des ratings de la grille."""
+    def avg_keys(*keys):
+        vals = [ratings.get(k) for k in keys if ratings.get(k) and ratings[k] > 0]
+        return sum(vals) / len(vals) if vals else None
+    return {
+        "technical_skills_rating": avg_keys("tech_1", "tech_2", "tech_3", "tech_4"),
+        "soft_skills_rating": avg_keys("soft_1", "soft_2", "soft_3", "soft_4"),
+        "communication_rating": ratings.get("soft_1") if ratings.get("soft_1") else None,
+        "motivation_rating": avg_keys("mot_1", "mot_2", "mot_3"),
+    }
+
+
 class ValidationReport(BaseModel):
-    """Schéma pour le rapport de validation"""
-    overallScore: float = Field(ge=0, le=5, description="Note globale sur 5")
+    """Schéma pour le rapport de validation (legacy + grille d'évaluation)"""
+    model_config = ConfigDict(extra="ignore")
+    # Format legacy
+    overallScore: Optional[float] = Field(None, ge=0, le=5, description="Note globale sur 5")
     technicalSkills: Optional[float] = Field(None, ge=0, le=5, description="Note compétences techniques")
     softSkills: Optional[float] = Field(None, ge=0, le=5, description="Note soft skills")
     communication: Optional[float] = Field(None, ge=0, le=5, description="Note communication")
@@ -30,7 +69,78 @@ class ValidationReport(BaseModel):
     softSkillsTags: Optional[list[str]] = Field(default=[], description="Tags soft skills")
     interview_notes: Optional[str] = Field(default="", description="Notes d'entretien")
     recommendations: Optional[str] = Field(default="", description="Recommandations")
-    summary: str = Field(min_length=50, description="Résumé de l'évaluation")
+    summary: Optional[str] = Field(default="", description="Résumé de l'évaluation")
+    # Format grille d'évaluation (nouveau)
+    ratings: Optional[Dict[str, int]] = Field(default=None, description="Notes par critère (1-5)")
+    comments: Optional[Dict[str, str]] = Field(default=None, description="Commentaires par critère")
+    globalComment: Optional[str] = Field(default=None, description="Avis global du recruteur")
+    decision: Optional[str] = Field(default=None, description="retenu | reserve | non_retenu")
+
+    @field_validator("ratings", mode="before")
+    @classmethod
+    def coerce_ratings(cls, v):
+        """Convertit les valeurs de ratings en int (tolère str depuis JSON)."""
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            return v
+        return {k: int(val) if val is not None else 0 for k, val in v.items()}
+
+    @field_validator("comments", mode="before")
+    @classmethod
+    def coerce_comments(cls, v):
+        """Convertit les valeurs de comments en str."""
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            return v
+        return {k: str(val) if val is not None else "" for k, val in v.items()}
+
+    @field_validator("decision", mode="before")
+    @classmethod
+    def normalize_decision(cls, v):
+        """Convertit une chaîne vide en None."""
+        if v == "" or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
+
+
+def _build_report_data(report: ValidationReport) -> Dict[str, Any]:
+    """Construit report_data pour admin_report (grille ou legacy)."""
+    if report.ratings and len(report.ratings) > 0:
+        # Format grille d'évaluation
+        total_score_100 = _compute_weighted_score(report.ratings)
+        overall_score = round(total_score_100 / 20, 2)  # 0-100 -> 0-5
+        legacy = _derive_legacy_scores(report.ratings)
+        summary = report.globalComment or report.summary or ""
+        return {
+            "overall_score": overall_score,
+            "technical_skills_rating": legacy.get("technical_skills_rating"),
+            "soft_skills_rating": legacy.get("soft_skills_rating"),
+            "communication_rating": legacy.get("communication_rating"),
+            "motivation_rating": legacy.get("motivation_rating"),
+            "soft_skills_tags": report.softSkillsTags or [],
+            "interview_notes": report.interview_notes or "",
+            "recommendations": report.recommendations or "",
+            "summary": summary,
+            "ratings": report.ratings,
+            "comments": report.comments or {},
+            "global_comment": report.globalComment or "",
+            "decision": report.decision or "",
+            "total_score_100": total_score_100,
+        }
+    # Format legacy
+    return {
+        "overall_score": report.overallScore,
+        "technical_skills_rating": report.technicalSkills,
+        "soft_skills_rating": report.softSkills,
+        "communication_rating": report.communication,
+        "motivation_rating": report.motivation,
+        "soft_skills_tags": report.softSkillsTags or [],
+        "interview_notes": report.interview_notes or "",
+        "recommendations": report.recommendations or "",
+        "summary": report.summary or "",
+    }
 
 
 class RejectionReport(BaseModel):
@@ -120,12 +230,25 @@ async def remove_candidate_task(candidate_id: int):
     await remove_candidate_from_search(candidate_id)
 
 
+def _parse_validation_report(body: Any) -> ValidationReport:
+    """Parse et valide le body en ValidationReport, avec logging en cas d'erreur."""
+    body = body if body is not None else {}
+    if not isinstance(body, dict):
+        raise RequestValidationError([{"loc": ("body",), "msg": "Le corps de la requête doit être un objet JSON", "type": "type_error.dict"}])
+    logger.info("validate body keys: %s", list(body.keys()))
+    try:
+        return ValidationReport.model_validate(body)
+    except ValidationError as e:
+        logger.warning("ValidationReport validation failed: %s", e.errors())
+        raise RequestValidationError(e.errors()) from e
+
+
 @router.post("/validate/{candidate_id}", status_code=status.HTTP_200_OK)
 async def validate_candidate(
     candidate_id: int,
-    report: ValidationReport,
     background_tasks: BackgroundTasks,
     admin_user=Depends(require_admin_role),
+    body: Optional[Dict[str, Any]] = Body(default=None),
 ):
     """
     Valide un profil candidat avec actions asynchrones via BackgroundTasks
@@ -137,23 +260,22 @@ async def validate_candidate(
     
     Si l'indexation ElasticSearch échoue, l'incident est loggé dans le Service Audit.
     """
+    report = _parse_validation_report(body)
     try:
+        # Validation : résumé requis pour valider (min 20 caractères)
+        summary_text = report.globalComment or report.summary or ""
+        if len(summary_text.strip()) < 20:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le résumé de l'évaluation doit contenir au moins 20 caractères pour valider le profil."
+            )
         # Récupérer le profil complet du candidat
         profile_response = await get_candidate_profile(candidate_id)
         profile_data = profile_response  # Le profil est déjà au format dict
         
-        # Préparer les données du rapport
-        report_data = {
-            "overall_score": report.overallScore,
-            "technical_skills_rating": report.technicalSkills,
-            "soft_skills_rating": report.softSkills,
-            "communication_rating": report.communication,
-            "motivation_rating": report.motivation,
-            "soft_skills_tags": report.softSkillsTags or [],
-            "interview_notes": report.interview_notes or "",
-            "recommendations": report.recommendations or "",
-            "summary": report.summary,
-        }
+        # Préparer les données du rapport (format grille ou legacy)
+        report_data = _build_report_data(report)
+        report_data["summary"] = summary_text
         
         # Récupérer les informations du candidat pour la notification
         recipient_email = profile_data.get("email", "")
@@ -241,9 +363,9 @@ async def validate_candidate(
 @router.post("/reject/{candidate_id}", status_code=status.HTTP_200_OK)
 async def reject_candidate(
     candidate_id: int,
-    report: RejectionReport,
     background_tasks: BackgroundTasks,
     admin_user=Depends(require_admin_role),
+    report: RejectionReport = Body(..., embed=False),
 ):
     """
     Rejette un profil candidat
@@ -291,8 +413,8 @@ async def reject_candidate(
 @router.post("/update-evaluation/{candidate_id}", status_code=status.HTTP_200_OK)
 async def update_evaluation(
     candidate_id: int,
-    report: ValidationReport,
     admin_user=Depends(require_admin_role),
+    report: ValidationReport = Body(..., embed=False),
 ):
     """
     Met à jour l'évaluation d'un candidat (admin_report, admin_score) sans changer le statut.
@@ -300,18 +422,7 @@ async def update_evaluation(
     Réindexe le candidat dans la CVthèque avec les données mises à jour.
     """
     try:
-        report_data = {
-            "overall_score": report.overallScore,
-            "technical_skills_rating": report.technicalSkills,
-            "soft_skills_rating": report.softSkills,
-            "communication_rating": report.communication,
-            "motivation_rating": report.motivation,
-            "soft_skills_tags": report.softSkillsTags or [],
-            "interview_notes": report.interview_notes or "",
-            "recommendations": report.recommendations or "",
-            "summary": report.summary,
-        }
-
+        report_data = _build_report_data(report)
         await update_candidate_evaluation(candidate_id=candidate_id, report_data=report_data)
 
         # Réindexer avec les données à jour (profil inclut déjà admin_report mis à jour)
@@ -488,6 +599,11 @@ def _empty_evaluation_response(candidate_id: int) -> dict:
         "interview_notes": None,
         "recommendations": None,
         "summary": None,
+        "ratings": None,
+        "comments": None,
+        "global_comment": None,
+        "decision": None,
+        "total_score_100": None,
         "validated_at": None,
     }
 
@@ -523,6 +639,11 @@ async def get_candidate_evaluation(
             "interview_notes": admin_report.get("interview_notes"),
             "recommendations": admin_report.get("recommendations"),
             "summary": admin_report.get("summary"),
+            "ratings": admin_report.get("ratings"),
+            "comments": admin_report.get("comments"),
+            "global_comment": admin_report.get("global_comment"),
+            "decision": admin_report.get("decision"),
+            "total_score_100": admin_report.get("total_score_100"),
             "validated_at": profile_data.get("validated_at"),
         }
     except CandidateNotFoundError:

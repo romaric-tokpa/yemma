@@ -5,11 +5,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import EvaluationForm from '@/components/admin/EvaluationForm'
-import { candidateApi } from '@/services/api'
+import { candidateApi, documentApi } from '@/services/api'
 import AdminLayout from '@/components/admin/AdminLayout'
 import { ROUTES } from '@/constants/routes'
 import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, RefreshCw, Star, Briefcase, MapPin, User } from 'lucide-react'
+import { getDisplayScore, getScoreColor } from '@/utils/validationScore'
 import { Button } from '@/components/ui/button'
+import { buildPhotoUrl } from '@/utils/photoUtils'
 
 const generateAvatarUrl = (firstName, lastName) => {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U'
@@ -40,6 +42,8 @@ export default function AdminEvaluationPage() {
   const [candidateData, setCandidateData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [photoUrl, setPhotoUrl] = useState(null)
+  const [photoError, setPhotoError] = useState(false)
 
   const fetchCandidateData = async () => {
     if (!candidateId) return
@@ -66,13 +70,36 @@ export default function AdminEvaluationPage() {
     fetchCandidateData()
   }, [candidateId])
 
+  useEffect(() => {
+    if (!candidateData?.id) {
+      setPhotoUrl(null)
+      return
+    }
+    if (candidateData.photo_url) {
+      let val = buildPhotoUrl(candidateData.photo_url, documentApi)
+      if (val && !val.includes('ui-avatars.com') && val.trim()) {
+        setPhotoUrl(val)
+        setPhotoError(false)
+        return
+      }
+    }
+    documentApi.getCandidateDocuments(candidateData.id).then((docs) => {
+      const photoDoc = docs
+        ?.filter(doc => (doc.document_type === 'PROFILE_PHOTO' || doc.document_type === 'OTHER') && !doc.deleted_at)
+        ?.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+      setPhotoUrl(photoDoc ? documentApi.getDocumentServeUrl(photoDoc.id) : null)
+      setPhotoError(false)
+    }).catch(() => setPhotoUrl(null))
+  }, [candidateData?.id, candidateData?.photo_url])
+
   const handleValidationSuccess = async () => {
     await new Promise(r => setTimeout(r, 1000))
     await fetchCandidateData()
   }
 
   const fullName = candidateData ? `${candidateData.first_name || ''} ${candidateData.last_name || ''}`.trim() || 'Candidat' : ''
-  const displayPhoto = candidateData ? generateAvatarUrl(candidateData.first_name, candidateData.last_name) : ''
+  const defaultAvatar = candidateData ? generateAvatarUrl(candidateData.first_name, candidateData.last_name) : ''
+  const displayPhoto = (photoUrl && !photoError && !photoUrl.includes('ui-avatars.com')) ? photoUrl : defaultAvatar
   const candidateLocation = candidateData ? [candidateData.city, candidateData.country].filter(Boolean).join(', ') : ''
 
   if (loading) {
@@ -144,7 +171,12 @@ export default function AdminEvaluationPage() {
             <div className="p-4 sm:p-5 flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden ring-2 ring-[#226D68]/20 bg-[#226D68]/10 shrink-0">
-                  <img src={displayPhoto} alt={fullName} className="w-full h-full object-cover" />
+                  <img
+                    src={displayPhoto}
+                    alt={fullName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.target.src = defaultAvatar; setPhotoError(true) }}
+                  />
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg sm:text-xl font-bold text-[#2C2C2C] truncate">{fullName}</h2>
@@ -164,12 +196,17 @@ export default function AdminEvaluationPage() {
                         {candidateLocation}
                       </span>
                     )}
-                    {candidateData?.admin_score != null && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#226D68]/10 text-[#1a5a55] font-medium">
-                        <Star className="h-3 w-3 fill-current" />
-                        {candidateData.admin_score}/5
-                      </span>
-                    )}
+                    {(() => {
+                      const display = getDisplayScore(candidateData)
+                      if (!display) return null
+                      const color = getScoreColor(display.value, display.scale, true)
+                      return (
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md border font-medium ${color}`}>
+                          <Star className="h-3 w-3 fill-current" />
+                          {display.label}
+                        </span>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
@@ -206,6 +243,8 @@ export default function AdminEvaluationPage() {
               <EvaluationForm
                 candidateId={candidateId}
                 candidateData={candidateData}
+                candidatePhotoUrl={displayPhoto}
+                defaultAvatarUrl={defaultAvatar}
                 onSuccess={handleValidationSuccess}
               />
             </div>

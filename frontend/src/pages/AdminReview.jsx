@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { getDisplayScore, getScoreColor, getDecisionLabel, getDecisionBadgeStyle, getValidationScore } from '@/utils/validationScore'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const generateAvatarUrl = (firstName, lastName) => {
@@ -356,15 +357,30 @@ export default function AdminReview() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <Badge className={`text-xs font-medium ${STATUS_COLORS[candidateData?.status] || STATUS_COLORS.DRAFT}`}>
-                      {STATUS_LABELS[candidateData?.status] || candidateData?.status}
-                    </Badge>
-                    {candidateData?.admin_score != null && (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#226D68]/10">
-                        <Star className="w-4 h-4 text-[#226D68]" fill="currentColor" strokeWidth={0} />
-                        <span className="text-xs sm:text-sm font-semibold text-[#226D68]">{candidateData.admin_score.toFixed(1)}/5</span>
-                      </div>
-                    )}
+                    {(() => {
+                      const { decision } = getValidationScore(candidateData)
+                      const decisionLabel = getDecisionLabel(decision)
+                      const status = candidateData?.status
+                      const badgeLabel = (status === 'VALIDATED' && decisionLabel) ? decisionLabel : (STATUS_LABELS[status] || status)
+                      const badgeStyle = (status === 'VALIDATED' && decision) ? getDecisionBadgeStyle(decision) : (STATUS_COLORS[status] || STATUS_COLORS.DRAFT)
+                      return (
+                        <Badge className={`text-xs font-medium border ${badgeStyle}`}>
+                          {status === 'VALIDATED' && decision === 'retenu' && <CheckCircle2 className="h-3 w-3 mr-1 shrink-0" />}
+                          {badgeLabel}
+                        </Badge>
+                      )
+                    })()}
+                    {(() => {
+                      const display = getDisplayScore(candidateData)
+                      if (!display) return null
+                      const color = getScoreColor(display.value, display.scale, true)
+                      return (
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-semibold ${color}`}>
+                          <Star className="w-4 h-4" fill="currentColor" strokeWidth={0} />
+                          <span className="text-xs sm:text-sm">{display.label}</span>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>

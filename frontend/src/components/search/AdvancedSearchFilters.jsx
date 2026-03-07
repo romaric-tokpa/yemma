@@ -1,95 +1,99 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { 
-  X, ChevronDown, ChevronUp, Search, SlidersHorizontal, 
+/**
+ * AdvancedSearchFilters — Redesign Yemma Solutions
+ * Aesthetic: Refined sidebar with subtle sections, elegant toggles
+ */
+import { useState, useEffect, useMemo } from 'react'
+import {
+  X, ChevronDown, ChevronUp, SlidersHorizontal,
   MapPin, Briefcase, GraduationCap, DollarSign, Star,
-  Clock, Languages, Sparkles, Filter, XCircle, Save, Download, Upload,
-  TrendingUp, Award, Users, Building2, Calendar
+  Clock, Sparkles, XCircle, Save, TrendingUp,
+  Building2, Calendar
 } from 'lucide-react'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
 import { Checkbox } from '../ui/checkbox'
 import { ScrollArea } from '../ui/scroll-area'
-import { Badge } from '../ui/badge'
-import { Separator } from '../ui/separator'
 import { Slider } from '../ui/slider'
-import { Card, CardContent } from '../ui/card'
-// Tooltip simple sans dépendance externe
-const SimpleTooltip = ({ children, content }) => {
-  const [show, setShow] = useState(false)
+
+/* ─── Styles ───────────────────────────────────────────────────── */
+
+const FILTER_STYLES = `.yf-root { font-family: 'DM Sans', system-ui, sans-serif; } .yf-scroll::-webkit-scrollbar { width: 3px; } .yf-scroll::-webkit-scrollbar-track { background: transparent; } .yf-scroll::-webkit-scrollbar-thumb { background: rgba(14,124,123,0.1); border-radius: 10px; } .yf-section-btn { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 10px; border-radius: 10px; border: none; background: transparent; cursor: pointer; transition: background 0.15s ease; font-family: 'DM Sans', system-ui, sans-serif; } .yf-section-btn:hover { background: #F8F9FB; } .yf-check-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; cursor: pointer; transition: all 0.15s ease; border: 1px solid transparent; } .yf-check-item:hover { background: #F8F9FB; border-color: #E2E8F0; } .yf-check-item[data-active="true"] { background: #E8F4F3; border-color: rgba(14,124,123,0.12); } .yf-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 8px; font-size: 10px; font-weight: 600; background: linear-gradient(135deg, #E8F4F3, #d5edeb); color: #0A5E5D; cursor: pointer; transition: all 0.15s ease; } .yf-tag:hover { background: linear-gradient(135deg, #FEF3F0, #fde8e2); color: #c4563a; } .yf-input { height: 34px; padding: 0 12px; border-radius: 9px; border: 1.5px solid #E2E8F0; background: #F8F9FB; font-size: 12px; color: #1A2B3C; outline: none; width: 100%; transition: all 0.2s ease; font-family: 'DM Sans', system-ui, sans-serif; } .yf-input:focus { background: white; border-color: #0E7C7B; box-shadow: 0 0 0 3px rgba(14,124,123,0.06); } .yf-input::placeholder { color: #9CA3AF; }`
+
+/* ─── Constants ────────────────────────────────────────────────── */
+
+const EXPERIENCE_RANGES = [
+  { label: 'Débutant', sub: '< 1 an', min: 0, max: 1 },
+  { label: 'Junior', sub: '1-3 ans', min: 1, max: 3 },
+  { label: 'Confirmé', sub: '3-5 ans', min: 3, max: 5 },
+  { label: 'Senior', sub: '5-10 ans', min: 5, max: 10 },
+  { label: 'Expert', sub: '10+ ans', min: 10, max: null },
+]
+
+const AVAILABILITY_OPTIONS = [
+  { value: 'immediate', label: 'Immédiate', icon: Clock },
+  { value: 'within_1_month', label: 'Sous 1 mois', icon: TrendingUp },
+  { value: 'within_2_months', label: 'Sous 2 mois', icon: Calendar },
+  { value: 'within_3_months', label: 'Sous 3 mois', icon: Calendar },
+  { value: 'after_3_months', label: 'Après 3 mois', icon: Clock },
+]
+
+const EDUCATION_LEVELS = [
+  { value: 'BAC', label: 'Baccalauréat' },
+  { value: 'BAC_PLUS_2', label: 'Bac+2 (BTS/DUT)' },
+  { value: 'BAC_PLUS_3', label: 'Bac+3 (Licence)' },
+  { value: 'BAC_PLUS_4', label: 'Bac+4 (Maîtrise)' },
+  { value: 'BAC_PLUS_5', label: 'Bac+5 (Master)' },
+  { value: 'DOCTORAT', label: 'Doctorat' },
+]
+
+const CONTRACT_TYPES = [
+  { value: 'CDI', label: 'CDI' },
+  { value: 'CDD', label: 'CDD' },
+  { value: 'STAGE', label: 'Stage' },
+  { value: 'FREELANCE', label: 'Freelance' },
+  { value: 'TEMPS_PARTIEL', label: 'Temps partiel' },
+  { value: 'TEMPORAIRE', label: 'Temporaire' },
+]
+
+const POPULAR_SKILLS = [
+  'Python', 'JavaScript', 'React', 'Node.js', 'Java', 'TypeScript', 'Vue.js',
+  'Angular', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'MongoDB', 'PostgreSQL',
+  'MySQL', 'Redis', 'Git', 'CI/CD', 'Agile', 'Scrum', 'Project Management',
+  'Marketing digital', 'SEO', 'SEM', 'Social Media', 'Graphisme', 'Photoshop',
+  'Comptabilité', 'Fiscalité', 'Audit', 'SAP', 'Sage', 'Vente', 'CRM',
+  'Gestion d\'équipe', 'Recrutement', 'Formation', 'Leadership', 'Communication'
+]
+
+/* ─── FilterSection ────────────────────────────────────────────── */
+
+function FilterSection({ id, title, icon: Icon, badge, expanded, onToggle, children }) {
   return (
-    <div 
-      className="relative inline-block"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-    >
-      {children}
-      {show && content && (
-        <div className="absolute z-50 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg bottom-full left-1/2 -translate-x-1/2 mb-1 whitespace-nowrap">
-          {content}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+    <div>
+      <button className="yf-section-btn" onClick={() => onToggle(id)}>
+        <div className="flex items-center gap-2.5">
+          {Icon && (
+            <div className="w-6 h-6 rounded-md bg-[#F8F9FB] flex items-center justify-center shrink-0">
+              <Icon className="h-3 w-3 text-gray-400" />
+            </div>
+          )}
+          <span className="text-[12px] font-semibold text-gray-700">{title}</span>
+          {badge > 0 && (
+            <span className="h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-md text-[9px] font-bold bg-[#0E7C7B] text-white">
+              {badge}
+            </span>
+          )}
         </div>
-      )}
+        <div className="w-5 h-5 rounded-md flex items-center justify-center">
+          {expanded ? <ChevronUp className="h-3 w-3 text-gray-400" /> : <ChevronDown className="h-3 w-3 text-gray-400" />}
+        </div>
+      </button>
+      {expanded && <div className="mt-1 ml-2 pl-6 border-l border-gray-100 space-y-1.5 pb-1">{children}</div>}
     </div>
   )
 }
 
-// Constantes pour les options de filtre
-const EXPERIENCE_RANGES = [
-  { label: "Débutant (< 1 an)", min: 0, max: 1 },
-  { label: "Junior (1-3 ans)", min: 1, max: 3 },
-  { label: "Confirmé (3-5 ans)", min: 3, max: 5 },
-  { label: "Senior (5-10 ans)", min: 5, max: 10 },
-  { label: "Expert (10+ ans)", min: 10, max: null },
-]
+/* ─── Main Component ───────────────────────────────────────────── */
 
-const AVAILABILITY_OPTIONS = [
-  { value: "immediate", label: "Immédiate", icon: Clock },
-  { value: "within_1_month", label: "Sous 1 mois", icon: TrendingUp },
-  { value: "within_2_months", label: "Sous 2 mois", icon: Calendar },
-  { value: "within_3_months", label: "Sous 3 mois", icon: Calendar },
-  { value: "after_3_months", label: "Après 3 mois", icon: Clock },
-]
-
-const EDUCATION_LEVELS = [
-  { value: "BAC", label: "Baccalauréat", icon: GraduationCap },
-  { value: "BAC_PLUS_2", label: "Bac+2 (BTS/DUT)", icon: GraduationCap },
-  { value: "BAC_PLUS_3", label: "Bac+3 (Licence)", icon: GraduationCap },
-  { value: "BAC_PLUS_4", label: "Bac+4 (Maîtrise)", icon: GraduationCap },
-  { value: "BAC_PLUS_5", label: "Bac+5 (Master)", icon: Award },
-  { value: "DOCTORAT", label: "Doctorat", icon: Award },
-]
-
-const CONTRACT_TYPES = [
-  { value: "CDI", label: "CDI", icon: Building2 },
-  { value: "CDD", label: "CDD", icon: Briefcase },
-  { value: "STAGE", label: "Stage", icon: Users },
-  { value: "FREELANCE", label: "Freelance", icon: Sparkles },
-  { value: "TEMPS_PARTIEL", label: "Temps partiel", icon: Clock },
-  { value: "TEMPORAIRE", label: "Temporaire", icon: Briefcase },
-]
-
-// Compétences populaires pour l'autocomplétion
-const POPULAR_SKILLS = [
-  "Python", "JavaScript", "React", "Node.js", "Java", "TypeScript", "Vue.js",
-  "Angular", "Docker", "Kubernetes", "AWS", "Azure", "MongoDB", "PostgreSQL",
-  "MySQL", "Redis", "Git", "CI/CD", "Agile", "Scrum", "Project Management",
-  "Marketing digital", "SEO", "SEM", "Social Media", "Graphisme", "Photoshop",
-  "Comptabilité", "Fiscalité", "Audit", "SAP", "Sage", "Vente", "CRM",
-  "Gestion d'équipe", "Recrutement", "Formation", "Leadership", "Communication"
-]
-
-const STORAGE_KEY = 'yemma_advanced_filters'
-
-export function AdvancedSearchFilters({ 
-  filters, 
-  facets = {}, 
-  onFilterChange, 
-  onClose,
-  onSavePreset,
-  savedPresets = []
-}) {
-  const [expandedSections, setExpandedSections] = useState({
+export function AdvancedSearchFilters({ filters, facets = {}, onFilterChange, onClose, onSavePreset }) {
+  const [sections, setSections] = useState({
     experience: true,
     availability: false,
     education: false,
@@ -99,527 +103,399 @@ export function AdvancedSearchFilters({
     salary: false,
     score: false,
   })
-
   const [skillSearch, setSkillSearch] = useState('')
   const [skillSuggestions, setSkillSuggestions] = useState([])
 
-  // Calculer les filtres actifs
-  const activeFiltersCount = useMemo(() => {
-    let count = 0
-    if (filters.min_experience > 0) count++
-    if (filters.max_experience) count++
-    if (filters.experience_ranges?.length > 0) count += filters.experience_ranges.length
-    if (filters.availability?.length > 0) count += filters.availability.length
-    if (filters.education_levels?.length > 0) count += filters.education_levels.length
-    if (filters.contract_types?.length > 0) count += filters.contract_types.length
-    if (filters.skills?.length > 0) count += filters.skills.length
-    if (filters.location) count++
-    if (filters.min_salary || filters.max_salary) count++
-    if (filters.min_admin_score) count++
-    if (filters.job_title) count++
-    return count
+  const activeCount = useMemo(() => {
+    let c = 0
+    if (filters.min_experience > 0) c++
+    if (filters.max_experience) c++
+    if (filters.experience_ranges?.length) c += filters.experience_ranges.length
+    if (filters.availability?.length) c += filters.availability.length
+    if (filters.education_levels?.length) c += filters.education_levels.length
+    if (filters.contract_types?.length) c += filters.contract_types.length
+    if (filters.skills?.length) c += filters.skills.length
+    if (filters.location) c++
+    if (filters.min_salary || filters.max_salary) c++
+    if (filters.min_admin_score) c++
+    if (filters.job_title) c++
+    return c
   }, [filters])
 
-  // Autocomplétion des compétences
   useEffect(() => {
     if (skillSearch.trim().length > 1) {
-      const filtered = POPULAR_SKILLS.filter(skill =>
-        skill.toLowerCase().includes(skillSearch.toLowerCase()) &&
-        !filters.skills?.includes(skill)
-      ).slice(0, 8)
-      setSkillSuggestions(filtered)
-    } else {
-      setSkillSuggestions([])
-    }
+      setSkillSuggestions(
+        POPULAR_SKILLS.filter(s => s.toLowerCase().includes(skillSearch.toLowerCase()) && !filters.skills?.includes(s)).slice(0, 6)
+      )
+    } else setSkillSuggestions([])
   }, [skillSearch, filters.skills])
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
+  const toggle = (id) => setSections(p => ({ ...p, [id]: !p[id] }))
+
+  const toggleList = (field, value) => {
+    const cur = filters[field] || []
+    const next = cur.includes(value) ? cur.filter(v => v !== value) : [...cur, value]
+    onFilterChange({ ...filters, [field]: next })
   }
 
-  const handleExperienceRangeToggle = (range) => {
-    const current = filters.experience_ranges || []
-    const exists = current.some(r => r.min === range.min && r.max === range.max)
-    const newRanges = exists
-      ? current.filter(r => r.min !== range.min || r.max !== range.max)
-      : [...current, range]
-    onFilterChange({ ...filters, experience_ranges: newRanges })
+  const toggleExpRange = (range) => {
+    const cur = filters.experience_ranges || []
+    const exists = cur.some(r => r.min === range.min && r.max === range.max)
+    onFilterChange({ ...filters, experience_ranges: exists ? cur.filter(r => r.min !== range.min || r.max !== range.max) : [...cur, range] })
   }
 
-  const handleAvailabilityToggle = (value) => {
-    const current = filters.availability || []
-    const newAvailability = current.includes(value)
-      ? current.filter(a => a !== value)
-      : [...current, value]
-    onFilterChange({ ...filters, availability: newAvailability })
-  }
-
-  const handleEducationToggle = (value) => {
-    const current = filters.education_levels || []
-    const newLevels = current.includes(value)
-      ? current.filter(l => l !== value)
-      : [...current, value]
-    onFilterChange({ ...filters, education_levels: newLevels })
-  }
-
-  const handleContractToggle = (value) => {
-    const current = filters.contract_types || []
-    const newTypes = current.includes(value)
-      ? current.filter(t => t !== value)
-      : [...current, value]
-    onFilterChange({ ...filters, contract_types: newTypes })
-  }
-
-  const handleAddSkill = (skill) => {
-    const current = filters.skills || []
-    if (!current.includes(skill)) {
-      onFilterChange({ ...filters, skills: [...current, skill] })
-    }
+  const addSkill = (s) => {
+    const cur = filters.skills || []
+    if (!cur.includes(s)) onFilterChange({ ...filters, skills: [...cur, s] })
     setSkillSearch('')
     setSkillSuggestions([])
   }
 
-  const handleRemoveSkill = (skillToRemove) => {
-    const current = filters.skills || []
-    onFilterChange({ ...filters, skills: current.filter(s => s !== skillToRemove) })
-  }
+  const removeSkill = (s) => onFilterChange({ ...filters, skills: (filters.skills || []).filter(x => x !== s) })
 
-  const handleExperienceSlider = ([min, max]) => {
-    onFilterChange({ 
-      ...filters, 
-      min_experience: min,
-      max_experience: max === 30 ? null : max
-    })
-  }
-
-  const handleSalarySlider = ([min, max]) => {
-    onFilterChange({ 
-      ...filters, 
-      min_salary: min,
-      max_salary: max === 10000000 ? null : max
-    })
-  }
-
-  const handleScoreSlider = ([value]) => {
-    onFilterChange({ 
-      ...filters, 
-      min_admin_score: value === 0 ? undefined : value
-    })
-  }
-
-  const clearAllFilters = () => {
-    onFilterChange({
-      min_experience: 0,
-      max_experience: null,
-      experience_ranges: [],
-      availability: [],
-      education_levels: [],
-      contract_types: [],
-      skills: [],
-      location: '',
-      min_salary: null,
-      max_salary: null,
-      min_admin_score: undefined,
-      job_title: '',
-    })
-  }
-
-  const FilterSection = ({ 
-    id, 
-    title, 
-    icon: Icon, 
-    children, 
-    badge,
-    defaultExpanded = false 
-  }) => {
-    const isExpanded = expandedSections[id] ?? defaultExpanded
-    return (
-      <div className="space-y-1.5">
-        <button
-          onClick={() => toggleSection(id)}
-          className="flex items-center justify-between w-full p-2 rounded-md hover:bg-[#F4F6F8] transition-colors group"
-        >
-          <div className="flex items-center gap-2">
-            {Icon && <Icon className="h-3.5 w-3.5 text-[#9ca3af] group-hover:text-[#226D68]" />}
-            <Label className="font-medium text-xs cursor-pointer text-[#2C2C2C]">{title}</Label>
-            {badge > 0 && (
-              <Badge className="ml-1 h-5 px-1.5 text-[10px] bg-[#226D68] text-white">
-                {badge}
-              </Badge>
-            )}
-          </div>
-          {isExpanded ? (
-            <ChevronUp className="h-3.5 w-3.5 text-[#9ca3af]" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-[#9ca3af]" />
-          )}
-        </button>
-        {isExpanded && (
-          <div className="pl-5 space-y-2">
-            {children}
-          </div>
-        )}
-      </div>
-    )
-  }
+  const clearAll = () => onFilterChange({
+    min_experience: 0,
+    max_experience: null,
+    experience_ranges: [],
+    availability: [],
+    education_levels: [],
+    contract_types: [],
+    skills: [],
+    location: '',
+    min_salary: null,
+    max_salary: null,
+    min_admin_score: undefined,
+    job_title: '',
+  })
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header compact */}
-      <div className="px-3 py-2.5 border-b border-[#e5e7eb] bg-[#F4F6F8]/50 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2 min-w-0">
-          <SlidersHorizontal className="h-4 w-4 text-[#226D68] flex-shrink-0" />
-          <h2 className="font-semibold text-sm text-[#2C2C2C] truncate">Filtres</h2>
-          {activeFiltersCount > 0 && (
-            <Badge className="h-5 px-1.5 text-[10px] bg-[#226D68] text-white flex-shrink-0">
-              {activeFiltersCount}
-            </Badge>
-          )}
+    <div className="yf-root h-full flex flex-col bg-white border-r border-gray-100">
+      <style>{FILTER_STYLES}</style>
+
+      {/* ═══ Header ═══ */}
+      <div className="px-4 py-3.5 border-b border-gray-100 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#0E7C7B] to-[#0A5E5D] flex items-center justify-center">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-[13px] font-bold text-gray-800 leading-tight">Filtres</h2>
+            {activeCount > 0 && (
+              <p className="text-[10px] text-gray-400">{activeCount} actif{activeCount > 1 ? 's' : ''}</p>
+            )}
+          </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 flex-shrink-0">
-          <X className="h-4 w-4" />
-        </Button>
+        {onClose && (
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-gray-500 hover:bg-gray-50 transition-all">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
-      {/* Filtres actifs - Tags */}
-      {activeFiltersCount > 0 && (
-        <div className="p-2 border-b border-[#e5e7eb] bg-[#F4F6F8]/30">
-          <div className="flex flex-wrap gap-1">
-            {filters.skills?.map((skill, idx) => (
-              <Badge key={idx} variant="secondary" className="h-5 text-[10px] px-1.5 flex items-center gap-0.5 bg-[#E8F4F3] text-[#226D68] border-0">
-                {skill}
-                <XCircle className="h-2.5 w-2.5 cursor-pointer hover:text-red-500" onClick={() => handleRemoveSkill(skill)} />
-              </Badge>
+      {/* ═══ Active filter tags ═══ */}
+      {activeCount > 0 && (
+        <div className="px-4 py-2.5 border-b border-gray-50 bg-[#FAFBFC]">
+          <div className="flex flex-wrap gap-1.5">
+            {filters.skills?.map((s, i) => (
+              <span key={i} className="yf-tag" onClick={() => removeSkill(s)}>
+                {s} <XCircle className="h-2.5 w-2.5" />
+              </span>
             ))}
             {filters.location && (
-              <Badge variant="secondary" className="h-5 text-[10px] px-1.5 flex items-center gap-0.5 bg-[#E8F4F3] text-[#226D68] border-0">
-                <MapPin className="h-2.5 w-2.5" />
-                {filters.location}
-                <XCircle className="h-2.5 w-2.5 cursor-pointer hover:text-red-500" onClick={() => onFilterChange({ ...filters, location: '' })} />
-              </Badge>
+              <span className="yf-tag" onClick={() => onFilterChange({ ...filters, location: '' })}>
+                <MapPin className="h-2.5 w-2.5" /> {filters.location} <XCircle className="h-2.5 w-2.5" />
+              </span>
             )}
             {filters.job_title && (
-              <Badge variant="secondary" className="h-5 text-[10px] px-1.5 flex items-center gap-0.5 bg-[#E8F4F3] text-[#226D68] border-0">
-                {filters.job_title}
-                <XCircle className="h-2.5 w-2.5 cursor-pointer hover:text-red-500" onClick={() => onFilterChange({ ...filters, job_title: '' })} />
-              </Badge>
+              <span className="yf-tag" onClick={() => onFilterChange({ ...filters, job_title: '' })}>
+                {filters.job_title} <XCircle className="h-2.5 w-2.5" />
+              </span>
             )}
           </div>
         </div>
       )}
 
-      <ScrollArea className="flex-1">
-        <div className="p-3 space-y-3">
-          {/* Recherche de poste */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-[#2C2C2C] flex items-center gap-1.5">
-              <Search className="h-3.5 w-3.5 text-[#9ca3af]" />
-              Poste recherché
-            </Label>
-            <Input
+      {/* ═══ Filter sections ═══ */}
+      <ScrollArea className="flex-1 yf-scroll">
+        <div className="px-3 py-3 space-y-1">
+          {/* Job title */}
+          <div className="px-2.5 pb-3">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 block">Poste recherché</label>
+            <input
               type="text"
-              placeholder="Ex: Développeur Full Stack..."
+              placeholder="Ex: Développeur Full Stack…"
               value={filters.job_title || ''}
               onChange={(e) => onFilterChange({ ...filters, job_title: e.target.value })}
-              className="h-8 text-sm border-[#e5e7eb]"
+              className="yf-input"
             />
           </div>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Expérience */}
+          {/* Experience */}
           <FilterSection
             id="experience"
             title="Expérience"
             icon={Briefcase}
             badge={filters.experience_ranges?.length || (filters.min_experience > 0 ? 1 : 0)}
-            defaultExpanded={true}
+            expanded={sections.experience}
+            onToggle={toggle}
           >
-            {/* Slider pour plage d'expérience */}
-            <div className="space-y-3">
+            <div className="space-y-2.5 pr-1">
               <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-2">
-                  <span>Min: {filters.min_experience || 0} an{filters.min_experience > 1 ? 's' : ''}</span>
-                  <span>Max: {filters.max_experience || '∞'} an{filters.max_experience > 1 ? 's' : ''}</span>
+                <div className="flex justify-between text-[10px] text-gray-400 mb-2 font-medium">
+                  <span>Min: {filters.min_experience || 0} an{(filters.min_experience || 0) > 1 ? 's' : ''}</span>
+                  <span>Max: {filters.max_experience || '∞'}</span>
                 </div>
                 <Slider
                   value={[filters.min_experience || 0, filters.max_experience || 30]}
-                  onValueChange={handleExperienceSlider}
+                  onValueChange={([min, max]) => onFilterChange({ ...filters, min_experience: min, max_experience: max === 30 ? null : max })}
                   max={30}
                   step={1}
                   className="w-full"
                 />
               </div>
-              
-              <div className="text-xs text-gray-500 mb-2">Ou sélectionnez des tranches :</div>
-              <div className="space-y-2">
-                {EXPERIENCE_RANGES.map((range) => {
-                  const isSelected = filters.experience_ranges?.some(
-                    r => r.min === range.min && r.max === range.max
-                  )
-                  return (
-                    <label
-                      key={`${range.min}-${range.max}`}
-                      className="flex items-center gap-2 cursor-pointer p-2 rounded hover:bg-gray-50 transition-colors"
-                    >
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => handleExperienceRangeToggle(range)}
-                      />
-                      <span className="text-sm">{range.label}</span>
-                    </label>
-                  )
-                })}
-              </div>
+              <p className="text-[10px] text-gray-400 font-medium">Ou par tranche :</p>
+              {EXPERIENCE_RANGES.map((r) => {
+                const active = filters.experience_ranges?.some(x => x.min === r.min && x.max === r.max)
+                return (
+                  <label key={`${r.min}-${r.max}`} className="yf-check-item" data-active={active}>
+                    <Checkbox checked={active} onCheckedChange={() => toggleExpRange(r)} />
+                    <div className="flex-1">
+                      <span className="text-[12px] font-medium text-gray-700">{r.label}</span>
+                      <span className="text-[10px] text-gray-400 ml-1.5">{r.sub}</span>
+                    </div>
+                  </label>
+                )
+              })}
             </div>
           </FilterSection>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Disponibilité */}
+          {/* Availability */}
           <FilterSection
             id="availability"
             title="Disponibilité"
             icon={Clock}
             badge={filters.availability?.length}
+            expanded={sections.availability}
+            onToggle={toggle}
           >
-            <div className="space-y-2">
-              {AVAILABILITY_OPTIONS.map((option) => {
-                const isSelected = filters.availability?.includes(option.value)
-                const Icon = option.icon
+            <div className="space-y-1 pr-1">
+              {AVAILABILITY_OPTIONS.map((o) => {
+                const active = filters.availability?.includes(o.value)
                 return (
-                  <label
-                    key={option.value}
-                    className="flex items-center gap-3 cursor-pointer p-2 rounded-lg border border-gray-200 hover:border-[#226D68] hover:bg-[#226D68]/5 transition-all"
-                  >
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => handleAvailabilityToggle(option.value)}
-                    />
-                    {Icon && <Icon className="h-4 w-4 text-gray-500" />}
-                    <span className="text-sm flex-1">{option.label}</span>
+                  <label key={o.value} className="yf-check-item" data-active={active}>
+                    <Checkbox checked={active} onCheckedChange={() => toggleList('availability', o.value)} />
+                    <span className="text-[12px] font-medium text-gray-700 flex-1">{o.label}</span>
                   </label>
                 )
               })}
             </div>
           </FilterSection>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Niveau d'éducation */}
+          {/* Education */}
           <FilterSection
             id="education"
             title="Niveau d'éducation"
             icon={GraduationCap}
             badge={filters.education_levels?.length}
+            expanded={sections.education}
+            onToggle={toggle}
           >
-            <div className="space-y-2">
-              {EDUCATION_LEVELS.map((level) => {
-                const isSelected = filters.education_levels?.includes(level.value)
-                const Icon = level.icon
+            <div className="space-y-1 pr-1">
+              {EDUCATION_LEVELS.map((l) => {
+                const active = filters.education_levels?.includes(l.value)
                 return (
-                  <label
-                    key={level.value}
-                    className="flex items-center gap-3 cursor-pointer p-2 rounded-lg border border-gray-200 hover:border-[#226D68] hover:bg-[#226D68]/5 transition-all"
-                  >
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => handleEducationToggle(level.value)}
-                    />
-                    {Icon && <Icon className="h-4 w-4 text-gray-500" />}
-                    <span className="text-sm flex-1">{level.label}</span>
+                  <label key={l.value} className="yf-check-item" data-active={active}>
+                    <Checkbox checked={active} onCheckedChange={() => toggleList('education_levels', l.value)} />
+                    <span className="text-[12px] font-medium text-gray-700 flex-1">{l.label}</span>
                   </label>
                 )
               })}
             </div>
           </FilterSection>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Type de contrat */}
+          {/* Contract */}
           <FilterSection
             id="contract"
             title="Type de contrat"
-            icon={Briefcase}
+            icon={Building2}
             badge={filters.contract_types?.length}
+            expanded={sections.contract}
+            onToggle={toggle}
           >
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {CONTRACT_TYPES.map((type) => {
-                const isSelected = filters.contract_types?.includes(type.value)
-                const Icon = type.icon
+            <div className="grid grid-cols-2 gap-1.5 pr-1">
+              {CONTRACT_TYPES.map((t) => {
+                const active = filters.contract_types?.includes(t.value)
                 return (
-                  <label
-                    key={type.value}
-                    className={`flex flex-col items-center gap-2 cursor-pointer p-3 rounded-lg border-2 transition-all ${
-                      isSelected 
-                        ? 'border-[#226D68] bg-[#226D68]/10' 
-                        : 'border-gray-200 hover:border-[#226D68]/50'
+                  <button
+                    key={t.value}
+                    onClick={() => toggleList('contract_types', t.value)}
+                    className={`text-[11px] font-semibold py-2 px-2.5 rounded-lg border transition-all text-center ${
+                      active
+                        ? 'bg-[#0E7C7B] text-white border-[#0E7C7B] shadow-sm shadow-[#0E7C7B]/15'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#0E7C7B]/30 hover:text-[#0E7C7B]'
                     }`}
                   >
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => handleContractToggle(type.value)}
-                      className="mb-1"
-                    />
-                    {Icon && <Icon className="h-4 w-4 text-gray-500" />}
-                    <span className="text-xs text-center font-medium">{type.label}</span>
-                  </label>
+                    {t.label}
+                  </button>
                 )
               })}
             </div>
           </FilterSection>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Compétences */}
+          {/* Skills */}
           <FilterSection
             id="skills"
             title="Compétences"
             icon={Sparkles}
             badge={filters.skills?.length}
+            expanded={sections.skills}
+            onToggle={toggle}
           >
-            <div className="space-y-3">
+            <div className="space-y-2.5 pr-1">
               <div className="relative">
-                <Input
+                <input
                   type="text"
-                  placeholder="Rechercher une compétence..."
+                  placeholder="Rechercher…"
                   value={skillSearch}
                   onChange={(e) => setSkillSearch(e.target.value)}
-                  className="h-8 text-sm border-[#e5e7eb]"
+                  className="yf-input"
                 />
                 {skillSuggestions.length > 0 && (
-                  <Card className="absolute z-50 w-full mt-1 shadow-lg border">
-                    <CardContent className="p-2">
-                      <div className="space-y-1">
-                        {skillSuggestions.map((skill) => (
-                          <button
-                            key={skill}
-                            onClick={() => handleAddSkill(skill)}
-                            className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 transition-colors"
-                          >
-                            + {skill}
-                          </button>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-xl overflow-hidden">
+                    {skillSuggestions.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => addSkill(s)}
+                        className="w-full text-left px-3 py-2 text-[12px] text-gray-600 hover:bg-[#E8F4F3] hover:text-[#0E7C7B] transition-colors flex items-center gap-2"
+                      >
+                        <span className="text-[#0E7C7B] font-bold">+</span> {s}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
-              
+
               {filters.skills?.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {filters.skills.map((skill, idx) => (
-                    <Badge
-                      key={idx}
-                      variant="secondary"
-                      className="flex items-center gap-1 cursor-pointer hover:bg-red-50 hover:border-red-300"
-                      onClick={() => handleRemoveSkill(skill)}
-                    >
-                      {skill}
-                      <XCircle className="h-3 w-3" />
-                    </Badge>
+                <div className="flex flex-wrap gap-1.5">
+                  {filters.skills.map((s, i) => (
+                    <span key={i} className="yf-tag" onClick={() => removeSkill(s)}>
+                      {s} <XCircle className="h-2.5 w-2.5" />
+                    </span>
                   ))}
                 </div>
               )}
 
-              <div className="text-xs text-gray-500">
-                Suggestions populaires :
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {POPULAR_SKILLS.slice(0, 6)
-                  .filter(skill => !filters.skills?.includes(skill))
-                  .map((skill) => (
-                    <Badge
-                      key={skill}
-                      variant="outline"
-                      className="cursor-pointer hover:bg-[#226D68]/10 hover:border-[#226D68]"
-                      onClick={() => handleAddSkill(skill)}
-                    >
-                      + {skill}
-                    </Badge>
-                  ))}
+              <div>
+                <p className="text-[10px] text-gray-400 font-medium mb-1.5">Suggestions :</p>
+                <div className="flex flex-wrap gap-1">
+                  {POPULAR_SKILLS.slice(0, 8)
+                    .filter(s => !filters.skills?.includes(s))
+                    .map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => addSkill(s)}
+                        className="text-[10px] font-medium text-gray-400 px-2 py-1 rounded-md border border-gray-100 hover:border-[#0E7C7B]/20 hover:text-[#0E7C7B] hover:bg-[#E8F4F3] transition-all"
+                      >
+                        + {s}
+                      </button>
+                    ))}
+                </div>
               </div>
             </div>
           </FilterSection>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Localisation */}
+          {/* Location */}
           <FilterSection
             id="location"
             title="Localisation"
             icon={MapPin}
             badge={filters.location ? 1 : 0}
+            expanded={sections.location}
+            onToggle={toggle}
           >
-            <Input
+            <input
               type="text"
-              placeholder="Ex: Abidjan, Paris..."
+              placeholder="Ex: Abidjan, Paris…"
               value={filters.location || ''}
               onChange={(e) => onFilterChange({ ...filters, location: e.target.value })}
-              className="h-8 text-sm border-[#e5e7eb]"
+              className="yf-input mr-1"
             />
           </FilterSection>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Prétentions salariales */}
+          {/* Salary */}
           <FilterSection
             id="salary"
             title="Prétentions salariales"
             icon={DollarSign}
             badge={(filters.min_salary || filters.max_salary) ? 1 : 0}
+            expanded={sections.salary}
+            onToggle={toggle}
           >
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-2">
-                  <span>Min: {filters.min_salary ? `${(filters.min_salary / 1000).toFixed(0)}k` : '0'} FCFA</span>
-                  <span>Max: {filters.max_salary ? `${(filters.max_salary / 1000).toFixed(0)}k` : '∞'} FCFA</span>
-                </div>
-                <Slider
-                  value={[filters.min_salary || 0, filters.max_salary || 10000000]}
-                  onValueChange={handleSalarySlider}
-                  max={10000000}
-                  step={100000}
-                  className="w-full"
-                />
+            <div className="space-y-2.5 pr-1">
+              <div className="flex justify-between text-[10px] text-gray-400 font-medium">
+                <span>{filters.min_salary ? `${(filters.min_salary / 1000).toFixed(0)}k` : '0'} FCFA</span>
+                <span>{filters.max_salary ? `${(filters.max_salary / 1000).toFixed(0)}k` : '∞'} FCFA</span>
               </div>
+              <Slider
+                value={[filters.min_salary || 0, filters.max_salary || 10000000]}
+                onValueChange={([min, max]) => onFilterChange({ ...filters, min_salary: min, max_salary: max === 10000000 ? null : max })}
+                max={10000000}
+                step={100000}
+                className="w-full"
+              />
             </div>
           </FilterSection>
 
-          <Separator className="bg-[#e5e7eb]" />
+          <div className="h-px bg-gray-100 mx-2" />
 
-          {/* Score expert - attribué lors de l'évaluation admin */}
+          {/* Score */}
           <FilterSection
             id="score"
-            title="Score d'évaluation minimum"
+            title="Score évaluation"
             icon={Star}
             badge={filters.min_admin_score ? 1 : 0}
+            expanded={sections.score}
+            onToggle={toggle}
           >
-            <p className="text-[10px] text-[#9ca3af] mb-2">Note donnée par l'expert lors de la validation du profil</p>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs text-gray-600 mb-2">
-                  <span>Score: {filters.min_admin_score?.toFixed(1) || '0.0'}/5.0</span>
-                </div>
-                <Slider
-                  value={[filters.min_admin_score || 0]}
-                  onValueChange={handleScoreSlider}
-                  max={5}
-                  step={0.1}
-                  className="w-full"
-                />
+            <div className="space-y-2.5 pr-1">
+              <p className="text-[10px] text-gray-400">Note minimum de l'expert</p>
+              <div className="flex justify-between text-[10px] text-gray-400 font-medium">
+                <span>{filters.min_admin_score?.toFixed(1) || '0.0'} / 5.0</span>
               </div>
-              <div className="flex gap-2">
-                {[0, 3, 4, 4.5, 5].map((score) => (
-                  <Button
-                    key={score}
-                    variant={filters.min_admin_score === score ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => onFilterChange({ ...filters, min_admin_score: score === 0 ? undefined : score })}
-                    className="flex-1"
+              <Slider
+                value={[filters.min_admin_score || 0]}
+                onValueChange={([v]) => onFilterChange({ ...filters, min_admin_score: v === 0 ? undefined : v })}
+                max={5}
+                step={0.1}
+                className="w-full"
+              />
+              <div className="flex gap-1.5">
+                {[0, 3, 4, 4.5, 5].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => onFilterChange({ ...filters, min_admin_score: s === 0 ? undefined : s })}
+                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition-all border ${
+                      filters.min_admin_score === s || (s === 0 && !filters.min_admin_score)
+                        ? 'bg-[#0E7C7B] text-white border-[#0E7C7B]'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-[#0E7C7B]/30'
+                    }`}
                   >
-                    {score === 0 ? 'Tous' : `${score}+`}
-                  </Button>
+                    {s === 0 ? 'Tous' : `${s}+`}
+                  </button>
                 ))}
               </div>
             </div>
@@ -627,35 +503,30 @@ export function AdvancedSearchFilters({
         </div>
       </ScrollArea>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-[#e5e7eb] bg-[#F4F6F8]/30 space-y-1.5">
+      {/* ═══ Footer ═══ */}
+      <div className="px-4 py-3 border-t border-gray-100 bg-[#FAFBFC] space-y-2 shrink-0">
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 h-8 text-xs border-[#d1d5db] text-[#2C2C2C]"
-            onClick={clearAllFilters}
-            disabled={activeFiltersCount === 0}
+          <button
+            onClick={clearAll}
+            disabled={activeCount === 0}
+            className="flex-1 h-9 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 hover:bg-red-50 disabled:opacity-30 disabled:hover:text-gray-500 disabled:hover:border-gray-200 disabled:hover:bg-transparent transition-all"
           >
-            <XCircle className="h-3 w-3 mr-1.5" />
-            Réinitialiser
-          </Button>
+            <XCircle className="h-3 w-3" /> Réinitialiser
+          </button>
           {onSavePreset && (
-            <SimpleTooltip content="Sauvegarder cette configuration">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onSavePreset(filters)}
-              >
-                <Save className="h-4 w-4" />
-              </Button>
-            </SimpleTooltip>
+            <button
+              onClick={() => onSavePreset(filters)}
+              className="w-9 h-9 rounded-xl flex items-center justify-center border border-gray-200 text-gray-400 hover:text-[#0E7C7B] hover:border-[#0E7C7B]/20 hover:bg-[#E8F4F3] transition-all"
+              title="Sauvegarder"
+            >
+              <Save className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
-        {activeFiltersCount > 0 && (
-          <div className="text-[10px] text-center text-[#9ca3af]">
-            {activeFiltersCount} filtre{activeFiltersCount > 1 ? 's' : ''} actif{activeFiltersCount > 1 ? 's' : ''}
-          </div>
+        {activeCount > 0 && (
+          <p className="text-[10px] text-center text-gray-400">
+            {activeCount} filtre{activeCount > 1 ? 's' : ''} actif{activeCount > 1 ? 's' : ''}
+          </p>
         )}
       </div>
     </div>

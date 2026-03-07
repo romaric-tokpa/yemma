@@ -1,73 +1,236 @@
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { adminApi, candidateApi } from '@/services/api'
-import { useState, useEffect, useRef } from 'react'
-import { Loader2, CheckCircle2, XCircle, History, MessageSquare, FileText, Scale, Sparkles, Copy, Bot, Upload, AlertCircle } from 'lucide-react'
+/**
+ * Grille d'évaluation candidat — charte graphique Yemma Solutions
+ * Intégré au backend et à la base de données (admin_report)
+ */
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { adminApi } from '@/services/api'
+import { Loader2, AlertCircle, History, Sparkles, Copy, Bot, Upload, Settings, FileText, Users, Target, TrendingUp, BarChart3, CheckCircle2, Clock, XCircle, ChevronDown, Printer } from 'lucide-react'
 import { formatDateTime } from '@/utils/dateUtils'
 import { getApiErrorDetail } from '@/utils/apiError'
-import { z } from 'zod'
 
-const evaluationSchema = z.object({
-  overallScore: z.number().min(0).max(5).step(0.5, 'La note doit être un multiple de 0.5'),
-  technicalSkills: z.number().min(0).max(5).step(0.5).optional().nullable(),
-  softSkills: z.number().min(0).max(5).step(0.5).optional().nullable(),
-  communication: z.number().min(0).max(5).step(0.5).optional().nullable(),
-  motivation: z.number().min(0).max(5).step(0.5).optional().nullable(),
-  summary: z.string().min(50, 'Le résumé doit contenir au moins 50 caractères'),
-  interview_notes: z.string().optional(),
-  recommendations: z.string().optional(),
-})
+// Charte graphique Yemma Solutions
+const CHARTE = {
+  primary: '#226D68',      // Vert principal (green-emerald)
+  primaryLight: '#E8F4F3', // Vert clair
+  secondary: '#e76f51',    // Orange secondaire
+  text: '#2C2C2C',        // Gris anthracite
+  textMuted: '#6b7280',
+  bg: '#F4F6F8',
+  border: '#E5E7EB',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+}
 
-const SCORE_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
+const RATING_LABELS = {
+  1: { label: 'Insuffisant', color: CHARTE.danger, desc: 'Ne répond pas aux exigences minimales' },
+  2: { label: 'À développer', color: CHARTE.warning, desc: 'En dessous des attentes, potentiel à confirmer' },
+  3: { label: 'Satisfaisant', color: '#3B82F6', desc: 'Répond aux attentes du poste' },
+  4: { label: 'Bon', color: CHARTE.primary, desc: 'Dépasse les attentes sur plusieurs points' },
+  5: { label: 'Excellent', color: CHARTE.success, desc: 'Performance exceptionnelle, profil différenciant' },
+}
+
 const CRITERIA = [
-  { key: 'technicalSkills', label: 'Compétences techniques', short: 'Technique' },
-  { key: 'softSkills', label: 'Compétences comportementales', short: 'Soft' },
-  { key: 'communication', label: 'Communication', short: 'Com.' },
-  { key: 'motivation', label: 'Motivation', short: 'Motiv.' },
+  {
+    category: 'Compétences Techniques',
+    Icon: Settings,
+    weight: 30,
+    items: [
+      { id: 'tech_1', label: "Maîtrise des compétences clés du poste", hint: "Évaluer l'adéquation entre les compétences déclarées et les exigences techniques du poste" },
+      { id: 'tech_2', label: 'Capacité de résolution de problèmes', hint: 'Aptitude à analyser un problème complexe et proposer des solutions structurées' },
+      { id: 'tech_3', label: "Connaissance de l'environnement sectoriel", hint: "Compréhension du secteur d'activité, de ses enjeux et tendances" },
+      { id: 'tech_4', label: 'Outils & méthodologies', hint: 'Maîtrise des outils, logiciels et méthodologies pertinents pour le poste' },
+    ],
+  },
+  {
+    category: 'Expérience & Parcours',
+    Icon: FileText,
+    weight: 25,
+    items: [
+      { id: 'exp_1', label: "Pertinence de l'expérience professionnelle", hint: 'Cohérence du parcours avec les responsabilités du poste visé' },
+      { id: 'exp_2', label: 'Réalisations concrètes et résultats', hint: "Capacité à quantifier ses réussites et démontrer un impact mesurable" },
+      { id: 'exp_3', label: 'Progression de carrière', hint: 'Évolution professionnelle cohérente, prise de responsabilités croissantes' },
+    ],
+  },
+  {
+    category: 'Compétences Comportementales',
+    Icon: Users,
+    weight: 20,
+    items: [
+      { id: 'soft_1', label: 'Communication & clarté d\'expression', hint: 'Capacité à articuler ses idées de manière claire, structurée et convaincante' },
+      { id: 'soft_2', label: 'Esprit d\'équipe & collaboration', hint: 'Aptitude à travailler en équipe, à écouter et à contribuer positivement' },
+      { id: 'soft_3', label: 'Leadership & prise d\'initiative', hint: 'Capacité à prendre des décisions, à mobiliser et à proposer des solutions' },
+      { id: 'soft_4', label: 'Adaptabilité & gestion du stress', hint: 'Résilience face au changement, gestion de la pression et flexibilité' },
+    ],
+  },
+  {
+    category: 'Motivation & Adéquation',
+    Icon: Target,
+    weight: 15,
+    items: [
+      { id: 'mot_1', label: 'Motivation pour le poste', hint: 'Intérêt sincère pour le rôle, compréhension des missions et des défis' },
+      { id: 'mot_2', label: 'Adéquation culturelle avec l\'entreprise', hint: 'Alignement des valeurs du candidat avec la culture de l\'entreprise cliente' },
+      { id: 'mot_3', label: 'Projet professionnel cohérent', hint: 'Vision claire de son évolution et cohérence avec l\'opportunité proposée' },
+    ],
+  },
+  {
+    category: 'Potentiel & Évolution',
+    Icon: TrendingUp,
+    weight: 10,
+    items: [
+      { id: 'pot_1', label: "Capacité d'apprentissage", hint: 'Curiosité intellectuelle, aptitude à monter en compétences rapidement' },
+      { id: 'pot_2', label: "Potentiel d'évolution à moyen terme", hint: 'Capacité à prendre des responsabilités élargies dans les 2-3 ans' },
+    ],
+  },
 ]
 
-export default function EvaluationForm({ candidateId, candidateData, onSuccess }) {
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [action, setAction] = useState(null)
-  const [error, setError] = useState(null)
+const DECISIONS = [
+  { value: 'retenu', label: 'Retenu', color: CHARTE.success, Icon: CheckCircle2 },
+  { value: 'reserve', label: 'En réserve', color: CHARTE.warning, Icon: Clock },
+  { value: 'non_retenu', label: 'Non retenu', color: CHARTE.danger, Icon: XCircle },
+]
+
+function StarRating({ value, onChange }) {
+  const [hover, setHover] = useState(0)
+  return (
+    <div className="flex gap-1 items-center">
+      {[1, 2, 3, 4, 5].map((star) => {
+        const active = star <= (hover || value)
+        const ratingInfo = RATING_LABELS[hover || value]
+        return (
+          <button
+            key={star}
+            type="button"
+            onClick={() => onChange(star === value ? 0 : star)}
+            onMouseEnter={() => setHover(star)}
+            onMouseLeave={() => setHover(0)}
+            className="w-8 h-8 min-w-[2rem] min-h-[2rem] shrink-0 rounded-lg flex items-center justify-center text-sm font-bold"
+            style={{
+              background: active ? (ratingInfo?.color || CHARTE.border) : CHARTE.bg,
+              color: active ? 'white' : CHARTE.textMuted,
+              transform: active ? 'scale(1.05)' : 'scale(1)',
+              transformOrigin: 'center',
+              transition: 'background-color 0.15s, color 0.15s, transform 0.15s',
+            }}
+          >
+            {star}
+          </button>
+        )
+      })}
+      {/* Zone fixe pour éviter le flickering : espace réservé, pas de changement de dimensions au hover */}
+      <span
+        className="ml-2 min-w-[7rem] text-xs font-semibold whitespace-nowrap transition-opacity duration-150"
+        style={{
+          color: (hover || value) > 0 ? RATING_LABELS[hover || value]?.color : 'transparent',
+          opacity: (hover || value) > 0 ? 1 : 0,
+        }}
+        aria-hidden
+      >
+        {(hover || value) > 0 ? RATING_LABELS[hover || value]?.label : '\u00A0'}
+      </span>
+    </div>
+  )
+}
+
+function ScoreGauge({ score, maxScore }) {
+  const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0
+  let color = CHARTE.danger
+  if (percentage >= 80) color = CHARTE.success
+  else if (percentage >= 60) color = CHARTE.primary
+  else if (percentage >= 40) color = '#3B82F6'
+  else if (percentage >= 20) color = CHARTE.warning
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 h-2 bg-gray-200 rounded overflow-hidden">
+        <div className="h-full rounded transition-all duration-500" style={{ width: `${percentage}%`, background: color }} />
+      </div>
+      <span className="text-sm font-bold min-w-[55px] text-right" style={{ color }}>{score.toFixed(1)}/{maxScore}</span>
+    </div>
+  )
+}
+
+const AI_PRESET_QUESTIONS = [
+  { label: "Résumé d'évaluation", question: "Rédige un résumé d'évaluation professionnel pour ce profil en 4-5 phrases : points forts, axes d'amélioration et avis global." },
+  { label: "Points forts / axes d'amélioration", question: "Quels sont les 3 principaux points forts et 2 axes d'amélioration pour ce candidat ?" },
+  { label: "Questions d'entretien", question: 'Propose 5 questions d\'entretien pertinentes pour ce profil.' },
+  { label: 'Adéquation poste', question: "Synthétise en une phrase l'adéquation du profil pour un poste en entreprise." },
+]
+
+export default function EvaluationForm({ candidateId, candidateData, candidatePhotoUrl, defaultAvatarUrl, onSuccess }) {
+  const [ratings, setRatings] = useState({})
+  const [comments, setComments] = useState({})
+  const [globalComment, setGlobalComment] = useState('')
+  const [decision, setDecision] = useState('')
+  const [expandedCategories, setExpandedCategories] = useState(CRITERIA.map((c) => c.category))
+  const [activeTab, setActiveTab] = useState('eval')
   const [loading, setLoading] = useState(true)
-  const [evaluationHistory, setEvaluationHistory] = useState([])
-  const [showHistory, setShowHistory] = useState(false)
-  const [confirmReject, setConfirmReject] = useState(false)
-  // Analyse par IA (CvGPT / Profile Asking HrFlow)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+  const synthesisRef = useRef(null)
+  const evaluationHistory = candidateData?.admin_report?.evaluation_history || []
+
+  // IA (CvGPT)
   const [aiQuestion, setAiQuestion] = useState('')
   const [aiAnswer, setAiAnswer] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState(null)
-  // Indexer un CV pour profils sans hrflow_profile_key
   const [indexCvLoading, setIndexCvLoading] = useState(false)
   const [indexCvError, setIndexCvError] = useState(null)
   const [indexCvSuccess, setIndexCvSuccess] = useState(false)
   const indexCvInputRef = useRef(null)
-
   const hasAiProfile = Boolean(candidateData?.hrflow_profile_key)
 
-  const AI_PRESET_QUESTIONS = [
-    {
-      label: 'Résumé d\'évaluation',
-      question: "Rédige un résumé d'évaluation professionnel pour ce profil en 4-5 phrases : points forts, axes d'amélioration et avis global.",
+  const candidat = {
+    nom: candidateData?.last_name || '',
+    prenom: candidateData?.first_name || '',
+    poste: candidateData?.profile_title || '',
+    date: new Date().toISOString().split('T')[0],
+    recruteur: '',
+    entreprise: '',
+    source: '',
+  }
+
+  const updateRating = (id, value) => setRatings((prev) => ({ ...prev, [id]: value }))
+  const updateComment = (id, value) => setComments((prev) => ({ ...prev, [id]: value }))
+  const toggleCategory = (cat) =>
+    setExpandedCategories((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]))
+
+  const getCategoryScore = useCallback(
+    (category) => {
+      const rated = category.items.filter((item) => ratings[item.id] > 0)
+      if (rated.length === 0) return { score: 0, max: category.items.length * 5, avg: 0, count: rated.length, total: category.items.length }
+      const sum = rated.reduce((acc, item) => acc + (ratings[item.id] || 0), 0)
+      return { score: sum, max: category.items.length * 5, avg: sum / rated.length, count: rated.length, total: category.items.length }
     },
-    {
-      label: 'Points forts / axes d\'amélioration',
-      question: 'Quels sont les 3 principaux points forts et 2 axes d\'amélioration pour ce candidat ?',
-    },
-    {
-      label: 'Questions d\'entretien',
-      question: 'Propose 5 questions d\'entretien pertinentes pour ce profil.',
-    },
-    {
-      label: 'Adéquation poste',
-      question: "Synthétise en une phrase l'adéquation du profil pour un poste en entreprise.",
-    },
-  ]
+    [ratings]
+  )
+
+  const getWeightedTotal = useCallback(() => {
+    let weightedSum = 0
+    let totalWeight = 0
+    CRITERIA.forEach((cat) => {
+      const { avg, count } = getCategoryScore(cat)
+      if (count > 0) {
+        weightedSum += avg * cat.weight
+        totalWeight += cat.weight
+      }
+    })
+    return totalWeight > 0 ? (weightedSum / totalWeight) * 20 : 0
+  }, [getCategoryScore])
+
+  const totalScore = getWeightedTotal()
+  const ratedCount = Object.values(ratings).filter((v) => v > 0).length
+  const totalItems = CRITERIA.reduce((acc, c) => acc + c.items.length, 0)
+  const completionPct = Math.round((ratedCount / totalItems) * 100)
+
+  const getScoreLabel = (score) => {
+    if (score >= 80) return { text: 'Excellent', color: CHARTE.success }
+    if (score >= 65) return { text: 'Bon', color: CHARTE.primary }
+    if (score >= 50) return { text: 'Satisfaisant', color: '#3B82F6' }
+    if (score >= 35) return { text: 'À développer', color: CHARTE.warning }
+    return { text: 'Insuffisant', color: CHARTE.danger }
+  }
 
   const askAi = async (questionText) => {
     const q = (questionText || aiQuestion || '').trim()
@@ -80,136 +243,136 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
       setAiAnswer(data?.answer ?? '')
     } catch (err) {
       setAiError(getApiErrorDetail(err, "Erreur lors de l'analyse IA."))
-      setAiAnswer('')
     } finally {
       setAiLoading(false)
     }
   }
 
-  const insertAiInto = (field) => {
+  const insertAiInto = () => {
     if (!aiAnswer) return
-    const current = form.getValues(field) || ''
-    const sep = current.length ? '\n\n' : ''
-    setValue(field, current + sep + aiAnswer)
+    setGlobalComment((prev) => (prev ? prev + '\n\n' + aiAnswer : aiAnswer))
   }
 
-  const form = useForm({
-    resolver: zodResolver(evaluationSchema),
-    defaultValues: {
-      overallScore: 0,
-      technicalSkills: 0,
-      softSkills: 0,
-      communication: 0,
-      motivation: 0,
-      summary: '',
-      interview_notes: '',
-      recommendations: '',
-    },
-  })
-
-  const { register, handleSubmit, formState: { errors }, watch, setValue, reset } = form
-  const overallScore = watch('overallScore')
-  const summary = watch('summary')
-
+  // Chargement initial : dépendre uniquement de candidateId pour éviter les boucles infinies
   useEffect(() => {
-    const loadEvaluation = async () => {
+    if (!candidateId) return
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
       try {
-        setLoading(true)
         const adminReport = candidateData?.admin_report
-        if (adminReport) {
-          reset({
-            overallScore: adminReport.overall_score ?? 0,
-            technicalSkills: adminReport.technical_skills_rating ?? 0,
-            softSkills: adminReport.soft_skills_rating ?? 0,
-            communication: adminReport.communication_rating ?? 0,
-            motivation: adminReport.motivation_rating ?? 0,
-            summary: adminReport.summary || '',
-            interview_notes: adminReport.interview_notes || '',
-            recommendations: adminReport.recommendations || '',
-          })
-          if (adminReport.evaluation_history && Array.isArray(adminReport.evaluation_history)) {
-            setEvaluationHistory(adminReport.evaluation_history)
+        if (adminReport?.ratings || adminReport?.summary || adminReport?.global_comment) {
+          if (!cancelled) {
+            setRatings(adminReport.ratings || {})
+            setComments(adminReport.comments || {})
+            setGlobalComment(adminReport.global_comment || adminReport.summary || '')
+            setDecision(adminReport.decision || '')
           }
         } else {
           try {
             const evalData = await adminApi.getCandidateEvaluation(candidateId)
-            if (evalData) {
-              reset({
-                overallScore: evalData.overall_score ?? 0,
-                technicalSkills: evalData.technical_skills_rating ?? 0,
-                softSkills: evalData.soft_skills_rating ?? 0,
-                communication: evalData.communication_rating ?? 0,
-                motivation: evalData.motivation_rating ?? 0,
-                summary: evalData.summary || '',
-                interview_notes: evalData.interview_notes || '',
-                recommendations: evalData.recommendations || '',
-              })
+            if (!cancelled && evalData) {
+              if (evalData.ratings) {
+                setRatings(evalData.ratings || {})
+                setComments(evalData.comments || {})
+                setGlobalComment(evalData.global_comment || evalData.summary || '')
+                setDecision(evalData.decision || '')
+              } else {
+                setGlobalComment(evalData.summary || '')
+              }
             }
-          } catch {
-            // Pas d'évaluation existante
+          } catch (evalErr) {
+            if (!cancelled && adminReport) {
+              setGlobalComment(adminReport.global_comment || adminReport.summary || '')
+              setDecision(adminReport.decision || '')
+            }
           }
         }
       } catch (err) {
-        console.error('Erreur chargement évaluation:', err)
+        if (!cancelled) console.error('Erreur chargement évaluation:', err)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-    if (candidateId) loadEvaluation()
-  }, [candidateId, candidateData?.admin_report, reset])
+    load()
+    return () => { cancelled = true }
+  }, [candidateId])
 
-  const isAlreadyValidated = candidateData?.status === 'VALIDATED'
+  const buildPayload = () => ({
+    ratings: Object.fromEntries(Object.entries(ratings).filter(([, v]) => v > 0)),
+    comments: comments,
+    globalComment: globalComment,
+    decision: decision,
+    summary: globalComment,
+    interview_notes: '',
+    recommendations: '',
+  })
 
-  const onSubmit = async (data) => {
-    setIsSubmitting(true)
+  const handleSaveReserve = async () => {
     setError(null)
-    const currentAction = data.action || action
+    setIsSubmitting(true)
     try {
-      if (currentAction === 'validate') {
-        if (isAlreadyValidated) {
-          await adminApi.updateEvaluation(candidateId, {
-            overallScore: data.overallScore,
-            technicalSkills: data.technicalSkills ?? null,
-            softSkills: data.softSkills ?? null,
-            communication: data.communication ?? null,
-            motivation: data.motivation ?? null,
-            summary: data.summary,
-            interview_notes: data.interview_notes || '',
-            recommendations: data.recommendations || '',
-          })
-        } else {
-          await adminApi.validateProfile(candidateId, {
-            overallScore: data.overallScore,
-            technicalSkills: data.technicalSkills ?? null,
-            softSkills: data.softSkills ?? null,
-            communication: data.communication ?? null,
-            motivation: data.motivation ?? null,
-            summary: data.summary,
-            interview_notes: data.interview_notes || '',
-            recommendations: data.recommendations || '',
-          })
-        }
-      } else if (currentAction === 'reject') {
-        await adminApi.rejectProfile(candidateId, {
-          rejectionReason: data.summary || 'Non spécifié',
-          overallScore: data.overallScore ?? null,
-          interview_notes: data.interview_notes || '',
-        })
-      }
-      if (onSuccess) await onSuccess()
-      setConfirmReject(false)
-      setAction(null)
-      await new Promise((r) => setTimeout(r, 400))
-      const profile = await candidateApi.getProfile(candidateId)
-      if (profile?.admin_report?.evaluation_history) {
-        setEvaluationHistory(profile.admin_report.evaluation_history)
-      }
+      const payload = buildPayload()
+      await adminApi.updateEvaluation(candidateId, payload)
+      await onSuccess?.()
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Erreur lors de la soumission')
+      setError(getApiErrorDetail(err, 'Erreur lors de la sauvegarde'))
     } finally {
       setIsSubmitting(false)
     }
   }
+
+  const handleValidate = async () => {
+    if (globalComment.trim().length < 20) {
+      setError("L'avis global doit contenir au moins 20 caractères pour valider.")
+      return
+    }
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const payload = buildPayload()
+      await adminApi.validateProfile(candidateId, payload)
+      await onSuccess?.()
+    } catch (err) {
+      setError(getApiErrorDetail(err, 'Erreur lors de la validation'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (globalComment.trim().length < 20) {
+      setError("L'avis global doit contenir au moins 20 caractères pour rejeter.")
+      return
+    }
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const payload = buildPayload()
+      // Sauvegarder l'évaluation complète avant le rejet (ratings, comments)
+      if (Object.keys(payload.ratings || {}).length > 0) {
+        await adminApi.updateEvaluation(candidateId, payload)
+      }
+      await adminApi.rejectProfile(candidateId, {
+        rejectionReason: globalComment,
+        overallScore: totalScore / 20,
+        interview_notes: '',
+      })
+      await onSuccess?.()
+    } catch (err) {
+      setError(getApiErrorDetail(err, 'Erreur lors du rejet'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handlePrint = () => window.print()
+  const generateSynthesis = () => setTimeout(() => synthesisRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+
+  const tabs = [
+    { id: 'eval', label: 'Évaluation', Icon: BarChart3 },
+    { id: 'synthese', label: 'Synthèse', Icon: FileText },
+  ]
 
   if (loading) {
     return (
@@ -221,397 +384,370 @@ export default function EvaluationForm({ candidateId, candidateData, onSuccess }
   }
 
   return (
-    <div className="space-y-6">
-      {/* Historique - compact */}
+    <div className="min-h-full rounded-xl overflow-hidden bg-white border border-gray-200 shadow-sm">
+      {error && (
+        <div className="mx-4 sm:mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+
+      {/* Historique */}
       {evaluationHistory.length > 0 && (
-        <details className="group rounded-xl border border-gray-200 bg-[#F9FAFB]/80 overflow-hidden">
+        <details className="group mx-4 sm:mx-6 mt-4 rounded-xl border border-gray-200 bg-white overflow-hidden">
           <summary className="flex items-center gap-2 px-4 py-3 cursor-pointer list-none text-sm font-medium text-[#2C2C2C] hover:bg-[#F4F6F8] transition-colors">
             <History className="h-4 w-4 text-[#226D68]" />
             Historique des évaluations ({evaluationHistory.length})
-            <span className="ml-auto inline-block text-xs text-[#6b7280] group-open:rotate-180 transition-transform">▼</span>
+            <ChevronDown className="group-open:rotate-180 transition-transform h-4 w-4 text-[#6b7280]" />
           </summary>
           <div className="px-4 pb-4 pt-1 space-y-2 max-h-52 overflow-y-auto">
             {evaluationHistory.map((entry, index) => (
               <div key={index} className="rounded-lg border border-gray-100 bg-white p-3 text-sm">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="text-xs text-[#6b7280]">
-                    {entry.updated_at ? formatDateTime(entry.updated_at) : '—'}
-                  </span>
-                  {entry.status && (
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                        entry.status === 'VALIDATED'
-                          ? 'bg-[#226D68]/15 text-[#1a5a55]'
-                          : entry.status === 'REJECTED'
-                            ? 'bg-[#e76f51]/15 text-[#c04a2f]'
-                            : 'bg-gray-100 text-[#6b7280]'
-                      }`}
-                    >
-                      {entry.status}
-                    </span>
-                  )}
-                </div>
-                {entry.overall_score != null && (
-                  <p className="text-[#2C2C2C] font-medium">
-                    Note globale <strong className="text-[#226D68]">{entry.overall_score}/5</strong>
-                  </p>
-                )}
-                {entry.summary && (
-                  <p className="text-[#6b7280] mt-1 line-clamp-2 text-xs">{entry.summary}</p>
-                )}
+                <div className="text-xs text-[#6b7280]">{entry.updated_at ? formatDateTime(entry.updated_at) : '—'}</div>
+                {entry.total_score_100 != null && <div className="font-semibold text-[#226D68]">Score : {entry.total_score_100.toFixed(0)}/100</div>}
+                {entry.summary && <p className="text-[#6b7280] mt-1 line-clamp-2 text-xs">{entry.summary}</p>}
               </div>
             ))}
           </div>
         </details>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
-
-        {/* Critères d'évaluation */}
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 bg-[#F9FAFB] flex items-center gap-2">
-            <Scale className="h-4 w-4 text-[#226D68]" strokeWidth={2} />
-            <span className="text-sm font-semibold text-[#2C2C2C]">Critères d&apos;évaluation</span>
-          </div>
-          <div className="p-4 sm:p-5 space-y-5">
-            {/* Note globale - mise en avant */}
-            <div className="rounded-xl bg-gradient-to-br from-[#226D68]/5 to-[#226D68]/10 p-4 sm:p-5 border border-[#226D68]/10">
-              <Label htmlFor="overallScore" className="text-sm font-semibold text-[#2C2C2C]">
-                Note globale <span className="text-[#e76f51]">*</span>
-              </Label>
-              <div className="flex items-center gap-4 mt-3 flex-wrap">
-                <div className="flex gap-0.5" role="group" aria-label="Note sur 5">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setValue('overallScore', star)}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold transition-all ${
-                        overallScore >= star
-                          ? 'bg-[#226D68] text-white shadow-sm'
-                          : 'bg-white/80 text-gray-300 hover:bg-[#226D68]/10 hover:text-[#226D68] border border-gray-200'
-                      }`}
-                    >
-                      {star}
-                    </button>
-                  ))}
-                </div>
-                <span className="text-2xl font-bold text-[#226D68] tabular-nums">{overallScore}/5</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {SCORE_OPTIONS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setValue('overallScore', s)}
-                    className={`min-w-[2.25rem] h-8 rounded-lg text-xs font-medium transition-all ${
-                      overallScore === s
-                        ? 'bg-[#226D68] text-white ring-2 ring-[#226D68]/30'
-                        : 'bg-white text-[#6b7280] hover:bg-[#226D68]/10 hover:text-[#1a5a55] border border-gray-200'
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              {errors.overallScore && (
-                <p className="text-xs text-red-600 mt-2">{errors.overallScore.message}</p>
-              )}
+      {/* Tabs + Score Badge */}
+      <div className="flex items-center gap-0 bg-white border-b-2 border-gray-100 px-4 sm:px-6">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => { setActiveTab(tab.id); if (tab.id === 'synthese') generateSynthesis() }}
+            className={`flex items-center gap-2 px-4 sm:px-6 py-4 border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? 'border-b-[#e76f51] text-[#226D68] font-bold'
+                : 'border-b-transparent text-[#6b7280] font-medium hover:text-[#2C2C2C]'
+            }`}
+          >
+            <tab.Icon className="h-4 w-4" />
+            {tab.label}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <div className="flex items-center gap-4 py-2">
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-wider text-[#6b7280] font-medium">Score global</div>
+            <div className="text-[#226D68] font-extrabold text-xl">
+              {totalScore.toFixed(0)}
+              <span className="text-sm font-normal text-[#6b7280] opacity-70">/100</span>
             </div>
+          </div>
+          <button type="button" onClick={handlePrint} className="flex items-center gap-2 h-9 px-4 rounded-lg bg-[#226D68] hover:bg-[#1a5a55] text-white text-xs font-semibold transition-colors">
+            <Printer className="h-3.5 w-3.5" />
+            Imprimer
+          </button>
+        </div>
+      </div>
 
-            {/* 4 critères en grille 2x2 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {CRITERIA.map(({ key, label }) => (
-                <div key={key} className="rounded-lg border border-gray-100 bg-[#F9FAFB]/50 p-3">
-                  <Label className="text-xs font-medium text-[#6b7280]">{label}</Label>
-                  <div className="flex items-center gap-3 mt-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="5"
-                      step="0.5"
-                      className="flex-1 h-2 rounded-full appearance-none bg-gray-200 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#226D68] [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm accent-[#226D68]"
-                      {...register(key, { valueAsNumber: true })}
-                    />
-                    <span className="w-10 text-right text-sm font-semibold text-[#2C2C2C] tabular-nums">{watch(key) ?? '—'}/5</span>
+      <div className="max-w-4xl mx-auto p-4 sm:p-6">
+        {/* TAB: Évaluation */}
+        {activeTab === 'eval' && (
+          <div className="flex flex-col gap-4">
+            {candidat.nom && (
+              <div className="rounded-xl border border-gray-200 bg-white p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-[#E8F4F3] flex items-center justify-center text-sm font-bold text-[#226D68] shrink-0">
+                    {candidatePhotoUrl ? (
+                      <img
+                        src={candidatePhotoUrl}
+                        alt={`${candidat.prenom} ${candidat.nom}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { if (defaultAvatarUrl) e.target.src = defaultAvatarUrl }}
+                      />
+                    ) : (
+                      <span>{candidat.prenom?.[0]}{candidat.nom?.[0]}</span>
+                    )}
                   </div>
+                  <div>
+                    <div className="font-bold text-sm">{candidat.prenom} {candidat.nom}</div>
+                    <div className="text-xs text-[#6b7280]">{candidat.poste}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-[#6b7280]">{ratedCount}/{totalItems} critères évalués</div>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-gray-200 bg-white p-4 flex items-center gap-4 justify-center flex-wrap">
+              <span className="text-[10px] font-semibold text-[#6b7280] uppercase tracking-wider">Échelle :</span>
+              {Object.entries(RATING_LABELS).map(([val, info]) => (
+                <div key={val} className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold text-white" style={{ background: info.color }}>{val}</div>
+                  <span className="text-[11px] text-[#6b7280]">{info.label}</span>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
 
-        {/* Synthèse */}
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-          <div className="px-4 sm:px-5 py-3 border-b border-gray-100 bg-[#F9FAFB] flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#226D68]" strokeWidth={2} />
-            <span className="text-sm font-semibold text-[#2C2C2C]">Synthèse & analyse</span>
+            {CRITERIA.map((cat) => {
+              const { score, max, avg, count, total } = getCategoryScore(cat)
+              const isExpanded = expandedCategories.includes(cat.category)
+              const CatIcon = cat.Icon
+              return (
+                <div key={cat.category} className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(cat.category)}
+                    className={`w-full px-5 py-4 flex items-center justify-between text-left transition-colors ${
+                      isExpanded ? 'bg-[#E8F4F3]' : 'bg-white hover:bg-[#F9FAFB]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#226D68]/10 flex items-center justify-center">
+                        <CatIcon className="h-5 w-5 text-[#226D68]" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#2C2C2C]">{cat.category}</div>
+                        <div className="text-xs text-[#6b7280] mt-0.5">Pondération : {cat.weight}% · {count}/{total} évalués{avg > 0 ? ` · Moyenne : ${avg.toFixed(1)}/5` : ''}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-28"><ScoreGauge score={score} maxScore={max} /></div>
+                      <ChevronDown className={`h-5 w-5 text-[#6b7280] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="px-5 pb-4 pt-1 border-t border-gray-100">
+                      {cat.items.map((item, idx) => (
+                        <div key={item.id} className={`py-4 ${idx < cat.items.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                          <div className="flex justify-between items-start gap-4 flex-wrap">
+                            <div className="flex-1 min-w-[200px]">
+                              <div className="font-semibold text-sm text-[#2C2C2C]">{item.label}</div>
+                              <div className="text-xs text-[#6b7280] mt-1 leading-relaxed">{item.hint}</div>
+                            </div>
+                            <StarRating value={ratings[item.id] || 0} onChange={(val) => updateRating(item.id, val)} />
+                          </div>
+                          {ratings[item.id] > 0 && (
+                            <textarea
+                              value={comments[item.id] || ''}
+                              onChange={(e) => updateComment(item.id, e.target.value)}
+                              placeholder="Observations du recruteur (optionnel)..."
+                              rows={2}
+                              className="mt-3 w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm bg-[#F4F6F8] focus:ring-2 focus:ring-[#226D68]/30 focus:border-[#226D68] resize-y"
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => { setActiveTab('synthese'); generateSynthesis() }}
+                disabled={ratedCount === 0}
+                className={`px-8 py-3.5 rounded-lg font-bold text-sm transition-colors ${
+                  ratedCount > 0
+                    ? 'bg-[#e76f51] hover:bg-[#d65a3d] text-white'
+                    : 'bg-gray-200 text-[#6b7280] cursor-not-allowed'
+                }`}
+              >
+                Générer la synthèse
+              </button>
+            </div>
           </div>
-          <div className="p-4 sm:p-5 space-y-4">
-            {/* Analyse par IA (CvGPT / Profile Asking HrFlow) */}
-            <div className="rounded-xl border border-[#226D68]/20 bg-gradient-to-br from-[#226D68]/5 to-transparent p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#2C2C2C]">
-                <Sparkles className="h-4 w-4 text-[#226D68]" strokeWidth={2} />
-                <span>Analyse par IA (CvGPT)</span>
+        )}
+
+        {/* TAB: Synthèse */}
+        {activeTab === 'synthese' && (
+          <div ref={synthesisRef} className="flex flex-col gap-4">
+            <div className="rounded-xl bg-gradient-to-br from-[#226D68] to-[#1a5a55] p-6 sm:p-7 text-white shadow-lg">
+              <div className="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <div className="text-xs uppercase tracking-wider opacity-75">Synthèse d&apos;évaluation</div>
+                  <div className="text-xl font-bold mt-1">{candidat.prenom} {candidat.nom || '—'}</div>
+                  <div className="text-sm opacity-90">{candidat.poste || 'Poste non renseigné'}</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-4xl sm:text-5xl font-extrabold">{totalScore.toFixed(0)}</div>
+                  <div className="text-sm opacity-75">/ 100 points</div>
+                  <div className="mt-1.5 px-4 py-1 rounded-full bg-white/20 text-xs font-bold">{getScoreLabel(totalScore).text}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h3 className="text-xs font-bold text-[#226D68] uppercase tracking-wider mb-4">Détail par catégorie</h3>
+              <div className="flex flex-col gap-4">
+                {CRITERIA.map((cat) => {
+                  const { avg, count, total } = getCategoryScore(cat)
+                  const catPct = avg > 0 ? (avg / 5) * 100 : 0
+                  const CatIcon = cat.Icon
+                  return (
+                    <div key={cat.category}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <CatIcon className="h-4 w-4 text-[#226D68]" />
+                          <span className="text-sm font-semibold">{cat.category}</span>
+                          <span className="text-[11px] text-[#6b7280]">({cat.weight}%)</span>
+                        </div>
+                        <span className="text-sm font-bold" style={{ color: getScoreLabel(catPct).color }}>{avg > 0 ? `${avg.toFixed(1)}/5` : '—'}</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-200 rounded overflow-hidden">
+                        <div className="h-full rounded transition-all duration-500" style={{ width: `${catPct}%`, background: getScoreLabel(catPct).color }} />
+                      </div>
+                      <div className="mt-1.5 pl-6">
+                        {cat.items.filter((item) => ratings[item.id] > 0).map((item) => (
+                          <div key={item.id} className="flex justify-between py-0.5 text-[11px]">
+                            <span className="text-[#6b7280]">{item.label}</span>
+                            <span className="font-semibold" style={{ color: RATING_LABELS[ratings[item.id]]?.color }}>
+                              {ratings[item.id]}/5 — {RATING_LABELS[ratings[item.id]]?.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {Object.keys(comments).filter((k) => comments[k]).length > 0 && (
+              <div className="rounded-xl border border-gray-200 bg-white p-5">
+                <h3 className="text-xs font-bold text-[#226D68] uppercase tracking-wider mb-3">Observations du recruteur</h3>
+                {Object.entries(comments)
+                  .filter(([, v]) => v)
+                  .map(([id, comment]) => {
+                    const item = CRITERIA.flatMap((c) => c.items).find((i) => i.id === id)
+                    return (
+                      <div key={id} className="mb-3 p-3 bg-[#F4F6F8] rounded-lg border-l-4 border-[#226D68]">
+                        <div className="text-xs font-semibold text-[#226D68] mb-1">{item?.label}</div>
+                        <div className="text-sm text-[#2C2C2C] leading-relaxed">{comment}</div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+
+            {/* Analyse IA */}
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-4 w-4 text-[#226D68]" />
+                <h3 className="text-xs font-bold text-[#226D68] uppercase tracking-wider">Analyse par IA (CvGPT)</h3>
               </div>
               {!hasAiProfile ? (
-                <div className="space-y-3">
-                  <p className="text-xs text-[#6b7280]">
-                    L&apos;analyse IA n&apos;est pas disponible pour ce profil (créé sans CV ou sans indexation HrFlow).
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      ref={indexCvInputRef}
-                      type="file"
-                      accept=".pdf,.docx"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0]
-                        if (!f) return
-                        setIndexCvError(null)
-                        setIndexCvSuccess(false)
-                        setIndexCvLoading(true)
-                        try {
-                          await adminApi.indexCvForCandidate(candidateId, f)
-                          setIndexCvSuccess(true)
-                          onSuccess?.()
-                        } catch (err) {
-                          setIndexCvError(err?.response?.data?.detail || err?.message || 'Erreur lors de l\'indexation.')
-                        } finally {
-                          setIndexCvLoading(false)
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={indexCvLoading}
-                      onClick={() => indexCvInputRef.current?.click()}
-                    >
-                      {indexCvLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
-                      {indexCvLoading ? 'Indexation…' : 'Indexer un CV (PDF/DOCX)'}
-                    </Button>
-                  </div>
-                  {indexCvSuccess && <p className="text-xs text-emerald-600">CV indexé. L&apos;analyse IA est maintenant disponible.</p>}
-                  {indexCvError && <p className="text-xs text-destructive">{indexCvError}</p>}
+                <div>
+                  <p className="text-xs text-[#6b7280] mb-3">L&apos;analyse IA n&apos;est pas disponible (profil sans indexation HrFlow).</p>
+                  <input
+                    ref={indexCvInputRef}
+                    type="file"
+                    accept=".pdf,.docx"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      setIndexCvError(null)
+                      setIndexCvSuccess(false)
+                      setIndexCvLoading(true)
+                      try {
+                        await adminApi.indexCvForCandidate(candidateId, f)
+                        setIndexCvSuccess(true)
+                        onSuccess?.()
+                      } catch (err) {
+                        setIndexCvError(err?.response?.data?.detail || err?.message || 'Erreur indexation')
+                      } finally {
+                        setIndexCvLoading(false)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={() => indexCvInputRef.current?.click()} disabled={indexCvLoading} className="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-gray-200 bg-white text-sm hover:bg-[#F4F6F8] disabled:opacity-50">
+                    {indexCvLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                    {indexCvLoading ? 'Indexation…' : 'Indexer un CV'}
+                  </button>
+                  {indexCvSuccess && <span className="ml-3 text-xs text-emerald-600">CV indexé.</span>}
+                  {indexCvError && <p className="mt-2 text-xs text-red-600">{indexCvError}</p>}
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {AI_PRESET_QUESTIONS.map(({ label, question }) => (
-                      <Button
-                        key={label}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 border-[#226D68]/40 text-[#2C2C2C] hover:bg-[#226D68]/10 hover:border-[#226D68]/60"
-                        disabled={aiLoading}
-                        onClick={() => {
-                          setAiQuestion(question)
-                          askAi(question)
-                        }}
-                      >
+                      <button key={label} type="button" onClick={() => askAi(question)} disabled={aiLoading} className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs hover:bg-[#E8F4F3] hover:border-[#226D68]/30 disabled:opacity-50">
                         {label}
-                      </Button>
+                      </button>
                     ))}
                   </div>
-                  <div className="flex gap-2">
-                    <Textarea
-                      placeholder="Ou posez une question en langage naturel sur le profil..."
-                      value={aiQuestion}
-                      onChange={(e) => setAiQuestion(e.target.value)}
-                      rows={2}
-                      className="resize-none text-sm border-gray-200 rounded-lg flex-1 focus:ring-2 focus:ring-[#226D68]/30 focus:border-[#226D68]"
-                      disabled={aiLoading}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="bg-[#226D68] hover:bg-[#1a5a55] text-white shrink-0"
-                      disabled={aiLoading || !aiQuestion.trim()}
-                      onClick={() => askAi()}
-                    >
-                      {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                      {aiLoading ? 'Analyse...' : 'Poser'}
-                    </Button>
+                  <div className="flex gap-2 mb-2">
+                    <textarea value={aiQuestion} onChange={(e) => setAiQuestion(e.target.value)} placeholder="Posez une question sur le profil..." rows={2} className="flex-1 px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-[#226D68]/30 focus:border-[#226D68] disabled:opacity-50" disabled={aiLoading} />
+                    <button type="button" onClick={() => askAi()} disabled={aiLoading || !aiQuestion.trim()} className="h-10 px-4 rounded-lg bg-[#226D68] hover:bg-[#1a5a55] text-white disabled:opacity-50 shrink-0">
+                      {aiLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Bot className="h-5 w-5" />}
+                    </button>
                   </div>
-                  {aiError && (
-                    <p className="text-xs text-destructive">{aiError}</p>
-                  )}
+                  {aiError && <p className="text-xs text-red-600">{aiError}</p>}
                   {aiAnswer && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-[#6b7280]">Réponse IA :</p>
-                      <div className="rounded-lg bg-white border border-gray-200 p-3 text-sm text-[#2C2C2C] whitespace-pre-wrap">
-                        {aiAnswer}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-8 border-[#226D68]/30 text-[#1a5a55] hover:bg-[#226D68]/10"
-                          onClick={() => insertAiInto('summary')}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Insérer dans le résumé
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-8 border-[#226D68]/30 text-[#1a5a55] hover:bg-[#226D68]/10"
-                          onClick={() => insertAiInto('interview_notes')}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Notes d&apos;entretien
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-8 border-[#226D68]/30 text-[#1a5a55] hover:bg-[#226D68]/10"
-                          onClick={() => insertAiInto('recommendations')}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Recommandations
-                        </Button>
-                      </div>
+                    <div className="mt-3">
+                      <div className="p-3 bg-[#F4F6F8] rounded-lg text-sm whitespace-pre-wrap">{aiAnswer}</div>
+                      <button type="button" onClick={insertAiInto} className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#226D68] bg-[#E8F4F3] text-[#226D68] text-xs font-medium hover:bg-[#226D68]/10">
+                        <Copy className="h-3 w-3" />Insérer dans l&apos;avis global
+                      </button>
                     </div>
                   )}
                 </>
               )}
             </div>
 
-            <div>
-              <Label htmlFor="summary" className="text-sm font-medium text-[#2C2C2C]">
-                Résumé de l&apos;évaluation <span className="text-[#e76f51]">*</span>
-              </Label>
-              <Textarea
-                id="summary"
-                rows={4}
-                placeholder="Synthétisez les points forts, les axes d'amélioration et votre avis global (min. 50 caractères)."
-                className="mt-2 resize-none text-sm border-gray-200 rounded-xl focus:ring-2 focus:ring-[#226D68]/30 focus:border-[#226D68]"
-                {...register('summary')}
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h3 className="text-xs font-bold text-[#226D68] uppercase tracking-wider mb-3">Avis global du recruteur</h3>
+              <textarea
+                value={globalComment}
+                onChange={(e) => setGlobalComment(e.target.value)}
+                placeholder="Synthèse qualitative : points forts, axes d'amélioration, impression générale, recommandation argumentée... (min. 20 caractères pour valider/rejeter)"
+                rows={5}
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-[#226D68]/30 focus:border-[#226D68] resize-y"
               />
-              <div className="flex justify-between items-center mt-1.5">
-                {errors.summary && (
-                  <p className="text-xs text-red-600">{errors.summary.message}</p>
-                )}
-                <p className={`text-xs ml-auto font-medium ${(summary?.length || 0) >= 50 ? 'text-[#226D68]' : 'text-[#6b7280]'}`}>
-                  {summary?.length || 0} / 50 min.
-                </p>
+              <div className="text-[11px] text-[#6b7280] mt-1">{(globalComment?.length || 0)} / 20 min. pour valider ou rejeter</div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h3 className="text-xs font-bold text-[#226D68] uppercase tracking-wider mb-4">Décision</h3>
+              <div className="flex gap-3 flex-wrap">
+                {DECISIONS.map((d) => {
+                  const DIcon = d.Icon
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => setDecision(d.value)}
+                      className={`flex-1 min-w-[140px] p-4 rounded-xl border-2 text-center transition-all ${
+                        decision === d.value ? '' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      style={decision === d.value ? { borderColor: d.color, background: `${d.color}15` } : {}}
+                    >
+                      <DIcon className={`h-6 w-6 mx-auto mb-2 ${decision === d.value ? '' : 'text-[#6b7280]'}`} style={decision === d.value ? { color: d.color } : {}} />
+                      <div className={`text-sm font-bold ${decision === d.value ? '' : 'text-[#2C2C2C]'}`} style={decision === d.value ? { color: d.color } : {}}>{d.label}</div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
-            <div>
-              <Label htmlFor="interview_notes" className="text-sm font-medium text-[#2C2C2C] flex items-center gap-1.5">
-                <MessageSquare className="h-4 w-4 text-[#226D68]" />
-                Notes d&apos;entretien (optionnel)
-              </Label>
-              <Textarea
-                id="interview_notes"
-                rows={2}
-                placeholder="Points notés en entretien..."
-                className="mt-2 resize-none text-sm border-gray-200 rounded-xl focus:ring-2 focus:ring-[#226D68]/30 focus:border-[#226D68]"
-                {...register('interview_notes')}
-              />
-            </div>
-            <div>
-              <Label htmlFor="recommendations" className="text-sm font-medium text-[#2C2C2C]">
-                Recommandations (optionnel)
-              </Label>
-              <Textarea
-                id="recommendations"
-                rows={2}
-                placeholder="Recommandations pour le poste ou la suite du processus..."
-                className="mt-2 resize-none text-sm border-gray-200 rounded-xl focus:ring-2 focus:ring-[#226D68]/30 focus:border-[#226D68]"
-                {...register('recommendations')}
-              />
-            </div>
-          </div>
-        </div>
 
-        {/* Décision */}
-        <div className="pt-6 mt-6 border-t border-gray-200">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setAction(null)
-                setConfirmReject(false)
-                setError(null)
-              }}
-              disabled={isSubmitting}
-              className="text-[#6b7280] hover:text-[#226D68] hover:bg-[#E8F4F3]"
-            >
-              Réinitialiser
-            </Button>
-            <div className="flex flex-wrap items-center gap-2">
-              {!confirmReject ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setConfirmReject(true)}
-                  disabled={isSubmitting || (summary?.length || 0) < 50}
-                  className="h-10 px-4 border-[#e76f51]/50 text-[#e76f51] hover:bg-[#e76f51]/10 hover:border-[#e76f51]"
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Rejeter
-                </Button>
-              ) : (
-                <>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmReject(false)} disabled={isSubmitting} className="h-10">
-                    Annuler
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={async () => {
-                      setAction('reject')
-                      const valid = await form.trigger()
-                      if (valid) await onSubmit({ ...form.getValues(), action: 'reject' })
-                    }}
-                    disabled={isSubmitting || (summary?.length || 0) < 50}
-                    className="h-10 px-4"
-                  >
-                    {isSubmitting && action === 'reject' ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <XCircle className="w-4 h-4 mr-2" />
-                    )}
-                    Confirmer le rejet
-                  </Button>
-                </>
-              )}
-              <Button
-                type="submit"
-                size="sm"
-                onClick={() => setAction('validate')}
-                disabled={isSubmitting || (summary?.length || 0) < 50 || overallScore == null}
-                className="h-10 px-5 bg-[#226D68] hover:bg-[#1a5a55] text-white font-medium shadow-sm"
-              >
-                {isSubmitting && action === 'validate' ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4 mr-2" /> 
-                )}
-                {isAlreadyValidated ? 'Mettre à jour' : 'Valider le profil'}
-              </Button>
+            <div className="flex gap-3 justify-end flex-wrap pt-2">
+              <button type="button" onClick={() => setActiveTab('eval')} className="h-10 px-5 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-[#6b7280] hover:bg-[#F4F6F8] hover:text-[#2C2C2C]">
+                Modifier l&apos;évaluation
+              </button>
+              <button type="button" onClick={handleSaveReserve} disabled={isSubmitting} className="h-10 px-5 rounded-lg border-2 border-amber-500 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100 disabled:opacity-50 inline-flex items-center gap-2">
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Sauvegarder en réserve
+              </button>
+              <button type="button" onClick={handleReject} disabled={isSubmitting || (globalComment?.trim().length || 0) < 20} className="h-10 px-5 rounded-lg border-2 border-red-500 bg-red-50 text-red-700 text-sm font-semibold hover:bg-red-100 disabled:opacity-50 inline-flex items-center gap-2">
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Non retenu
+              </button>
+              <button type="button" onClick={handleValidate} disabled={isSubmitting || (globalComment?.trim().length || 0) < 20} className="h-10 px-5 rounded-lg bg-[#226D68] hover:bg-[#1a5a55] text-white text-sm font-bold disabled:opacity-50 inline-flex items-center gap-2">
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Retenu — Valider le profil
+              </button>
             </div>
           </div>
-        </div>
-      </form>
+        )}
+      </div>
     </div>
   )
 }

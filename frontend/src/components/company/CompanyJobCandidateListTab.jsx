@@ -12,8 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Toast } from '@/components/common/Toast'
 import { formatDate } from '@/utils/dateUtils'
-
-const getAdminScore = (app) => app.admin_report?.overall_score ?? app.admin_score ?? null
+import { getDisplayScore, getScoreColor } from '@/utils/validationScore'
 
 const APPLICATION_STATUS_OPTIONS = [
   { value: 'PENDING', label: 'En attente' },
@@ -235,7 +234,7 @@ export function CompanyJobCandidateListTab({ companyId, jobId, basePath = '/comp
             let photoUrl = buildPhotoUrl(app.photo_url, documentApi)
             if (!photoUrl && profilePhotos[app.candidate_id]) photoUrl = profilePhotos[app.candidate_id]
             const displayPhoto = photoUrl || defaultAvatar
-            const adminScore = getAdminScore(app)
+            const displayScore = getDisplayScore(app)
             const report = app.admin_report || {}
             const summary = report.summary
             const isValidated = app.profile_status === 'VALIDATED'
@@ -265,13 +264,13 @@ export function CompanyJobCandidateListTab({ companyId, jobId, basePath = '/comp
                         {/* Évaluation administrateur */}
                         <div className="mt-3 p-3 rounded-lg bg-[#F8FAFC] border border-gray-100">
                           <p className="text-[10px] font-semibold text-[#6b7280] uppercase tracking-wider mb-1.5">Évaluation Yemma</p>
-                          {adminScore != null || summary ? (
+                          {displayScore != null || summary ? (
                             <>
                               <div className="flex flex-wrap items-center gap-2">
-                                {adminScore != null ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#226D68]/15 text-[#1a5a55] text-sm font-semibold">
+                                {displayScore != null ? (
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-sm font-semibold ${getScoreColor(displayScore.value, displayScore.scale, true)}`}>
                                     <Star className="h-3.5 w-3.5 fill-current" />
-                                    {Number(adminScore).toFixed(1)}/5
+                                    {displayScore.label}
                                   </span>
                                 ) : null}
                                 {report.technical_skills_rating != null && (

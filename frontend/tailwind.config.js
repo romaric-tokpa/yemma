@@ -116,8 +116,10 @@ export default {
         },
       },
       fontFamily: {
-        'heading': ['DM Sans', 'Inter', 'sans-serif'],
-        'body': ['Inter', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        'sans': ['DM Sans', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        'heading': ['DM Sans', 'system-ui', 'sans-serif'],
+        'serif': ['DM Serif Display', 'Georgia', 'serif'],
+        'body': ['DM Sans', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
         'mono': ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {

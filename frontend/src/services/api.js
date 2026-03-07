@@ -889,22 +889,23 @@ export const adminApi = {
     return response.data
   },
 
-  // Valider un profil
+  // Valider un profil (format legacy ou grille d'évaluation)
   validateProfile: async (candidateId, reportData) => {
-    // Mapper les données frontend vers le format backend
     const payload = {
-      overallScore: reportData.overallScore,
-      softSkills: reportData.softSkills || null,
-      summary: reportData.summary,
-      // Champs optionnels avec valeurs par défaut
-      technicalSkills: reportData.technicalSkills || null,
-      communication: reportData.communication || null,
-      motivation: reportData.motivation || null,
-      softSkillsTags: reportData.softSkillsTags || [],
-      interview_notes: reportData.interview_notes || '',
-      recommendations: reportData.recommendations || '',
+      overallScore: reportData.overallScore ?? null,
+      technicalSkills: reportData.technicalSkills ?? null,
+      softSkills: reportData.softSkills ?? null,
+      communication: reportData.communication ?? null,
+      motivation: reportData.motivation ?? null,
+      softSkillsTags: reportData.softSkillsTags ?? [],
+      interview_notes: reportData.interview_notes ?? '',
+      recommendations: reportData.recommendations ?? '',
+      summary: reportData.summary ?? reportData.globalComment ?? '',
+      ratings: reportData.ratings && typeof reportData.ratings === 'object' ? reportData.ratings : null,
+      comments: reportData.comments && typeof reportData.comments === 'object' ? reportData.comments : null,
+      globalComment: reportData.globalComment ?? null,
+      decision: (reportData.decision && String(reportData.decision).trim()) || null,
     }
-    
     const response = await adminApiClient.post(`/api/v1/admin/validate/${candidateId}`, payload)
     return response.data
   },
@@ -912,26 +913,29 @@ export const adminApi = {
   // Rejeter un profil
   rejectProfile: async (candidateId, reportData) => {
     const payload = {
-      rejectionReason: reportData.rejectionReason || reportData.summary || 'Non spécifié',
-      overallScore: reportData.overallScore || null,
-      interview_notes: reportData.interview_notes || '',
+      rejectionReason: reportData.rejectionReason || reportData.globalComment || reportData.summary || 'Non spécifié',
+      overallScore: reportData.overallScore ?? null,
+      interview_notes: reportData.interview_notes ?? '',
     }
-    
     const response = await adminApiClient.post(`/api/v1/admin/reject/${candidateId}`, payload)
     return response.data
   },
 
-  // Mettre à jour l'évaluation d'un profil (validé ou non) sans changer le statut
+  // Mettre à jour l'évaluation d'un profil (validé ou non) sans changer le statut (format legacy ou grille)
   updateEvaluation: async (candidateId, reportData) => {
     const payload = {
-      overallScore: reportData.overallScore,
-      technicalSkills: reportData.technicalSkills || null,
-      softSkills: reportData.softSkills || null,
-      communication: reportData.communication || null,
-      motivation: reportData.motivation || null,
-      summary: reportData.summary,
-      interview_notes: reportData.interview_notes || '',
-      recommendations: reportData.recommendations || '',
+      overallScore: reportData.overallScore ?? null,
+      technicalSkills: reportData.technicalSkills ?? null,
+      softSkills: reportData.softSkills ?? null,
+      communication: reportData.communication ?? null,
+      motivation: reportData.motivation ?? null,
+      summary: reportData.summary ?? reportData.globalComment ?? '',
+      interview_notes: reportData.interview_notes ?? '',
+      recommendations: reportData.recommendations ?? '',
+      ratings: reportData.ratings && typeof reportData.ratings === 'object' ? reportData.ratings : null,
+      comments: reportData.comments && typeof reportData.comments === 'object' ? reportData.comments : null,
+      globalComment: reportData.globalComment ?? null,
+      decision: (reportData.decision && String(reportData.decision).trim()) || null,
     }
     const response = await adminApiClient.post(`/api/v1/admin/update-evaluation/${candidateId}`, payload)
     return response.data

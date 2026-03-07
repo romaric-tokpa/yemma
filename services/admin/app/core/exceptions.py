@@ -48,19 +48,26 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handler pour les erreurs de validation Pydantic"""
+    import logging
+    logger = logging.getLogger(__name__)
+    raw_errors = exc.errors()
+    logger.warning("Validation error on %s: %s", request.url.path, raw_errors)
+
     errors = []
-    for error in exc.errors():
+    for error in raw_errors:
         errors.append({
             "field": ".".join(str(loc) for loc in error["loc"]),
             "message": error["msg"],
             "type": error["type"],
         })
-    
+
+    # Format standard FastAPI (detail) pour compatibilité frontend
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
+            "detail": raw_errors,
             "error": True,
-            "message": "Validation error",
+            "message": "Erreur de validation",
             "details": {"validation_errors": errors},
             "path": str(request.url),
         }

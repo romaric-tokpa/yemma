@@ -10,6 +10,7 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { BlurredDocuments } from '../components/search/BlurredDocuments'
+import { getDisplayScore, getScoreColor } from '@/utils/validationScore'
 
 const generateAvatarUrl = (firstName, lastName) => {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U'
@@ -18,13 +19,6 @@ const generateAvatarUrl = (firstName, lastName) => {
 
 const generateCompanyLogoUrl = (companyName) => {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(companyName || 'Co')}&size=80&background=e8f4f3&color=226D68&bold=true`
-}
-
-const getScoreColor = (score) => {
-  if (score >= 4.5) return 'bg-[#226D68]'
-  if (score >= 3.5) return 'bg-[#226D68]/80'
-  if (score >= 2.5) return 'bg-[#e76f51]/80'
-  return 'bg-[#e76f51]'
 }
 
 const formatSkillLevel = (level) => {
@@ -167,7 +161,7 @@ export default function CandidateDetailPage() {
   const canDownloadDossier = subscription?.plan?.document_access === true
   const location = [candidate.city, candidate.country].filter(Boolean).join(', ') || null
   const report = candidate.admin_report || {}
-  const overallScore = report.overall_score
+  const displayScore = getDisplayScore(candidate)
   const hasReport = report && Object.keys(report).length > 0
 
   const scoreItems = [
@@ -210,10 +204,10 @@ export default function CandidateDetailPage() {
                     <CheckCircle2 className="h-4 w-4 text-[#226D68]" />
                   </div>
                 )}
-                {overallScore && (
-                  <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 ${getScoreColor(overallScore)} text-white rounded-full px-2 py-0.5 text-xs font-bold flex items-center gap-1 border-2 border-white shadow`}>
+                {displayScore && (
+                  <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 ${getScoreColor(displayScore.value, displayScore.scale)} text-white rounded-full px-2 py-0.5 text-xs font-bold flex items-center gap-1 border-2 border-white shadow`}>
                     <Star className="h-3 w-3 fill-current" />
-                    {overallScore.toFixed(1)}/5
+                    {displayScore.label}
                   </div>
                 )}
               </div>

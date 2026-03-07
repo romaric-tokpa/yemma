@@ -16,6 +16,7 @@ import {
   Users, Search, Loader2, Eye, User, AlertCircle, Briefcase, Calendar,
   Star, ChevronLeft, ChevronRight
 } from 'lucide-react'
+import { getDisplayScore, getValidationScore, getDecisionLabel, getDecisionBadgeStyle } from '@/utils/validationScore'
 
 const STATUS_LABELS = {
   DRAFT: 'Brouillon',
@@ -354,14 +355,14 @@ export default function AdminValidationPage() {
                       <img src={displayPhoto} alt={`${profile.first_name} ${profile.last_name}`} className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-100 shrink-0" onError={(e) => { e.target.src = defaultAvatar }} />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm text-[#2C2C2C] truncate">{profile.first_name} {profile.last_name}</div>
-                        <Badge className={`text-[10px] px-1.5 py-0 h-4 mt-1 font-medium ${STATUS_COLORS[profile.status] || STATUS_COLORS.DRAFT}`}>
-                          {STATUS_LABELS[profile.status] || profile.status}
+                        <Badge className={`text-[10px] px-1.5 py-0 h-4 mt-1 font-medium border ${(profile.status === 'VALIDATED' && getValidationScore(profile).decision) ? getDecisionBadgeStyle(getValidationScore(profile).decision) : (STATUS_COLORS[profile.status] || STATUS_COLORS.DRAFT)}`}>
+                          {(profile.status === 'VALIDATED' && getDecisionLabel(getValidationScore(profile).decision)) || STATUS_LABELS[profile.status] || profile.status}
                         </Badge>
                         {profile.profile_title && <div className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5"><Briefcase className="h-3 w-3 shrink-0 text-[#226D68]" />{profile.profile_title}</div>}
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-muted-foreground">
                           <span>{completion}%</span>
                           {dateInfo && <span className={dateInfo.color}>{formatDateTime(dateInfo.date)}</span>}
-                          {profile.admin_score != null && <span className="text-[#226D68] font-medium">★ {profile.admin_score}/5</span>}
+                          {getDisplayScore(profile) && <span className="text-[#226D68] font-medium">★ {getDisplayScore(profile).label}</span>}
                         </div>
                       </div>
                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleViewProfile(profile.id) }} className="h-9 w-9 p-0 shrink-0 text-[#226D68] hover:bg-[#226D68]/10">
@@ -410,8 +411,8 @@ export default function AdminValidationPage() {
                             </div>
                           </td>
                           <td className="py-2 px-3 sm:px-4">
-                            <Badge className={`text-[10px] px-2 py-0 h-5 font-medium ${STATUS_COLORS[profile.status] || STATUS_COLORS.DRAFT}`}>
-                              {STATUS_LABELS[profile.status] || profile.status}
+                            <Badge className={`text-[10px] px-2 py-0 h-5 font-medium border ${(profile.status === 'VALIDATED' && getValidationScore(profile).decision) ? getDecisionBadgeStyle(getValidationScore(profile).decision) : (STATUS_COLORS[profile.status] || STATUS_COLORS.DRAFT)}`}>
+                              {(profile.status === 'VALIDATED' && getDecisionLabel(getValidationScore(profile).decision)) || STATUS_LABELS[profile.status] || profile.status}
                             </Badge>
                           </td>
                           <td className="py-2 px-3 sm:px-4">
@@ -434,10 +435,10 @@ export default function AdminValidationPage() {
                             )}
                           </td>
                           <td className="py-2 px-3 sm:px-4">
-                            {profile.admin_score != null ? (
+                            {getDisplayScore(profile) ? (
                               <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#226D68]">
                                 <Star className="h-3 w-3 fill-current" />
-                                {profile.admin_score}/5
+                                {getDisplayScore(profile).label}
                               </span>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
