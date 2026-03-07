@@ -47,7 +47,7 @@ export default function CandidateHeroIllustration() {
         className="absolute top-[8%] left-[5%] w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden border-2 border-white shadow-lg"
       >
         <img
-          src="/candidate-profile-cvtheque.png"
+          src="/candidate-profile-cvtheque.png?v=2"
           alt=""
           className="w-full h-full object-cover"
         />

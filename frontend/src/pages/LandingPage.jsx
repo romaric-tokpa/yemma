@@ -137,7 +137,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-3 xs:px-4 sm:px-6 mb-6">
           <p className="text-center text-sm md:text-base text-[#2C2C2C]">
             <span className="font-semibold underline decoration-[#226D68] decoration-2 underline-offset-2">+500 entreprises</span>
-            {' '}recrutent sans agences grâce à Yemma
+            {' '}recrutent grâce à Yemma
           </p>
         </div>
         <div className="relative w-full overflow-hidden">

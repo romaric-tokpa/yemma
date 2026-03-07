@@ -188,7 +188,7 @@ export default function CandidatLanding() {
             >
               <div className="w-36 h-36 xs:w-48 xs:h-48 md:w-64 md:h-64 rounded-full overflow-hidden bg-[#FDF2F0] border-4 border-white shadow-lg">
                 <img
-                  src="/candidate-profile-cvtheque.png"
+                  src="/candidate-profile-cvtheque.png?v=2"
                   alt="Profils préqualifiés dans la CVthèque Yemma"
                   className="w-full h-full object-cover"
                   loading="eager"
