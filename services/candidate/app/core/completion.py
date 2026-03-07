@@ -147,17 +147,8 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
         
         if complete_experiences > 0:
             # Score basé sur le nombre d'expériences complètes
-            # - 1 expérience complète = 50% de la section (15% du total)
-            # - 2 expériences complètes = 75% de la section (22.5% du total)
-            # - 3+ expériences complètes = 100% de la section (30% du total)
-            if complete_experiences >= 3:
-                exp_score = 1.0
-            elif complete_experiences == 2:
-                exp_score = 0.75
-            elif complete_experiences == 1:
-                exp_score = 0.5
-            else:
-                exp_score = 0.0
+            # - 1+ expérience(s) complète(s) = 100% de la section (30% du total)
+            exp_score = 1.0
             
             # Bonus si au moins 1 expérience a un document justificatif
             if experiences_with_doc >= 1:
@@ -203,14 +194,8 @@ def calculate_completion_percentage(profile: Profile, has_cv: bool = False) -> f
         
         if complete_educations > 0:
             # Score basé sur le nombre de formations complètes
-            # - 1 formation complète = 60% de la section (9% du total)
-            # - 2+ formations complètes = 100% de la section (15% du total)
-            if complete_educations >= 2:
-                edu_score = 1.0
-            elif complete_educations == 1:
-                edu_score = 0.6
-            else:
-                edu_score = 0.0
+            # - 1+ formation(s) complète(s) = 100% de la section (15% du total)
+            edu_score = 1.0
             
             total_percentage += edu_score * 15.0
             logger.debug(f"Formations: {complete_educations} complètes, score={edu_score} = {edu_score * 15.0:.2f}%")

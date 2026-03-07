@@ -128,8 +128,6 @@ export default function JobOfferDetailPage() {
         className="flex-1 py-8 md:py-12"
         style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%)',
-          backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0), linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%)',
-          backgroundSize: '24px 24px, 100% 100%',
         }}
       >
         <div className="max-w-3xl mx-auto min-w-0 px-3 xs:px-4 sm:px-6">

@@ -102,26 +102,24 @@ class S3Storage:
     
     async def upload_file(self, file_content: bytes, s3_key: str, content_type: str) -> bool:
         """Upload un fichier vers S3 avec Server-Side Encryption (si supporté)"""
-        try:
+        import asyncio
+
+        def _upload():
             put_params = {
                 'Bucket': self.bucket_name,
                 'Key': s3_key,
                 'Body': file_content,
                 'ContentType': content_type,
             }
-            
-            # Ajouter le chiffrement seulement si ce n'est pas MinIO (MinIO ne supporte pas SSE)
-            # On détecte MinIO par l'endpoint localhost ou minio
             is_minio = 'localhost' in settings.S3_ENDPOINT.lower() or 'minio' in settings.S3_ENDPOINT.lower()
-            
             if not is_minio and settings.S3_SERVER_SIDE_ENCRYPTION:
                 put_params['ServerSideEncryption'] = settings.S3_SERVER_SIDE_ENCRYPTION
-                
-                # Si KMS est utilisé, ajouter la clé KMS
                 if settings.S3_SERVER_SIDE_ENCRYPTION == 'aws:kms' and settings.S3_KMS_KEY_ID:
                     put_params['SSEKMSKeyId'] = settings.S3_KMS_KEY_ID
-            
             self.client.put_object(**put_params)
+
+        try:
+            await asyncio.to_thread(_upload)
             return True
         except ClientError as e:
             raise DocumentError(f"Failed to upload file: {str(e)}")

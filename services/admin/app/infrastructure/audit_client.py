@@ -95,3 +95,38 @@ async def log_incident(
         print(f"⚠️ Erreur inattendue lors de l'enregistrement de l'incident: {str(e)}")
         return False
 
+
+async def get_deleted_profiles(
+    limit: int = 100,
+    offset: int = 0,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """
+    Récupère la liste des profils supprimés depuis le Service Audit.
+
+    Returns:
+        dict: {"total": int, "items": [...]}
+    """
+    try:
+        headers = get_service_token_header("admin-service")
+        params = {"limit": limit, "offset": offset}
+        if start_date:
+            params["start_date"] = start_date.isoformat()
+        if end_date:
+            params["end_date"] = end_date.isoformat()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                f"{settings.AUDIT_SERVICE_URL}/api/v1/audit/deleted-profiles",
+                headers=headers,
+                params=params,
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError as e:
+        print(f"⚠️ Erreur lors de la récupération des profils supprimés: {str(e)}")
+        return {"total": 0, "items": []}
+    except Exception as e:
+        print(f"⚠️ Erreur inattendue: {str(e)}")
+        return {"total": 0, "items": []}
+

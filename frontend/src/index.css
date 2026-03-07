@@ -161,11 +161,9 @@
   }
 }
 
-/* Fond pointillés - utilisé sur toutes les pages */
+/* Fond dégradé - utilisé sur toutes les pages (sans pointillés) */
 .bg-dots {
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
-  background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0), linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
-  background-size: 24px 24px, 100% 100%;
 }
 
 @layer base {
@@ -179,8 +177,6 @@
     min-height: 100vh;
     min-height: 100dvh;
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
-    background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0), linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
-    background-size: 24px 24px, 100% 100%;
   }
   
   * {

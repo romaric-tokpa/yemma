@@ -27,8 +27,11 @@ services:
   document:
     environment:
       APP_ENV: development
+      ALLOWED_EXTENSIONS: "pdf,docx"
     ports:
       - "${DOCUMENT_PORT:-8003}:8000"
+    volumes:
+      - ./services/document:/app
 
   search:
     environment:

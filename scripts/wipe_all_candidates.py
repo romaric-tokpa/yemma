@@ -14,16 +14,16 @@ Ce qui est supprimé :
 
 Usage:
   Depuis la racine du projet :
-    python scripts/wipe_all_candidates.py
-    python scripts/wipe_all_candidates.py -y              # Sans confirmation
-    python scripts/wipe_all_candidates.py --no-es        # Sans vider Elasticsearch
-    python scripts/wipe_all_candidates.py --no-users    # Garder les comptes (supprimer uniquement les données)
+    python3 scripts/wipe_all_candidates.py -y           # Tout supprimer en une commande (recommandé)
+    python3 scripts/wipe_all_candidates.py              # Avec confirmation
+    python3 scripts/wipe_all_candidates.py -y --no-es   # Sans vider Elasticsearch
+    python3 scripts/wipe_all_candidates.py -y --no-users # Garder les comptes (données uniquement)
 
 Prérequis:
   - .env à la racine avec les variables DB_*
-  - Pour Docker local (docker-compose.override) : les ports par défaut sont 5441 (auth),
-    5442 (candidate), 5445 (document), 5446 (logs). Vérifier POSTGRES_*_PORT si besoin.
-  - Si toutes les tables sont dans une seule base : utiliser --unified-db
+  - Base unifiée (yemma_db) : le script réessaie automatiquement si candidate_db/document_db n'existent pas
+  - auth_db (users, roles) : souvent sur port 5432 (DB_AUTH_PORT). Si sur le même postgres que yemma_db,
+    mettre DB_AUTH_PORT=5433 (même que DB_PORT)
 """
 import asyncio
 import os
@@ -48,39 +48,57 @@ if os.getenv("APP_ENV", "development") != "development":
 # Configuration des bases de données (multi-service)
 DB_HOST = os.getenv("DB_HOST", "localhost")
 
+# Ports : POSTGRES_* > DB_*_PORT > DB_PORT > docker_default
+def _port(postgres_key: str, db_key: str, docker_default: int) -> int:
+    v = os.getenv(postgres_key)
+    if v:
+        return int(v)
+    v = os.getenv(db_key)
+    if v:
+        return int(v)
+    v = os.getenv("DB_PORT")  # Base unique sur un seul port
+    if v:
+        return int(v)
+    return docker_default
+
+# Utiliser DB_USER/DB_PASSWORD pour les scripts (évite "password authentication failed")
+# Les users service (candidate_user, auth_user) peuvent ne pas exister en dev local
+_script_user = os.getenv("DB_USER", "postgres")
+_script_password = os.getenv("DB_PASSWORD", "postgres")
+
 # Auth (users, roles, user_roles, refresh_tokens)
 AUTH_DB = {
     "host": os.getenv("DB_AUTH_HOST", DB_HOST),
-    "port": int(os.getenv("POSTGRES_AUTH_PORT", os.getenv("DB_AUTH_PORT", "5441"))),
-    "user": os.getenv("DB_AUTH_USER", os.getenv("DB_USER", "postgres")),
-    "password": os.getenv("DB_AUTH_PASSWORD", os.getenv("DB_PASSWORD", "postgres")),
+    "port": _port("POSTGRES_AUTH_PORT", "DB_AUTH_PORT", 5441),
+    "user": _script_user,
+    "password": _script_password,
     "name": os.getenv("DB_AUTH_NAME", "auth_db"),
 }
 
 # Candidate (profiles, experiences, educations, certifications, skills, job_preferences, applications)
 CANDIDATE_DB = {
     "host": os.getenv("DB_CANDIDATE_HOST", DB_HOST),
-    "port": int(os.getenv("POSTGRES_CANDIDATE_PORT", os.getenv("DB_CANDIDATE_PORT", "5442"))),
-    "user": os.getenv("DB_CANDIDATE_USER", os.getenv("DB_USER", "postgres")),
-    "password": os.getenv("DB_CANDIDATE_PASSWORD", os.getenv("DB_PASSWORD", "postgres")),
+    "port": _port("POSTGRES_CANDIDATE_PORT", "DB_CANDIDATE_PORT", 5442),
+    "user": _script_user,
+    "password": _script_password,
     "name": os.getenv("DB_CANDIDATE_NAME", "candidate_db"),
 }
 
 # Document (documents - CV, attestations, etc.)
 DOCUMENT_DB = {
     "host": os.getenv("DB_DOCUMENT_HOST", DB_HOST),
-    "port": int(os.getenv("POSTGRES_DOCUMENT_PORT", os.getenv("DB_DOCUMENT_PORT", "5445"))),
-    "user": os.getenv("DB_DOCUMENT_USER", os.getenv("DB_USER", "postgres")),
-    "password": os.getenv("DB_DOCUMENT_PASSWORD", os.getenv("DB_PASSWORD", "postgres")),
+    "port": _port("POSTGRES_DOCUMENT_PORT", "DB_DOCUMENT_PORT", 5445),
+    "user": _script_user,
+    "password": _script_password,
     "name": os.getenv("DB_DOCUMENT_NAME", "document_db"),
 }
 
 # Logs / Audit (access_logs)
 LOGS_DB = {
     "host": os.getenv("DB_LOGS_HOST", DB_HOST),
-    "port": int(os.getenv("POSTGRES_LOGS_PORT", os.getenv("DB_LOGS_PORT", "5446"))),
-    "user": os.getenv("DB_LOGS_USER", os.getenv("DB_USER", "postgres")),
-    "password": os.getenv("DB_LOGS_PASSWORD", os.getenv("DB_PASSWORD", "postgres")),
+    "port": _port("POSTGRES_LOGS_PORT", "DB_LOGS_PORT", 5446),
+    "user": _script_user,
+    "password": _script_password,
     "name": os.getenv("DB_LOGS_NAME", "logs_db"),
 }
 
@@ -107,12 +125,14 @@ async def wipe_all_candidates(with_users: bool = True, with_es: bool = True, uni
     candidate_url = get_db_url(db_config)
     try:
         conn_cand = await asyncpg.connect(candidate_url)
-        profile_ids = await conn_cand.fetch("SELECT id FROM profiles")
+        profile_ids = await conn_cand.fetch("SELECT id, user_id FROM profiles")
         profile_id_list = [r["id"] for r in profile_ids]
+        candidate_user_ids = [r["user_id"] for r in profile_ids]
         await conn_cand.close()
     except Exception as e:
         print(f"  ⚠ Impossible de se connecter à candidate_db ({CANDIDATE_DB['host']}:{CANDIDATE_DB['port']}): {e}")
         profile_id_list = []
+        candidate_user_ids = []
 
     # 2. Documents (document_db) - candidate_id = profile.id
     doc_config = UNIFIED_DB if unified_db else DOCUMENT_DB
@@ -142,7 +162,7 @@ async def wipe_all_candidates(with_users: bool = True, with_es: bool = True, uni
             print(f"  ⚠ documents: {e}")
             stats["documents"] = 0
 
-    # 3. Access logs (logs_db) - candidate_id = profile.id
+    # 3. Access logs (logs_db) - optionnel, peut ne pas exister en base unifiée
     logs_config = UNIFIED_DB if unified_db else LOGS_DB
     if profile_id_list:
         try:
@@ -156,7 +176,8 @@ async def wipe_all_candidates(with_users: bool = True, with_es: bool = True, uni
             await conn_logs.close()
             print(f"  ✓ access_logs: {stats['access_logs']} supprimés")
         except Exception as e:
-            print(f"  ⚠ access_logs: {e}")
+            if "does not exist" not in str(e):
+                print(f"  ⚠ access_logs: {e}")
             stats["access_logs"] = 0
     else:
         try:
@@ -167,7 +188,8 @@ async def wipe_all_candidates(with_users: bool = True, with_es: bool = True, uni
             await conn_logs.close()
             print(f"  ✓ access_logs: {stats['access_logs']} supprimés")
         except Exception as e:
-            print(f"  ⚠ access_logs: {e}")
+            if "does not exist" not in str(e):
+                print(f"  ⚠ access_logs: {e}")
             stats["access_logs"] = 0
 
     # 4. Candidate DB - ordre des FK
@@ -196,20 +218,41 @@ async def wipe_all_candidates(with_users: bool = True, with_es: bool = True, uni
         await conn_cand.close()
 
     # 5. Auth - utilisateurs candidats (users, user_roles, refresh_tokens)
+    # En mode unifié : auth_db (port 5432) contient users/roles ; yemma_db contient profiles
     if with_users:
-        auth_config = UNIFIED_DB if unified_db else AUTH_DB
-        auth_url = get_db_url(auth_config)
+        auth_db_same_port = {**UNIFIED_DB, "name": AUTH_DB["name"]} if unified_db else None
+        auth_configs = [AUTH_DB]
+        if unified_db:
+            auth_configs.append(auth_db_same_port)
+            auth_configs.append(UNIFIED_DB)
+        conn_auth = None
+        role_row = None
+        for auth_config in auth_configs:
+            try:
+                conn_auth = await asyncpg.connect(get_db_url(auth_config))
+                role_row = await conn_auth.fetchrow(
+                    "SELECT id FROM roles WHERE name = 'ROLE_CANDIDAT'"
+                )
+                if role_row:
+                    break
+                await conn_auth.close()
+                conn_auth = None
+            except Exception as e:
+                if auth_config == auth_configs[0]:
+                    print(f"  ⚠ auth_db: {e}")
+                if conn_auth:
+                    await conn_auth.close()
+                conn_auth = None
+                role_row = None
         try:
-            conn_auth = await asyncpg.connect(auth_url)
-            role_row = await conn_auth.fetchrow(
-                "SELECT id FROM roles WHERE name = 'ROLE_CANDIDAT'"
-            )
-            if role_row:
+            if role_row and conn_auth:
                 role_id = role_row["id"]
                 user_ids = await conn_auth.fetch(
                     "SELECT user_id FROM user_roles WHERE role_id = $1", role_id
                 )
                 uids = [r["user_id"] for r in user_ids]
+                if not uids and unified_db and candidate_user_ids:
+                    uids = candidate_user_ids
                 if uids:
                     await conn_auth.execute(
                         "DELETE FROM refresh_tokens WHERE user_id = ANY($1)",
@@ -228,13 +271,36 @@ async def wipe_all_candidates(with_users: bool = True, with_es: bool = True, uni
                 else:
                     stats["users"] = 0
                     print(f"  ✓ users (candidats): 0 (aucun trouvé)")
+            elif candidate_user_ids and unified_db:
+                try:
+                    conn_unified = await asyncpg.connect(get_db_url(UNIFIED_DB))
+                    await conn_unified.execute(
+                        "DELETE FROM refresh_tokens WHERE user_id = ANY($1)",
+                        candidate_user_ids,
+                    )
+                    await conn_unified.execute(
+                        "DELETE FROM user_roles WHERE user_id = ANY($1)",
+                        candidate_user_ids,
+                    )
+                    await conn_unified.execute(
+                        "DELETE FROM users WHERE id = ANY($1)",
+                        candidate_user_ids,
+                    )
+                    await conn_unified.close()
+                    stats["users"] = len(candidate_user_ids)
+                    print(f"  ✓ users (candidats, via profils): {stats['users']} supprimés")
+                except Exception as e:
+                    print(f"  ⚠ auth (users): {e}")
+                    stats["users"] = 0
             else:
                 stats["users"] = 0
-                print(f"  ⚠ Rôle ROLE_CANDIDAT non trouvé, aucun user supprimé")
-            await conn_auth.close()
+                print(f"  ⚠ Rôle ROLE_CANDIDAT non trouvé ou auth_db inaccessible")
         except Exception as e:
             print(f"  ⚠ auth (users): {e}")
             stats["users"] = 0
+        finally:
+            if conn_auth:
+                await conn_auth.close()
 
     # 6. Elasticsearch
     if with_es:
@@ -324,18 +390,26 @@ async def main():
             print("Annulé.")
             sys.exit(0)
 
-    try:
-        stats = await wipe_all_candidates(
-            with_users=with_users, with_es=with_es, unified_db=unified_db
-        )
-        total = sum(v for v in stats.values() if isinstance(v, int))
-        print()
-        print(f"✅ Terminé. {total} enregistrements supprimés.")
-    except Exception as e:
-        print(f"\n❌ Erreur: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    for attempt_unified in ([False] if unified_db else [False, True]):
+        try:
+            use_unified = unified_db or attempt_unified
+            if attempt_unified:
+                print("\n   ⚠ Réessai avec base unifiée (DB_HOST:DB_PORT/DB_NAME)...")
+            stats = await wipe_all_candidates(
+                with_users=with_users, with_es=with_es, unified_db=use_unified
+            )
+            total = sum(v for v in stats.values() if isinstance(v, int))
+            print()
+            print(f"✅ Terminé. {total} enregistrements supprimés.")
+            break
+        except (OSError, ConnectionError, Exception) as e:
+            if attempt_unified:
+                print(f"\n❌ Erreur: {e}")
+                if "Connect call failed" in str(e) or "Errno 61" in str(e):
+                    print("   Vérifiez que PostgreSQL/Docker est démarré et que les ports dans .env sont corrects.")
+                import traceback
+                traceback.print_exc()
+                sys.exit(1)
 
 
 if __name__ == "__main__":

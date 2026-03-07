@@ -74,6 +74,7 @@ export const ROUTES = {
   ADMIN_CVTHEQUE: '/yemma/cvtheque',
   ADMIN_VALIDATION: '/yemma/validation',
   ADMIN_INVITATIONS: '/yemma/invitations',
+  ADMIN_DELETED_PROFILES: '/yemma/deleted-profiles',
 
   // Routes entreprise - onglets avec routes
   COMPANY_DASHBOARD_OVERVIEW: '/company/dashboard',

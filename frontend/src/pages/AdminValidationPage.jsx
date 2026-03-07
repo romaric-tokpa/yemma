@@ -89,12 +89,14 @@ export default function AdminValidationPage() {
       } catch {
         // fallback
       }
+      // Fallback : requêtes légères (size=1) pour récupérer uniquement le total
       const statuses = ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'VALIDATED', 'REJECTED', 'ARCHIVED']
       const statsPromises = statuses.map(async (status) => {
         try {
-          const response = await candidateApi.listProfiles(status, 1, 10000)
+          const response = await candidateApi.listProfiles(status, 1, 1)
           if (Array.isArray(response)) return { status, count: response.length }
-          if (response?.items) return { status, count: response.total ?? response.items.length }
+          if (response?.total !== undefined) return { status, count: response.total }
+          if (response?.items) return { status, count: response.items.length }
           return { status, count: 0 }
         } catch {
           return { status, count: 0 }

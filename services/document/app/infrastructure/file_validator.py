@@ -11,14 +11,10 @@ from app.core.exceptions import InvalidFileTypeError, FileTooLargeError
 class FileValidator:
     """Classe pour valider les fichiers"""
     
-    # Magic numbers pour les types de fichiers autorisés
+    # Magic numbers pour les types de fichiers autorisés (PDF et DOCX uniquement)
     MAGIC_NUMBERS = {
         # PDF
         b'\x25\x50\x44\x46': 'application/pdf',  # %PDF
-        # JPEG
-        b'\xFF\xD8\xFF': 'image/jpeg',
-        # PNG
-        b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A': 'image/png',  # PNG signature
         # DOCX (Office Open XML = ZIP)
         b'PK\x03\x04': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     }
@@ -80,15 +76,11 @@ class FileValidator:
             logger.error(f"MIME type {mime_type} not in allowed types: {cls.ALLOWED_MIME_TYPES}")
             raise InvalidFileTypeError(cls.get_allowed_extensions())
         
-        # Vérifier la cohérence entre extension et MIME type (plus permissif)
+        # Vérifier la cohérence entre extension et MIME type
         expected_mime = cls._get_expected_mime_for_extension(extension)
         if mime_type != expected_mime:
             logger.warning(f"MIME type mismatch: detected={mime_type}, expected={expected_mime} for extension={extension}")
-            # Pour les images, on accepte si le MIME type est valide même si l'extension ne correspond pas exactement
-            if mime_type in ['image/jpeg', 'image/png', 'image/webp'] and extension in ['jpg', 'jpeg', 'png', 'webp']:
-                logger.info(f"Accepting image despite extension mismatch")
-            else:
-                raise InvalidFileTypeError(cls.get_allowed_extensions())
+            raise InvalidFileTypeError(cls.get_allowed_extensions())
         
         return mime_type, content
     
@@ -113,9 +105,6 @@ class FileValidator:
             # Vérifier que le type détecté est autorisé
             if detected in cls.ALLOWED_MIME_TYPES:
                 return detected
-            # Accepter aussi les variantes (ex: image/jpg au lieu de image/jpeg)
-            if detected == 'image/jpg' and 'image/jpeg' in cls.ALLOWED_MIME_TYPES:
-                return 'image/jpeg'
             # DOCX détecté par python-magic
             if 'wordprocessingml' in str(detected) and 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' in cls.ALLOWED_MIME_TYPES:
                 return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -125,12 +114,6 @@ class FileValidator:
         # Si python-magic n'est pas disponible ou n'a pas détecté, utiliser la détection basique
         if content.startswith(b'\x25\x50\x44\x46'):
             return 'application/pdf'
-        elif content.startswith(b'\xFF\xD8\xFF'):
-            return 'image/jpeg'
-        elif content.startswith(b'\x89\x50\x4E\x47'):
-            return 'image/png'
-        elif content.startswith(b'RIFF') and len(content) >= 12 and content[8:12] == b'WEBP':
-            return 'image/webp'
         elif content.startswith(b'PK\x03\x04'):
             return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         else:
@@ -142,11 +125,88 @@ class FileValidator:
         """Retourne le type MIME attendu pour une extension"""
         mapping = {
             'pdf': 'application/pdf',
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png': 'image/png',
-            'webp': 'image/webp',
             'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         }
         return mapping.get(extension.lower(), 'application/octet-stream')
+
+    # Validation spécifique pour les photos de profil (images uniquement)
+    IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'jpe', 'jfif', 'png', 'webp', 'gif', 'bmp', 'heic', 'heif', 'tiff', 'tif']
+    IMAGE_MIME_TYPES = [
+        'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp', 'image/gif',
+        'image/bmp', 'image/x-ms-bmp', 'image/heic', 'image/heif', 'image/x-heic', 'image/x-heif',
+        'image/tiff', 'image/x-tiff'
+    ]
+    IMAGE_MAX_SIZE = 5 * 1024 * 1024  # 5MB
+
+    @classmethod
+    async def validate_image_content(cls, file: UploadFile) -> Tuple[str, bytes]:
+        """Valide une image (photo de profil). Accepte JPG, PNG, WebP, GIF, BMP, HEIC (max 5MB)."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        content = await file.read()
+        await file.seek(0)
+
+        file_size = len(content)
+        logger.info(f"Image validation: size={file_size}, filename={file.filename}")
+
+        if file_size > cls.IMAGE_MAX_SIZE:
+            raise FileTooLargeError(cls.IMAGE_MAX_SIZE)
+        if file_size == 0:
+            raise InvalidFileTypeError(cls.IMAGE_EXTENSIONS)
+
+        if not file.filename or '.' not in file.filename:
+            raise InvalidFileTypeError(cls.IMAGE_EXTENSIONS)
+        extension = file.filename.rsplit('.', 1)[1].lower()
+        if extension not in cls.IMAGE_EXTENSIONS:
+            raise InvalidFileTypeError(cls.IMAGE_EXTENSIONS)
+
+        mime_type = cls._detect_image_mime_type(content, getattr(file, 'content_type', None))
+        logger.info(f"Detected image MIME type: {mime_type}")
+
+        if mime_type not in cls.IMAGE_MIME_TYPES:
+            raise InvalidFileTypeError(cls.IMAGE_EXTENSIONS)
+
+        return mime_type, content
+
+    @classmethod
+    def _detect_image_mime_type(cls, content: bytes, content_type: str = None) -> str:
+        """Détecte le type MIME d'une image."""
+        # Magic numbers
+        if content.startswith(b'\xFF\xD8\xFF'):
+            return 'image/jpeg'
+        if content.startswith(b'\x89\x50\x4E\x47'):
+            return 'image/png'
+        if len(content) >= 12 and content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+            return 'image/webp'
+        if content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+            return 'image/gif'
+        if content.startswith(b'BM'):
+            return 'image/bmp'
+        # TIFF (little-endian or big-endian)
+        if len(content) >= 4 and (content[:4] == b'II*\x00' or content[:4] == b'MM\x00*'):
+            return 'image/tiff'
+        # HEIC/HEIF (ftyp box)
+        if len(content) >= 12 and content[4:8] == b'ftyp':
+            if b'heic' in content[:24] or b'heix' in content[:24] or b'mif1' in content[:24]:
+                return 'image/heic'
+        # python-magic fallback
+        try:
+            import magic
+            mime = magic.Magic(mime=True)
+            detected = mime.from_buffer(content)
+            if detected and detected.startswith('image/'):
+                if detected in ('image/jpg', 'image/pjpeg'):
+                    return 'image/jpeg'
+                if detected == 'image/x-ms-bmp':
+                    return 'image/bmp'
+                if detected in ('image/x-tiff', 'image/tiff'):
+                    return 'image/tiff'
+                return detected
+        except (ImportError, Exception):
+            pass
+        # Fallback: content-type du header si image/*
+        if content_type and content_type.startswith('image/'):
+            return content_type.split(';')[0].strip()
+        raise InvalidFileTypeError(cls.IMAGE_EXTENSIONS)
 

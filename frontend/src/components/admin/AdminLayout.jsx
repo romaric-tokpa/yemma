@@ -7,7 +7,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import {
   LogOut, Menu, X, HelpCircle, LayoutDashboard, FileCheck, Briefcase,
-  BarChart3, Search, Shield, Building, Bell, User, ExternalLink
+  BarChart3, Search, Shield, Building, Bell, User, ExternalLink, UserX
 } from 'lucide-react'
 import { LogoutConfirmDialog } from '@/components/common/LogoutConfirmDialog'
 import { authApiService, notificationApi } from '@/services/api'
@@ -43,6 +43,7 @@ const NAV_GROUPS = [
   {
     label: 'Administration',
     items: [
+      { path: ROUTES.ADMIN_DELETED_PROFILES, label: 'Profils supprimés', icon: UserX },
       { path: ROUTES.ADMIN_INVITATIONS, label: 'Invitations Yemma', icon: Shield, superAdminOnly: true },
     ],
   },

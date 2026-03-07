@@ -31,8 +31,8 @@ export default function AdminRaccourcisPage() {
     const statuses = ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'VALIDATED', 'REJECTED', 'ARCHIVED']
     const results = await Promise.all(statuses.map(async (status) => {
       try {
-        const r = await candidateApi.listProfiles(status, 1, 10000)
-        return { status, count: Array.isArray(r) ? r.length : (r?.items?.length ?? 0) }
+        const r = await candidateApi.listProfiles(status, 1, 1)
+        return { status, count: Array.isArray(r) ? r.length : (r?.total ?? r?.items?.length ?? 0) }
       } catch {
         return { status, count: 0 }
       }

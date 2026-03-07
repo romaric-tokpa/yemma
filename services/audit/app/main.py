@@ -4,7 +4,7 @@ Audit Service - Point d'entrée principal
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import access_logs, health
+from app.api.v1 import access_logs, health, deleted_profiles
 from app.core.config import settings
 from app.core.exceptions import setup_exception_handlers
 from app.infrastructure.database import init_db
@@ -32,6 +32,7 @@ setup_exception_handlers(app)
 # Routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(access_logs.router, prefix="/api/v1/audit", tags=["Audit"])
+app.include_router(deleted_profiles.router, prefix="/api/v1/audit/deleted-profiles", tags=["Deleted Profiles"])
 
 
 @app.on_event("startup")

@@ -113,6 +113,7 @@ export default function CandidateOnboarding() {
   const [consentError, setConsentError] = useState(null)
   const [existingProfileId, setExistingProfileId] = useState(null)
   const preferencesSectionRef = useRef(null)
+  const cvUploadedAtParseRef = useRef(false)
 
   // États pour les données parsées/éditées
   const [profile, setProfile] = useState({
@@ -298,9 +299,33 @@ export default function CandidateOnboarding() {
     setLoading(true)
     setError(null)
     try {
+      const profileId = existingProfileId
+      if (!profileId) {
+        setError('Profil non trouvé. Rechargez la page.')
+        return
+      }
+
+      // 1. Uploader le CV en premier (avant parsing qui peut consommer le fichier)
+      try {
+        await documentApi.uploadDocument(file, profileId, 'CV')
+        cvUploadedAtParseRef.current = true
+      } catch (e) {
+        const data = e.response?.data
+        const detail = data?.detail ?? data?.message
+        const validationErrors = data?.details?.validation_errors
+        const status = e.response?.status
+        let msg = 'Impossible d\'enregistrer le CV.'
+        if (typeof detail === 'string') msg = detail
+        else if (Array.isArray(validationErrors) && validationErrors[0]?.message) msg = validationErrors[0].message
+        else if (status === 400) msg = 'Format non supporté. Utilisez un PDF ou DOCX (max 10 Mo).'
+        else if (status === 502 || status === 503) msg = 'Service documents indisponible. Vérifiez que Docker (document, MinIO) est démarré.'
+        setError(msg)
+        return
+      }
+
+      // 2. Parser le CV
       const user = JSON.parse(localStorage.getItem('user') || '{}')
       const userEmail = user?.email
-
       console.log('[CandidateOnboarding] Parsing CV via HRFlow...')
       const parsedData = await parsingApi.parseCv(file, userEmail)
       const state = parsedToOnboardingState(parsedData, userEmail)
@@ -429,13 +454,14 @@ export default function CandidateOnboarding() {
           console.warn('Failed to save job preferences:', e)
         }
 
-        // Uploader le CV comme document (visible dans l'onglet Documents du dashboard)
+        // Uploader le CV comme document si pas déjà fait lors du parsing (fallback)
         try {
-          if (file) await documentApi.uploadDocument(file, profileId, 'CV')
+          if (file && !cvUploadedAtParseRef.current) {
+            await documentApi.uploadDocument(file, profileId, 'CV')
+          }
         } catch (e) {
           console.warn('Failed to upload CV to documents:', e)
           // L'upload échoue silencieusement pour ne pas bloquer la création du profil
-          // (ex: formats DOCX exigent que le service document accepte docx)
         }
 
         // Envoyer l'email de confirmation de création de profil (profil créé)
@@ -720,7 +746,7 @@ export default function CandidateOnboarding() {
               <h1 className="text-xl font-bold text-[#2C2C2C]">Profil créé</h1>
               <p className="text-sm text-[#6b7280] mt-2">Complétez les zones manquantes si besoin, puis soumettez depuis votre tableau de bord.</p>
               <Button
-                onClick={() => navigate('/candidate/dashboard/profile', { replace: true })}
+                onClick={() => navigate('/candidate/dashboard', { replace: true })}
                 className="mt-6 w-full h-10 text-sm bg-[#226D68] hover:bg-[#1a5a55] text-white rounded-lg focus-visible:ring-2 focus-visible:ring-[#226D68] focus-visible:ring-offset-2 shadow-sm"
               >
                 Accéder à mon espace candidat

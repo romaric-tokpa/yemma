@@ -76,3 +76,34 @@ class CandidateAccessSummaryResponse(BaseModel):
     companies: List[CompanyAccessSummary]
 
 
+class DeletedProfileAuditCreate(BaseModel):
+    """Schéma pour enregistrer une suppression de profil"""
+    profile_id: int
+    user_id: int
+    email: str = ""
+    first_name: str = ""
+    last_name: str = ""
+    deletion_reason: str = "SELF_DELETED"
+
+
+class DeletedProfileAuditResponse(BaseModel):
+    """Schéma de réponse pour un enregistrement de profil supprimé"""
+    id: int
+    profile_id: int
+    user_id: int
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    deletion_reason: str
+    deleted_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DeletedProfileAuditListResponse(BaseModel):
+    """Schéma de réponse pour la liste des profils supprimés"""
+    total: int
+    items: List[DeletedProfileAuditResponse]
+
+

@@ -33,6 +33,14 @@ def _set_cache(key: str, value: Any) -> None:
     _STATS_CACHE[key] = (value, datetime.utcnow() + timedelta(seconds=_CACHE_TTL_SECONDS))
 
 
+def invalidate_profiles_stats_cache() -> None:
+    """Invalide le cache des stats (appelé après suppression de profil)."""
+    global _STATS_CACHE
+    keys_to_remove = [k for k in _STATS_CACHE if k.startswith("profiles_")]
+    for k in keys_to_remove:
+        del _STATS_CACHE[k]
+
+
 def _parse_date(value: Optional[str]):
     if not value:
         return None

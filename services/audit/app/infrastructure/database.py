@@ -40,7 +40,7 @@ async def init_db():
     """Initialise la base de données (création des tables)"""
     async with engine.begin() as conn:
         # Import des modèles pour que SQLModel les enregistre
-        from app.domain.models import AccessLog
+        from app.domain.models import AccessLog, DeletedProfileAudit
         
         # Création des tables
         await conn.run_sync(SQLModel.metadata.create_all)

@@ -38,6 +38,7 @@ import {
 } from '../utils/profilePayloads'
 import { formatDateTime, formatDate } from '../utils/dateUtils'
 import SupportWidget from '../components/candidate/SupportWidget'
+import ProfileCompletionBanner from '../components/candidate/ProfileCompletionBanner'
 import { Toast } from '../components/common/Toast'
 import { ROUTES } from '../constants/routes'
 
@@ -209,6 +210,14 @@ function SettingsPageContent({ onSuccess, onError }) {
     }
     try {
       setDeletingAccount(true)
+      // 1. Supprimer toutes les données candidat (profil, documents, candidatures)
+      try {
+        await candidateApi.deleteMyAccount()
+      } catch (e) {
+        // 404 = pas de profil, on continue pour anonymiser le compte auth
+        if (e.response?.status !== 404) console.warn('Erreur suppression données candidat:', e)
+      }
+      // 2. Anonymiser le compte utilisateur (auth)
       await authApiService.anonymizeAccount()
       authApiService.logout()
       if (typeof window !== 'undefined') window.location.href = '/login'
@@ -282,7 +291,7 @@ function SettingsPageContent({ onSuccess, onError }) {
       <section className="rounded-xl border border-red-200 bg-red-50/30 p-4 sm:p-6">
         <h3 className="text-sm font-semibold text-red-600 mb-2">Zone de danger</h3>
         <p className="text-sm text-[#6b7280] mb-3">
-          La suppression de votre compte est irréversible. Toutes vos données personnelles seront anonymisées conformément au RGPD.
+          La suppression de votre compte est irréversible. Votre compte d&apos;authentification et toutes vos données (profil, CV, candidatures) seront supprimés conformément au RGPD.
         </p>
         <div className="space-y-2 max-w-md">
           <Label htmlFor="delete-confirm">Pour confirmer, tapez <strong>SUPPRIMER</strong></Label>
@@ -378,9 +387,7 @@ export default function CandidateDashboard() {
   const [skillSearchQuery, setSkillSearchQuery] = useState('')
   const [skillFilterType, setSkillFilterType] = useState('ALL')
   const [skillFilterLevel, setSkillFilterLevel] = useState('ALL')
-  // Guide de complétion du profil (visible quand < 100%)
-  const [showCompletionGuide, setShowCompletionGuide] = useState(false)
-  const completionGuideRef = useRef(null)
+  const [showCompletionGuide, setShowCompletionGuide] = useState(false) // Conservé pour compatibilité (todo list gérée par ProfileCompletionBanner)
   // États pour l'onglet Offres d'emploi
   const [jobsOffres, setJobsOffres] = useState([])
   const [appliedJobIds, setAppliedJobIds] = useState(new Set())
@@ -424,12 +431,6 @@ export default function CandidateDashboard() {
     },
   })
   const { register: regProfile, handleSubmit: handleProfileSubmit, formState: { errors: profileErrors }, setValue: setProfileValue, control: profileControl } = profileForm
-
-  useEffect(() => {
-    if (showCompletionGuide && completionGuideRef.current) {
-      completionGuideRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }
-  }, [showCompletionGuide])
 
   useEffect(() => {
     if (!toast) return
@@ -739,8 +740,8 @@ export default function CandidateDashboard() {
         }
       } catch (err) {
         setCurrentPhotoUrl(null)
-        // Ne pas afficher de warning pour 400/404 : profil récent sans documents ou id invalide
-        if (err.response?.status === 500) {
+        // 502/503 = service down, 500 = erreur serveur : ignorer silencieusement pour la photo
+        if (err.response?.status === 500 || err.response?.status === 502 || err.response?.status === 503) {
           console.warn('Documents non chargés pour la photo:', err.message)
         }
       }
@@ -768,12 +769,12 @@ export default function CandidateDashboard() {
             const docs = await documentApi.getCandidateDocuments(Number(profileId))
             setDocuments(docs || [])
           } catch (docErr) {
-            if (docErr.response?.status === 500) {
+            const status = docErr.response?.status
+            if (status === 500 || status === 502 || status === 503) {
               const detail = docErr.response?.data?.detail
-              const msg = typeof detail === 'string' ? detail : 'Service documents temporairement indisponible.'
+              const msg = typeof detail === 'string' ? detail : 'Service documents temporairement indisponible. Vérifiez que Docker (document, MinIO) est démarré.'
               setToast({ message: msg, type: 'error' })
             }
-            // 400/404 : ignorer silencieusement (profil récent, id invalide)
             setDocuments([])
           }
         } else {
@@ -2001,7 +2002,7 @@ export default function CandidateDashboard() {
                         <FileCheck className="w-4 h-4 mr-1.5" /> Soumettre
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => { completionPercentage < 100 && profile.status === 'DRAFT' ? setShowCompletionGuide(true) : navigate('/candidate/dashboard/profile?edit=1') }} className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3]">
+                    <Button variant="outline" size="sm" onClick={() => navigate('/candidate/dashboard/profile?edit=1')} className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3]">
                       <Edit className="w-4 h-4 mr-1.5" /> Modifier
                     </Button>
                   </div>
@@ -2012,24 +2013,16 @@ export default function CandidateDashboard() {
                     <span className="text-sm font-bold text-[#226D68]">{Math.round(completionPercentage)}%</span>
                   </div>
                   <Progress value={completionPercentage} className="h-2 rounded-full bg-gray-100 [&>div]:bg-[#226D68]" />
-                  {completionPercentage < 100 && profile.status === 'DRAFT' && (
-                    <Button variant="ghost" size="sm" className="w-full justify-between mt-2 text-xs text-[#6b7280] hover:text-[#226D68] hover:bg-[#E8F4F3]/50" onClick={() => setShowCompletionGuide(!showCompletionGuide)}>
-                      <span className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" />Comment compléter à 100 % ?</span>
-                      {showCompletionGuide ? '−' : '+'}
-                    </Button>
-                  )}
-                  {showCompletionGuide && completionPercentage < 100 && profile.status === 'DRAFT' && (
-                    <div ref={completionGuideRef} className="mt-3 p-4 rounded-xl bg-[#E8F4F3]/50 border border-[#226D68]/20 text-sm space-y-2">
-                      <p className="font-semibold text-[#226D68]">Pour soumettre :</p>
-                      <ul className="list-disc list-inside space-y-0.5 text-[#6b7280]">
-                        <li>Profil ≥ 80 %, CV uploadé, CGU/RGPD cochées</li>
-                        <li>Au moins 1 expérience, 1 formation, 1 compétence technique</li>
-                      </ul>
-                      <Button size="sm" className="mt-2 bg-[#226D68] hover:bg-[#1a5a55] text-white" onClick={() => { setShowCompletionGuide(false); navigate('/candidate/dashboard/profile?edit=1') }}>
-                        <Edit className="h-3.5 w-3.5 mr-1.5" /> Modifier mon profil
-                      </Button>
-                    </div>
-                  )}
+                  <ProfileCompletionBanner
+                    profile={profile}
+                    documents={documents}
+                    hasProfilePhoto={!!(currentPhotoUrl && !currentPhotoUrl.includes('ui-avatars.com'))}
+                    completionPercentage={completionPercentage}
+                    profileStatus={profile?.status}
+                    onOpenPreferences={() => setShowPreferencesDialog(true)}
+                    onOpenDocumentDialog={() => setShowDocumentDialog(true)}
+                    onOpenPhotoUpload={() => navigate('/candidate/dashboard/profile?edit=1')}
+                  />
                 </div>
               </div>
             </div>
@@ -2050,16 +2043,10 @@ export default function CandidateDashboard() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          if (completionPercentage < 100 && profile.status === 'DRAFT') {
-                            setShowCompletionGuide(true)
-                          } else {
-                            navigate('/candidate/dashboard/profile?edit=1')
-                          }
-                        }}
-                      className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] hover:text-[#1a5a55] shrink-0"
+                        onClick={() => navigate('/candidate/dashboard/profile?edit=1')}
+                        className="border-[#226D68] text-[#226D68] hover:bg-[#E8F4F3] hover:text-[#1a5a55] shrink-0"
                       >
-                      <Edit className="h-4 w-4 mr-1.5" /> Modifier
+                        <Edit className="h-4 w-4 mr-1.5" /> Modifier
                       </Button>
                   )}
                 </div>
@@ -2116,7 +2103,10 @@ export default function CandidateDashboard() {
                             setPhotoError(false)
                             await loadProfile()
                             setToast({ message: 'Photo mise à jour.', type: 'success' })
-                              } catch { setToast({ message: 'Erreur upload.', type: 'error' }) }
+                              } catch (err) {
+                                const msg = err.response?.data?.detail ?? err.response?.data?.message ?? 'Erreur upload photo.'
+                                setToast({ message: msg, type: 'error' })
+                              }
                           finally { setUploadingPhoto(false); e.target.value = '' }
                         }} />
                             <p className="text-[11px] text-[#6b7280] mt-1.5">JPG, PNG · max 5 Mo</p>
@@ -2207,7 +2197,10 @@ export default function CandidateDashboard() {
                                 setPhotoError(false)
                                 await loadProfile()
                             setToast({ message: 'Photo mise à jour.', type: 'success' })
-                          } catch (err) { setToast({ message: 'Erreur : ' + (err.response?.data?.detail || err.message), type: 'error' }) }
+                          } catch (err) {
+                                const msg = err.response?.data?.detail ?? err.response?.data?.message ?? 'Erreur upload photo.'
+                                setToast({ message: msg, type: 'error' })
+                              }
                           finally { setUploadingPhoto(false); e.target.value = '' }
                         }} />
                         <label htmlFor="photo-upload" className={`sm:hidden mt-1 block ${uploadingPhoto ? 'pointer-events-none opacity-70' : ''}`}>

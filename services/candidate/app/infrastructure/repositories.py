@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, update
 from sqlalchemy.orm import selectinload
 from sqlmodel import SQLModel
 
@@ -244,16 +244,15 @@ class ProfileRepository:
     
     @staticmethod
     async def delete(session: AsyncSession, profile_id: int) -> bool:
-        """Soft delete d'un profil"""
-        profile = await ProfileRepository.get_by_id(session, profile_id)
-        if not profile:
-            return False
-        
+        """Soft delete d'un profil - mise à jour explicite pour garantir la persistance"""
         from datetime import datetime
-        profile.deleted_at = datetime.utcnow()
-        
+        result = await session.execute(
+            update(Profile)
+            .where(Profile.id == profile_id)
+            .values(deleted_at=datetime.now(timezone.utc))
+        )
         await session.commit()
-        return True
+        return result.rowcount > 0
 
 
 class ExperienceRepository:
@@ -802,7 +801,12 @@ class ApplicationRepository:
         from app.domain.models import Profile
         profile_ids = [a.candidate_id for a in apps]
         profiles_result = await session.execute(
-            select(Profile).where(Profile.id.in_(profile_ids))
+            select(Profile).where(
+                and_(
+                    Profile.id.in_(profile_ids),
+                    Profile.deleted_at.is_(None)
+                )
+            )
         )
         profiles = {p.id: p for p in profiles_result.scalars().all()}
         return [(a, profiles.get(a.candidate_id)) for a in apps]

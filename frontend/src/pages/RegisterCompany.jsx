@@ -173,8 +173,6 @@ export default function RegisterCompany() {
             className="flex-1 flex items-center justify-center w-full min-w-0 px-4 xs:px-5 sm:px-8 lg:px-10 xl:px-12 py-6 xs:py-8 sm:py-10 lg:py-12"
             style={{
               background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%)',
-              backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0)',
-              backgroundSize: '24px 24px',
             }}
           >
             <div className="w-full max-w-[480px] min-w-0 overflow-hidden">

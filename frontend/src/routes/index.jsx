@@ -43,6 +43,7 @@ const AdminStatisticsPage = lazy(() => import('@/pages/AdminStatisticsPage'))
 const AdminReview = lazy(() => import('@/pages/AdminReview'))
 const AdminEvaluationPage = lazy(() => import('@/pages/AdminEvaluationPage'))
 const AdminInvitationsPage = lazy(() => import('@/pages/AdminInvitationsPage'))
+const AdminDeletedProfilesPage = lazy(() => import('@/pages/AdminDeletedProfilesPage'))
 const AdminJobManager = lazy(() => import('@/pages/AdminJobManager'))
 const AdminJobFormPage = lazy(() => import('@/pages/AdminJobFormPage'))
 const AdminJobCandidateListPage = lazy(() => import('@/pages/AdminJobCandidateListPage'))
@@ -501,6 +502,14 @@ export default function AppRoutes() {
             <AdminReview />
           </AuthGuard>
         } 
+      />
+      <Route 
+        path="/yemma/deleted-profiles" 
+        element={
+          <AuthGuard allowedRoles={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+            <AdminDeletedProfilesPage />
+          </AuthGuard>
+        }
       />
       <Route 
         path="/yemma/invitations" 

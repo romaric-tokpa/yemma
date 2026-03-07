@@ -443,7 +443,7 @@ services:
       S3_USE_SSL: ${S3_USE_SSL:-false}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
-      ALLOWED_EXTENSIONS: "pdf,jpg,jpeg,png"
+      ALLOWED_EXTENSIONS: "pdf,docx"
       TEMP_LINK_EXPIRE_HOURS: ${TEMP_LINK_EXPIRE_HOURS:-24}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}

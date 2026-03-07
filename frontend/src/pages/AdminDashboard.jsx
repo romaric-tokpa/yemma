@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { candidateApi, companyApi, paymentApiService } from '@/services/api'
+import { candidateApi, companyApi, paymentApiService, adminApi } from '@/services/api'
 import { formatDateTime } from '@/utils/dateUtils'
 import AdminLayout from '@/components/admin/AdminLayout'
 import { ROUTES } from '@/constants/routes'
@@ -12,7 +12,7 @@ import {
   Users, FileCheck, Clock, CheckCircle, XCircle, Archive, 
   Loader2, User, RefreshCw, Calendar,
   Building, UserCheck, CreditCard, BarChart3,
-  CheckCircle2, Mail, Phone, MapPin, Eye, Search
+  CheckCircle2, Mail, Phone, MapPin, Eye, Search, UserX
 } from 'lucide-react'
 
 const STATUS_COLORS = {
@@ -65,6 +65,7 @@ export default function AdminDashboard() {
   const [companySubscriptions, setCompanySubscriptions] = useState({})
   const [companiesLoading, setCompaniesLoading] = useState(false)
   const [viewingCompany, setViewingCompany] = useState(null) // Pour la fiche entreprise
+  const [deletedProfilesCount, setDeletedProfilesCount] = useState(null)
 
   // Fonction pour charger les statistiques
   const loadStats = async () => {
@@ -89,34 +90,14 @@ export default function AdminDashboard() {
         console.warn('⚠️ Endpoint /api/v1/profiles/stats non disponible, utilisation du fallback:', statsError?.response?.data || statsError?.message)
       }
 
-      // Fallback: calculer côté client en comptant tous les profils pour chaque statut
-      // Note: listProfiles retourne un tableau, pas une réponse paginée avec total
-      // Donc on doit charger tous les profils (avec une taille élevée) pour compter
+      // Fallback: requêtes légères (size=1) pour récupérer uniquement le total paginé
       const statuses = ['DRAFT', 'SUBMITTED', 'IN_REVIEW', 'VALIDATED', 'REJECTED', 'ARCHIVED']
       const statsPromises = statuses.map(async (status) => {
         try {
-          // Charger tous les profils pour ce statut (avec une taille élevée pour être sûr de tout récupérer)
-          const response = await candidateApi.listProfiles(status, 1, 10000)
-          
-          if (Array.isArray(response)) {
-            // Réponse directe: tableau de profils
-            const count = response.length
-            return { status, count }
-          } else if (response && typeof response === 'object') {
-            // Réponse paginée ou objet
-            if (response.items && Array.isArray(response.items)) {
-              // Si on a un total, l'utiliser
-              if (typeof response.total === 'number') {
-                return { status, count: response.total }
-              }
-              // Sinon, compter les items retournés (attention: peut être incomplet si pagination)
-              return { status, count: response.items.length }
-            }
-            // Si c'est un objet mais pas de items, essayer de trouver un total
-            if (typeof response.total === 'number') {
-              return { status, count: response.total }
-            }
-          }
+          const response = await candidateApi.listProfiles(status, 1, 1)
+          if (Array.isArray(response)) return { status, count: response.length }
+          if (typeof response?.total === 'number') return { status, count: response.total }
+          if (response?.items?.length) return { status, count: response.items.length }
           return { status, count: 0 }
         } catch {
           return { status, count: 0 }
@@ -136,6 +117,18 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     loadStats()
+  }, [])
+
+  useEffect(() => {
+    const loadDeletedCount = async () => {
+      try {
+        const data = await adminApi.getDeletedProfiles(1, 0)
+        setDeletedProfilesCount(data?.total ?? 0)
+      } catch {
+        setDeletedProfilesCount(0)
+      }
+    }
+    loadDeletedCount()
   }, [])
 
   useEffect(() => {
@@ -312,6 +305,7 @@ export default function AdminDashboard() {
                   { id: 'REJECTED', icon: XCircle, label: 'Candidats rejetés', value: stats.REJECTED || 0, desc: 'Profils refusés', action: () => navigate(ROUTES.ADMIN_VALIDATION, { state: { status: 'REJECTED' } }), accent: 'red' },
                   { id: 'stats', icon: BarChart3, label: 'Statistiques', value: '', desc: 'Effectifs et secteurs', action: () => navigate(ROUTES.ADMIN_STATISTICS), accent: 'default' },
                   { id: 'cvtheque', icon: Search, label: 'CVthèque', value: '', desc: 'Recherche dans les profils validés', action: () => navigate(ROUTES.ADMIN_CVTHEQUE), accent: 'default' },
+                  { id: 'deleted', icon: UserX, label: 'Profils supprimés', value: deletedProfilesCount ?? '—', desc: 'Trace des auto-suppressions', action: () => navigate(ROUTES.ADMIN_DELETED_PROFILES), accent: 'default' },
                   { id: 'companies', icon: Building, label: 'Entreprises', value: companies.length, desc: 'Annuaire des partenaires', action: () => navigate(ROUTES.ADMIN_COMPANIES), accent: 'default' },
                 ].map((item) => {
                   const Icon = item.icon

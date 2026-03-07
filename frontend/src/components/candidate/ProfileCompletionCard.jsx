@@ -5,6 +5,7 @@
 import { cn } from '@/lib/utils'
 
 const DEFAULT_MISSING_ITEMS = [
+  { key: 'photo', label: 'Photo de profil' },
   { key: 'identity', label: 'Identité complète' },
   { key: 'summary', label: 'Description professionnelle (min 300 car.)' },
   { key: 'experiences', label: 'Au moins une expérience' },
@@ -14,8 +15,9 @@ const DEFAULT_MISSING_ITEMS = [
   { key: 'cv', label: 'CV uploadé' },
 ]
 
-function computeMissingItems(profile, documents = []) {
+function computeMissingItems(profile, documents = [], hasProfilePhoto = false) {
   const missing = []
+  if (!hasProfilePhoto) missing.push({ key: 'photo', label: 'Photo de profil' })
   if (!profile?.first_name || !profile?.last_name || !profile?.email) missing.push({ key: 'identity', label: 'Identité complète' })
   if (!profile?.professional_summary || profile.professional_summary?.length < 300) missing.push({ key: 'summary', label: 'Description professionnelle (min 300 car.)' })
   if (!profile?.experiences?.length) missing.push({ key: 'experiences', label: 'Au moins une expérience' })
@@ -29,8 +31,8 @@ function computeMissingItems(profile, documents = []) {
   return missing.length ? missing : []
 }
 
-export default function ProfileCompletionCard({ completion = 0, missingItems, profile, documents }) {
-  const missing = missingItems ?? computeMissingItems(profile, documents)
+export default function ProfileCompletionCard({ completion = 0, missingItems, profile, documents, hasProfilePhoto = false }) {
+  const missing = missingItems ?? computeMissingItems(profile, documents, hasProfilePhoto)
   const percent = Math.round(Number(completion) || 0)
   const isComplete = percent >= 100
 

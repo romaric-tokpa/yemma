@@ -72,6 +72,21 @@ const PARSING_API_URL = getBaseUrl('VITE_PARSING_API_URL', 8010)
 // Timeout par défaut pour les appels API (ms)
 const DEFAULT_TIMEOUT = 15000
 
+/** Retry une requête en cas de 502 (service en redémarrage). Max 2 tentatives, délai 2s. */
+const with502Retry = (fn, maxRetries = 2) => async (...args) => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn(...args)
+    } catch (err) {
+      if (err?.response?.status === 502 && attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 2000))
+        continue
+      }
+      throw err
+    }
+  }
+}
+
 // Helper pour créer un client axios avec authentification
 const createApiClient = (baseURL) => {
   const client = axios.create({
@@ -403,6 +418,12 @@ export const candidateApi = {
     return response.data
   },
 
+  /** Supprime toutes les données candidat (profil, documents, candidatures). À appeler avant anonymizeAccount. */
+  deleteMyAccount: async () => {
+    const response = await api.delete('/api/v1/profiles/me/account')
+    return response.data
+  },
+
   // Mettre à jour le profil candidat (utilise PATCH /me avec PartialProfileUpdateSchema)
   updateProfile: async (profileId, data) => {
     // Construire le format attendu par le backend (PartialProfileUpdateSchema)
@@ -730,17 +751,15 @@ export const candidateApi = {
   },
 
   // ===== LISTE PROFILS (ADMIN) =====
-  listProfiles: async (status = null, page = 1, size = 10, search = '') => {
-    // Paramètres: status (optionnel), page, size, search (optionnel)
+  listProfiles: with502Retry(async (status = null, page = 1, size = 10, search = '') => {
     const params = new URLSearchParams()
     if (status) params.append('status', status)
     params.append('page', page)
     params.append('size', size)
     if (search && search.trim()) params.append('q', search.trim())
-    
     const response = await api.get(`/api/v1/profiles?${params.toString()}`)
     return response.data
-  },
+  }),
 
   // ===== STATISTIQUES PROFILS (ADMIN) =====
   /** Nombre de candidats inscrits et validés par secteur d'activité */
@@ -773,22 +792,30 @@ export const candidateApi = {
     }
   },
   getProfileStats: async () => {
-    // Essayer d'utiliser l'endpoint stats si disponible
+    const fetchStats = () => api.get('/api/v1/profiles/stats', { timeout: 15000 })
     try {
-      const response = await api.get('/api/v1/profiles/stats', { timeout: 60000 })
-      console.log('✅ Réponse de getProfileStats:', response.data)
-      if (response.data && typeof response.data === 'object') {
+      let response
+      try {
+        response = await fetchStats()
+      } catch (err) {
+        // Retry une fois après 2s en cas de 502 (service en démarrage)
+        if (err?.response?.status === 502) {
+          await new Promise(r => setTimeout(r, 2000))
+          response = await fetchStats()
+        } else {
+          throw err
+        }
+      }
+      if (response?.data && typeof response.data === 'object') {
         return response.data
       }
-      console.warn('⚠️ Format de réponse inattendu pour getProfileStats:', response.data)
       return null
     } catch (err) {
       const status = err?.response?.status
-      const url = err?.config?.url
       if (status === 422 || status === 404) {
         console.warn('⚠️ Endpoint /api/v1/profiles/stats non disponible (', status, '), fallback côté client')
       } else {
-        console.warn('⚠️ Endpoint /api/v1/profiles/stats erreur:', status, url, err?.message)
+        console.warn('⚠️ Endpoint /api/v1/profiles/stats erreur:', status, err?.message)
       }
       return null
     }
@@ -934,6 +961,14 @@ export const adminApi = {
     return response.data
   },
 
+  // Liste des profils supprimés (trace d'audit)
+  getDeletedProfiles: async (limit = 100, offset = 0) => {
+    const response = await adminApiClient.get('/api/v1/admin/deleted-profiles', {
+      params: { limit, offset },
+    })
+    return response.data
+  },
+
   /**
    * Pose une question sur le profil candidat (CvGPT / Profile Asking HrFlow).
    * Retourne une réponse IA pour aider à la synthèse d'évaluation.
@@ -974,14 +1009,10 @@ export const documentApi = {
 
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('candidate_id', candidateId)
-    formData.append('document_type', documentType)
+    formData.append('candidate_id', String(candidateId))
+    formData.append('document_type', String(documentType || 'CV'))
 
-    const response = await documentApiClient.post('/api/v1/documents/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
+    const response = await documentApiClient.post('/api/v1/documents/upload', formData)
     return response.data
   },
 
@@ -1003,13 +1034,9 @@ export const documentApi = {
   uploadProfilePhoto: async (file, candidateId) => {
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('candidate_id', candidateId)
+    formData.append('candidate_id', String(candidateId))
 
-    const response = await documentApiClient.post('/api/v1/documents/upload/profile-photo', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
+    const response = await documentApiClient.post('/api/v1/documents/upload/profile-photo', formData)
     return response.data
   },
 
@@ -1285,10 +1312,10 @@ export const companyApi = {
 }
 
 export const notificationApi = {
-  getValidationRequests: async (limit = 20) => {
+  getValidationRequests: with502Retry(async (limit = 20) => {
     const response = await api.get(`/api/v1/profiles/admin/validation-requests?limit=${limit}`)
     return response.data
-  },
+  }),
 }
 
 export const auditApiService = {

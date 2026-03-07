@@ -50,7 +50,7 @@ async def options_upload():
 
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
-    file: UploadFile = File(..., description="Fichier à uploader (PDF, JPG, PNG, max 10MB)"),
+    file: UploadFile = File(..., description="Fichier à uploader (PDF ou DOCX, max 10MB)"),
     candidate_id: int = Form(..., description="ID du candidat"),
     document_type: DocumentType = Form(..., description="Type de document"),
     session: AsyncSession = Depends(get_session)
@@ -58,7 +58,7 @@ async def upload_document(
     """
     Upload un document
     
-    - **file**: Fichier à uploader (PDF, JPG, PNG, max 10MB)
+    - **file**: Fichier à uploader (PDF ou DOCX, max 10MB)
     - **candidate_id**: ID du candidat propriétaire
     - **document_type**: Type de document (CV, ATTESTATION, etc.)
     """
@@ -78,29 +78,43 @@ async def upload_document(
     file_extension = file.filename.rsplit('.', 1)[1].lower()
     stored_filename = f"{uuid.uuid4()}.{file_extension}"
     s3_key = f"candidates/{candidate_id}/{document_type.value.lower()}/{stored_filename}"
-    
-    # Upload vers S3
-    await s3_storage.upload_file(
-        file_content=file_content,
-        s3_key=s3_key,
-        content_type=mime_type
-    )
-    
-    # Créer l'enregistrement en base de données
-    document = Document(
-        candidate_id=candidate_id,
-        document_type=document_type,
-        original_filename=file.filename,
-        stored_filename=stored_filename,
-        file_size=len(file_content),
-        mime_type=mime_type,
-        s3_key=s3_key,
-        status=DocumentStatus.UPLOADED
-    )
-    
-    session.add(document)
-    await session.commit()
-    await session.refresh(document)
+
+    try:
+        # Upload vers S3/MinIO
+        await s3_storage.upload_file(
+            file_content=file_content,
+            s3_key=s3_key,
+            content_type=mime_type
+        )
+    except Exception as e:
+        logger.exception(f"S3/MinIO upload failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Stockage temporairement indisponible. Vérifiez que MinIO est démarré."
+        )
+
+    try:
+        # Créer l'enregistrement en base de données
+        document = Document(
+            candidate_id=candidate_id,
+            document_type=document_type,
+            original_filename=file.filename,
+            stored_filename=stored_filename,
+            file_size=len(file_content),
+            mime_type=mime_type,
+            s3_key=s3_key,
+            status=DocumentStatus.UPLOADED
+        )
+        session.add(document)
+        await session.commit()
+        await session.refresh(document)
+    except Exception as e:
+        logger.exception(f"Database error during document save: {e}")
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erreur lors de l'enregistrement du document."
+        )
     
     return DocumentUploadResponse(
         id=document.id,
@@ -145,23 +159,14 @@ async def upload_company_logo(
     try:
         logger.info(f"Upload company logo: filename={file.filename}, company_id={company_id}")
         
-        # Valider le fichier (taille, extension, magic numbers)
-        # FileValidator.validate_file_content va vérifier la taille (max 10MB par défaut)
-        # On doit surcharger la vérification pour 5MB max
-        mime_type, file_content = await FileValidator.validate_file_content(file)
+        # Valider le fichier (images uniquement : JPG, PNG, WebP, max 5MB)
+        mime_type, file_content = await FileValidator.validate_image_content(file)
         
-        # Vérifier la taille spécifique pour les logos (max 5MB)
-        if len(file_content) > 5 * 1024 * 1024:
+        # Restreindre aux formats recommandés pour les logos (JPG, PNG, WebP)
+        if mime_type not in ['image/jpeg', 'image/png', 'image/webp']:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Le fichier ne doit pas dépasser 5 Mo"
-            )
-        
-        # Vérifier que c'est une image
-        if mime_type not in ['image/jpeg', 'image/png']:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Le fichier doit être une image (JPG, PNG)"
+                detail="Le fichier doit être une image (JPG, PNG ou WebP)"
             )
         
         # Générer un nom de fichier unique
@@ -226,7 +231,7 @@ async def upload_job_offer_logo(
     try:
         logger.info(f"Upload job offer logo: filename={file.filename}")
 
-        mime_type, file_content = await FileValidator.validate_file_content(file)
+        mime_type, file_content = await FileValidator.validate_image_content(file)
 
         if len(file_content) > 2 * 1024 * 1024:
             raise HTTPException(
@@ -303,22 +308,8 @@ async def upload_profile_photo(
     try:
         logger.info(f"Upload profile photo: filename={file.filename}, candidate_id={candidate_id}")
 
-        # Valider le fichier
-        mime_type, file_content = await FileValidator.validate_file_content(file)
-
-        # Vérifier la taille spécifique pour les photos (max 5MB)
-        if len(file_content) > 5 * 1024 * 1024:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="La photo ne doit pas dépasser 5 Mo"
-            )
-
-        # Vérifier que c'est une image
-        if mime_type not in ['image/jpeg', 'image/png', 'image/webp']:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Le fichier doit être une image (JPG, PNG, WebP)"
-            )
+        # Valider le fichier (images uniquement : JPG, PNG, WebP, max 5MB)
+        mime_type, file_content = await FileValidator.validate_image_content(file)
 
         # Supprimer l'ancienne photo de profil si elle existe
         old_photo_statement = select(Document).where(
@@ -332,10 +323,9 @@ async def upload_profile_photo(
         for old_photo in old_photos:
             try:
                 await s3_storage.delete_file(old_photo.s3_key)
-                old_photo.deleted_at = datetime.utcnow()
-                logger.info(f"Deleted old profile photo: {old_photo.id}")
             except Exception as e:
-                logger.warning(f"Could not delete old photo {old_photo.id}: {str(e)}")
+                logger.warning(f"Could not delete old photo from S3 {old_photo.id}: {str(e)}")
+            old_photo.deleted_at = datetime.utcnow()
 
         # Générer un nom de fichier unique
         file_extension = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else 'jpg'
@@ -380,6 +370,8 @@ async def upload_profile_photo(
             "message": "Photo de profil uploadée avec succès"
         }
     except HTTPException:
+        raise
+    except DocumentError:
         raise
     except Exception as e:
         logger.error(f"Error uploading profile photo: {type(e).__name__}: {str(e)}", exc_info=True)

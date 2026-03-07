@@ -50,3 +50,20 @@ class AccessLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class DeletedProfileAudit(SQLModel, table=True):
+    """
+    Trace des profils candidats supprimés (auto-suppression par le candidat).
+    Permet au dashboard admin de consulter l'historique des suppressions.
+    """
+    __tablename__ = "deleted_profiles_audit"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    profile_id: int = Field(index=True, description="ID du profil supprimé")
+    user_id: int = Field(index=True, description="ID utilisateur (auth-service)")
+    email: str = Field(max_length=255, description="Email du candidat au moment de la suppression")
+    first_name: Optional[str] = Field(default=None, max_length=100)
+    last_name: Optional[str] = Field(default=None, max_length=100)
+    deletion_reason: str = Field(default="SELF_DELETED", max_length=50)
+    deleted_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+

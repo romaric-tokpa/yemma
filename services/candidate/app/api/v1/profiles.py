@@ -14,7 +14,7 @@ from app.infrastructure.auth import get_current_user, require_current_user, requ
 from app.infrastructure.internal_auth import verify_internal_token
 from app.infrastructure.repositories import (
     ProfileRepository, ExperienceRepository, EducationRepository,
-    CertificationRepository, SkillRepository, JobPreferenceRepository
+    CertificationRepository, SkillRepository, JobPreferenceRepository,
 )
 from app.domain.models import ProfileStatus
 from app.domain.schemas import (
@@ -402,6 +402,144 @@ async def notify_profile_created(
         return {"message": "Profil créé – notification en attente"}
 
 
+@router.delete("/me/account", status_code=http_status.HTTP_200_OK)
+async def delete_my_account(
+    session: AsyncSession = Depends(get_session),
+    current_user: Optional[TokenData] = Depends(get_current_user),
+):
+    """
+    Supprime toutes les données du candidat connecté (profil, expériences, formations,
+    compétences, certifications, préférences, candidatures, documents).
+    À appeler avant anonymizeAccount() pour une suppression complète du compte.
+    """
+    current_user = require_current_user(current_user)
+    profile = await ProfileRepository.get_by_user_id(session, current_user.user_id)
+    if not profile:
+        return {"message": "Aucun profil à supprimer", "deleted": False}
+
+    profile_id = profile.id
+    # Données pour l'audit (avant suppression)
+    audit_data = {
+        "profile_id": profile_id,
+        "user_id": profile.user_id,
+        "email": profile.email or "",
+        "first_name": profile.first_name or "",
+        "last_name": profile.last_name or "",
+        "deletion_reason": "SELF_DELETED",
+    }
+
+    try:
+        from app.core.config import settings
+        import httpx
+        import sys
+        import os
+        import importlib.util
+        shared_path = "/shared" if os.path.exists("/shared") else os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))),
+            "shared",
+        )
+        if os.path.dirname(shared_path) not in sys.path:
+            sys.path.insert(0, os.path.dirname(shared_path))
+        try:
+            internal_auth_path = os.path.join(shared_path, "internal_auth.py")
+            if os.path.exists(internal_auth_path):
+                spec = importlib.util.spec_from_file_location("shared.internal_auth", internal_auth_path)
+                if spec and spec.loader:
+                    mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(mod)
+                    get_service_token_header = mod.get_service_token_header
+                else:
+                    from shared.internal_auth import get_service_token_header
+            else:
+                from shared.internal_auth import get_service_token_header
+            service_headers = get_service_token_header("candidate-service")
+        except Exception as e:
+            logger.warning("Could not load internal auth: %s", e)
+            service_headers = {}
+
+        # 0. Désindexer le profil (Search Service)
+        if settings.SEARCH_SERVICE_URL and service_headers:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.delete(
+                        f"{settings.SEARCH_SERVICE_URL}/api/v1/candidates/index/{profile_id}",
+                        headers=service_headers,
+                    )
+                    if response.status_code not in (200, 404):
+                        logger.warning("Could not remove profile from search index %s: %s", profile_id, response.text)
+            except Exception as e:
+                logger.warning("Error calling Search Service for profile %s: %s", profile_id, e)
+
+        # 0b. Enregistrer la trace dans l'Audit (avant suppression des données)
+        if settings.AUDIT_SERVICE_URL and service_headers:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.post(
+                        f"{settings.AUDIT_SERVICE_URL}/api/v1/audit/deleted-profiles",
+                        json=audit_data,
+                        headers=service_headers,
+                    )
+                    if response.status_code not in (200, 201):
+                        logger.warning("Could not log deleted profile to audit %s: %s", profile_id, response.text)
+            except Exception as e:
+                logger.warning("Error calling Audit Service for profile %s: %s", profile_id, e)
+
+        # 1. Supprimer les documents via Document Service (candidate_id = profile.id)
+        if settings.DOCUMENT_SERVICE_URL and service_headers:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.delete(
+                        f"{settings.DOCUMENT_SERVICE_URL}/api/v1/admin/candidate/{profile_id}",
+                        headers=service_headers,
+                    )
+                    if response.status_code != 200:
+                        logger.warning("Could not delete documents for profile %s: %s", profile_id, response.text)
+            except Exception as e:
+                logger.warning("Error calling Document Service for profile %s: %s", profile_id, e)
+
+        # 2. Supprimer les candidatures (applications)
+        from sqlalchemy import delete
+        from app.domain.models import Application
+        await session.execute(delete(Application).where(Application.candidate_id == profile_id))
+
+        # 3. Supprimer job_preferences, skills, certifications, educations, experiences
+        for exp in await ExperienceRepository.get_by_profile_id(session, profile_id):
+            await ExperienceRepository.delete(session, exp.id)
+        for edu in await EducationRepository.get_by_profile_id(session, profile_id):
+            await EducationRepository.delete(session, edu.id)
+        for cert in await CertificationRepository.get_by_profile_id(session, profile_id):
+            await CertificationRepository.delete(session, cert.id)
+        for skill in await SkillRepository.get_by_profile_id(session, profile_id):
+            await SkillRepository.delete(session, skill.id)
+
+        from app.domain.models import JobPreference
+        from sqlalchemy import select
+        jp_result = await session.execute(select(JobPreference).where(JobPreference.profile_id == profile_id))
+        jp = jp_result.scalar_one_or_none()
+        if jp:
+            await session.delete(jp)
+
+        # 4. Soft delete du profil
+        await ProfileRepository.delete(session, profile_id)
+        await session.commit()
+
+        # Invalider le cache des stats pour que la page validation affiche les bons comptages
+        try:
+            from app.api.v1.stats import invalidate_profiles_stats_cache
+            invalidate_profiles_stats_cache()
+        except Exception:
+            pass
+
+        return {"message": "Compte candidat supprimé", "deleted": True}
+    except Exception as e:
+        await session.rollback()
+        logger.exception("Error deleting account for user %s: %s", current_user.user_id, e)
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erreur lors de la suppression du compte.",
+        )
+
+
 @router.post("/me/request-validation", status_code=http_status.HTTP_202_ACCEPTED)
 async def request_validation(
     session: AsyncSession = Depends(get_session),
@@ -515,7 +653,8 @@ async def list_profiles(
     
     from sqlalchemy import select, func, or_
     from app.domain.models import Profile
-    
+
+    # Exclure impérativement les profils supprimés (soft delete)
     base_filter = Profile.deleted_at.is_(None)
     if q and q.strip():
         search_term = f"%{q.strip()}%"

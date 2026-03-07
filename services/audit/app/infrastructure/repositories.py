@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, and_
 from sqlalchemy.sql import text
 
-from app.domain.models import AccessLog
+from app.domain.models import AccessLog, DeletedProfileAudit
 
 
 class AccessLogRepository:
@@ -224,5 +224,41 @@ class AccessLogRepository:
             "accesses_by_date": accesses_by_date,
             "accesses_by_company": accesses_by_company,
         }
+
+
+class DeletedProfileAuditRepository:
+    """Repository pour les traces de profils supprimés"""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(self, data: dict) -> DeletedProfileAudit:
+        """Enregistre une suppression de profil"""
+        record = DeletedProfileAudit(**data)
+        self.session.add(record)
+        await self.session.commit()
+        await self.session.refresh(record)
+        return record
+
+    async def list_all(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> tuple[List[DeletedProfileAudit], int]:
+        """Liste les profils supprimés avec pagination"""
+        statement = select(DeletedProfileAudit)
+        count_statement = select(func.count(DeletedProfileAudit.id))
+        if start_date:
+            statement = statement.where(DeletedProfileAudit.deleted_at >= start_date)
+            count_statement = count_statement.where(DeletedProfileAudit.deleted_at >= start_date)
+        if end_date:
+            statement = statement.where(DeletedProfileAudit.deleted_at <= end_date)
+            count_statement = count_statement.where(DeletedProfileAudit.deleted_at <= end_date)
+        statement = statement.order_by(desc(DeletedProfileAudit.deleted_at)).limit(limit).offset(offset)
+        result = await self.session.execute(statement)
+        count_result = await self.session.execute(count_statement)
+        return list(result.scalars().all()), count_result.scalar_one() or 0
 
 

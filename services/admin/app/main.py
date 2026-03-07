@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import validation, stats
+from app.api.v1 import validation, stats, deleted_profiles
 from app.core.config import settings
 from app.core.exceptions import setup_exception_handlers
 
@@ -32,6 +32,7 @@ setup_exception_handlers(app)
 # Routers
 app.include_router(validation.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(stats.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(deleted_profiles.router, prefix="/api/v1/admin", tags=["Admin"])
 
 
 @app.get("/health", tags=["Health"])
